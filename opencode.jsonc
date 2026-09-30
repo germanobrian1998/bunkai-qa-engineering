@@ -1,0 +1,170 @@
+{
+  // OpenCode shared team config — committed to git.
+  // Secrets are NEVER stored here. Every credential below is a {file:...} POINTER
+  // into .auth/opencode/, which is gitignored and holds one value per file at
+  // mode 0600. Those files are GENERATED from .env by `bun run harness:env`, and
+  // `bun run setup:doctor` fails when they and .env disagree.
+  //
+  // Only LOCAL (stdio) servers live here: the ones that read .env values
+  // (dbhub, openapi, slack-aurora) plus context7, which needs no key. Browser
+  // automation is the playwright-cli, not an MCP. Remote servers whose only
+  // project-side content was an API key (web search, Postman) are connected at
+  // harness level instead: ~/.config/opencode/opencode.json for OpenCode. Skills
+  // resolve them by capability, whatever the prefix (AGENTS.md §6).
+  //
+  // WHY {file:} AND NOT {env:}. {env:VAR} resolves from the OpenCode PROCESS
+  // environment, which only exists when OpenCode was launched from a shell that
+  // had it — so `bun run opencode` works and a desktop or natively-launched
+  // session does not, and no hook can fix that because the MCP servers are
+  // spawned before any hook runs. {file:path} substitutes the file's CONTENTS and
+  // needs no environment at all, so it works however OpenCode was started.
+  //
+  // MEASURED on OpenCode 1.18.30, and worth knowing before editing this file:
+  //   - a MISSING {file:} target invalidates the WHOLE config (exit 1, "bad file
+  //     reference"), not just the one server. Never point at a file the generator
+  //     does not create.
+  //   - an EMPTY file substitutes silently to the empty string, exit 0. That is
+  //     the safe degraded state: exactly as degraded as {env:} was, never worse.
+  //     This is why the generator writes a file for every variable .env.example
+  //     declares, with or without a value.
+  //   - a trailing newline is trimmed. The generator writes none anyway, so a
+  //     value never depends on that.
+  //
+  // Syntax notes (OpenCode-specific, different from Claude Code's .mcp.json):
+  //   - File substitution uses {file:path}, env expansion {env:VAR_NAME} (NOT ${VAR})
+  //   - {file:} paths are relative to THIS file's directory, so in a worktree they
+  //     resolve to the worktree's own .auth/. Deliberately unlike Claude Code,
+  //     which reads .claude/settings.local.json from the MAIN checkout's root.
+  //   - MCP root key is "mcp"                  (NOT "mcpServers")
+  //   - MCP env field is "environment"         (NOT "env")
+  "$schema": "https://opencode.ai/config.json",
+
+  // Plugins:
+  //   - @warp-dot-dev/opencode-warp: Warp terminal integration — surfaces
+  //     OpenCode agent activity as native Warp notifications. Auto-installed
+  //     when OpenCode runs inside Warp.
+  //     Docs: https://docs.warp.dev/agent-platform/cli-agents/opencode/
+  //   - opencode-subagent-statusline: Cosmetic UX — shows the active subagent
+  //     in the OpenCode status line so you can see which agent is running at
+  //     a glance. Pure polish, no behavioral side effects.
+  "plugin": ["@warp-dot-dev/opencode-warp", "opencode-subagent-statusline"],
+
+  "mcp": {
+    "context7": {
+      "type": "local",
+      "command": ["bunx", "-y", "@upstash/context7-mcp@4.0.3"],
+      "enabled": true
+    },
+    // The Slack bot MCP (Aurora). Its token and the reaction-channel allowlist
+    // live in .env only; the channel ids are workspace identity and are never
+    // committed. An empty SLACK_MCP_REACTION_TOOL leaves reactions off.
+    "slack-aurora": {
+      "type": "local",
+      "command": ["bunx", "-y", "slack-mcp-server@latest", "--transport", "stdio"],
+      "enabled": true,
+      "environment": {
+        "SLACK_MCP_XOXP_TOKEN": "{file:.auth/opencode/SLACK_MCP_XOXP_TOKEN}",
+        "SLACK_MCP_ADD_MESSAGE_TOOL": "true",
+        "SLACK_MCP_REACTION_TOOL": "{file:.auth/opencode/SLACK_MCP_REACTION_TOOL}"
+      }
+    },
+    // dbhub.toml reads these six through ${VAR} interpolation, but only from the
+    // environment the server is LAUNCHED with. Declaring them here is what puts
+    // them there on every host — Codex forwards nothing it was not told to.
+    // An EMPTY value file leaves the variable empty and dbhub then fails on
+    // connect rather than at startup, which reads like a database problem: check
+    // the DBHUB_* values in .env first. See .agents/skills/agentic-qa-core/references/db-testing-doctrine.md.
+    "dbhub": {
+      "type": "local",
+      "command": ["bunx", "-y", "@bytebase/dbhub@1.2.1", "--config", "dbhub.toml"],
+      "enabled": true,
+      "environment": {
+        "DBHUB_DATABASE": "{file:.auth/opencode/DBHUB_DATABASE}",
+        "DBHUB_HOST": "{file:.auth/opencode/DBHUB_HOST}",
+        "DBHUB_PASSWORD": "{file:.auth/opencode/DBHUB_PASSWORD}",
+        "DBHUB_PORT": "{file:.auth/opencode/DBHUB_PORT}",
+        "DBHUB_TYPE": "{file:.auth/opencode/DBHUB_TYPE}",
+        "DBHUB_USER": "{file:.auth/opencode/DBHUB_USER}"
+      }
+    },
+    // SCHEMA-READ-ONLY: no API_TOKEN / Authorization header is injected here.
+    // The OpenAPI MCP is used ONLY to discover endpoints + read schemas
+    // (list-api-endpoints, get-api-endpoint-schema). Authenticated requests are
+    // executed with curl (token from `bun run api:login` → .auth/tokens.env).
+    // Keeping credentials out of the MCP also removes the spawn-time restart
+    // requirement for API auth. OPENAPI_SPEC_PATH may be a local file OR a URL.
+    "openapi": {
+      "type": "local",
+      "command": ["bunx", "-y", "@ivotoby/openapi-mcp-server@1.16.1", "--tools", "dynamic"],
+      "enabled": true,
+      "environment": {
+        "API_BASE_URL": "{file:.auth/opencode/API_BASE_URL}",
+        "OPENAPI_SPEC_PATH": "{file:.auth/opencode/OPENAPI_SPEC_PATH}"
+      }
+    }
+  },
+
+  // Permissions — mirrors .claude/settings.json 1:1.
+  // Rule precedence: last matching pattern wins, so deny entries are placed
+  // AFTER the broad allows they override (e.g. `git *` allow, then
+  // `git push --force *` deny — the deny wins for force-pushes).
+  "permission": {
+    "edit": "allow",
+    "webfetch": "allow",
+    "websearch": "allow",
+    "bash": {
+      "*": "ask",
+
+      "bun *": "allow",
+      "bunx *": "allow",
+      "npm *": "allow",
+      "npx *": "allow",
+      "pnpm *": "allow",
+      "yarn *": "allow",
+      "node *": "allow",
+
+      "git *": "allow",
+      "gh *": "allow",
+
+      "ls *": "allow",
+      "cat *": "allow",
+      "echo *": "allow",
+      "tree *": "allow",
+      "test *": "allow",
+      "mkdir *": "allow",
+      "touch *": "allow",
+      "cp *": "allow",
+      "mv *": "allow",
+      "find *": "allow",
+      "grep *": "allow",
+      "rg *": "allow",
+      "sed *": "allow",
+      "awk *": "allow",
+      "head *": "allow",
+      "tail *": "allow",
+      "wc *": "allow",
+      "diff *": "allow",
+      "jq *": "allow",
+      "curl *": "allow",
+
+      "playwright *": "allow",
+      "allure *": "allow",
+      "acli *": "allow",
+
+      "rm -rf *": "deny",
+      "wget *": "deny",
+      "sudo rm *": "deny",
+      "sudo *": "deny",
+      "git push --force *": "deny",
+      "git push -f *": "deny",
+      "git reset --hard *": "deny",
+      "git clean -fd *": "deny",
+      "git branch -D *": "deny",
+      "chmod 777 *": "deny",
+      "truncate *": "deny",
+      "shred *": "deny",
+      "dd if=*": "deny",
+      "mkfs*": "deny"
+    }
+  }
+}

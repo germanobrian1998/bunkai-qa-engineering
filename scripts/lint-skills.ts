@@ -1,0 +1,1577 @@
+#!/usr/bin/env bun
+/* eslint-disable regexp/no-super-linear-backtracking */
+/**
+ * lint-skills.ts — validates the T1-T4 skill tier coherence in this repo.
+ *
+ * Tier model (full doctrine: .agents/skills/agentic-qa-core/references/skill-composition-strategy.md)
+ *   T1  — project-owned skills committed under .agents/skills/<slug>/SKILL.md
+ *   T2  — vendored upstream skills committed under .agents/skills/<slug>/SKILL.md
+ *         (frontmatter `vendored_from` points at the upstream source)
+ *   T3  — community project-level, declared in cli/install.ts:PROJECT_LEVEL_SKILLS
+ *         (gitignored, fetched at install time, NOT committed)
+ *   T4  — community user-level, declared in cli/install.ts:USER_LEVEL_SKILLS
+ *
+ * The checks below are run; each violation is printed prefixed with the relevant
+ * skill or array name. Exit code 0 = pass (no ERROR violations), 1 = at least
+ * one ERROR violation. WARN and INFO are reported but do not cause non-zero exit.
+ *
+ *   1. T1 frontmatter parseability — every directory under .agents/skills/
+ *      either has SKILL.md with parseable YAML frontmatter, OR is the slug of
+ *      a T3 community skill listed in PROJECT_LEVEL_SKILLS (in which case it
+ *      might be present locally as a gitignored install artifact and is exempt).
+ *      The `complementary_categories` field is strictly OPTIONAL — skills do
+ *      not need to declare it. When declared, its values are audited by Check 4.
+ *
+ *   2. T3 PROJECT_LEVEL_SKILLS shape — every entry has both `package` (URL)
+ *      and `skill` (string) fields.
+ *
+ *   3. T4 USER_LEVEL_SKILLS shape — every entry has both `package` and `skill`.
+ *
+ *   4. Category vocabulary — when a SKILL.md declares
+ *      `complementary_categories` with at least one value, every cited
+ *      category MUST be in the known-category allowlist (mirrors §5.1 of the
+ *      strategy doc).
+ *
+ *   5. `framework-development` exclusivity — that skill MUST exist at
+ *      .agents/skills/framework-development/SKILL.md AND be the only T1 with
+ *      category `framework-evolution`.
+ *
+ *   6. Anti-leak — the substring `/sdd-` MUST NOT appear in the body of the
+ *      four QA-workflow skills (sprint-testing, test-automation,
+ *      regression-testing, test-documentation), EXCEPT inside the
+ *      "Forbidden invocations" section which legitimately mentions it.
+ *
+ *   7. TIER-MISMATCH — skill named in AGENTS.md §5 but absent from
+ *      cli/install.ts matching tier array, or vice versa. T1 + T4 skills
+ *      exempt (T1 lives in .agents/skills/; T4 is auto-discovered at runtime).
+ *      install.ts is the tier authority for community skills: one committed
+ *      as a real directory inside `.agents/skills/` (downstream projects commit
+ *      their `bunx skills add` output) keeps its install.ts tier and is never
+ *      reclassified as T1, so the T1-only checks (frontmatter, categories,
+ *      STALE-PATH, session contract) do not run over a body the project does
+ *      not author. WARN severity (does not fail CI).
+ *
+ *   8. STALE-PATH — path-like literals in inline backtick spans of T1 SKILL.md
+ *      bodies AND each skill's references/*.md (outside fenced code blocks)
+ *      must resolve to existing files relative to the skill dir or repo root.
+ *      Known gitignored artifacts + illustrative example paths are exempted
+ *      via STALE_PATH_ALLOWED; the example components `/test-framework-adaptation`
+ *      deletes are exempted via EXAMPLE_ARTIFACTS, so a skill body that cites
+ *      one passes here AND in an adapted repo. `.context/` is checked too,
+ *      with a kind-scoped rule: inside a `metadata.kind: context` skill every
+ *      `.context/` cite must exist (a context skill citing a dead map is the
+ *      failure mode the check exists for; only the gitignored Jira cache
+ *      `.context/PBI/` is exempt), while in every other skill the outputs the
+ *      generators write per project, plus the legacy discovery outputs a
+ *      project may still hold (CONTEXT_GENERATED_PREFIXES: project-config.md,
+ *      the legacy PRD / SRS / business / infrastructure files, the legacy
+ *      master test plan, skill reports) are exempt in both directions, because
+ *      they do not exist in the boilerplate checkout.
+ *      ERROR severity.
+ *
+ *   9. DUPLICATE-TIER — a skill slug appearing in more than one of
+ *      PROJECT_LEVEL_SKILLS, USER_LEVEL_SKILLS is an install conflict.
+ *      ERROR severity.
+ *
+ *  10. SESSION-BANNER-MISSING — retrofitted SKILL.md must contain the verbatim
+ *      session-management banner prefix. ERROR severity.
+ *
+ *  11. SESSION-PHASE-0-MISSING — retrofitted SKILL.md must have a Phase 0 (or
+ *      Phase -1) section that mentions `.session/`. ERROR severity.
+ *
+ *  12. SESSION-SCOPE-INVALID — a runtime directory under `.session/<skill>/`
+ *      must match the per-skill scope regex. WARN severity (gitignored state
+ *      should not break CI). No-op if `.session/` does not exist.
+ *
+ *  13. SKILL-HARDCODED-CFID — `customfield_NNNN` literal id inside any skill
+ *      markdown outside `HARDCODED_CFID_ALLOWED_SKILLS` (tool-owner allowlist:
+ *      acli + xray-cli). Anti-pattern citations exempted. ERROR severity.
+ *
+ *  14. SKILL-LITERAL-TOOL — literal tool commands (`acli <subcommand>`,
+ *      `xray <subcommand>`, `mcp__atlassian__`, `curl …/rest/api/3/…`) inside
+ *      any skill markdown outside `LITERAL_TOOL_ALLOWED_SKILLS` (tool-owner
+ *      allowlist: acli + xray-cli). Anti-pattern citations exempted. Regex
+ *      requires command-shape context to avoid false positives on prose
+ *      references like `/acli` or "(acli is T1)". ERROR severity.
+ *
+ *  15. KIND-MISSING — a T1 / vendored T2 SKILL.md must declare the purpose
+ *      axis `metadata.kind` (one of `KNOWN_KINDS`). Committed community
+ *      skills (T3 / T4 bodies the project does not author) are exempt, like
+ *      every other T1-only check. Doctrine: strategy doc §2b. ERROR severity.
+ *
+ *  16. KIND-VOCAB — a declared `metadata.kind` must be one of `KNOWN_KINDS`
+ *      (context / workflow / utility / core). ERROR severity.
+ *
+ *  17. KIND-SUFFIX — the slug suffix and the declared kind must agree in BOTH
+ *      directions (`KIND_SUFFIX_RULES`): a slug ending `-context` must declare
+ *      kind `context` and a `context` skill must end `-context`; a slug ending
+ *      `-cli` / `-tool` / `-app` must declare kind `utility` and a `utility`
+ *      skill must carry one of those suffixes. Slugs named in
+ *      `KIND_SUFFIX_EXEMPT` predate the rule and skip it. `workflow` and
+ *      `core` carry no suffix rule. ERROR severity.
+ *
+ *  18. CAPABILITY-VOCAB — every name in `metadata.requires_capabilities` (the
+ *      MCP capabilities a skill needs, declared by CAPABILITY and resolved by
+ *      tool-name suffix, never by server prefix) must be in
+ *      `KNOWN_CAPABILITIES`, the mirror of
+ *      agentic-qa-core/references/mcp-capabilities.md §2. Inline `[a, b]` and
+ *      block `- a` list forms are both read. ERROR severity.
+ *
+ *  19. CAPABILITY-UNDECLARED — heuristic half of the correspondence rule
+ *      (mcp-capabilities.md §3): a T1 SKILL.md BODY (not its references/, and
+ *      outside fenced code blocks) that carries one of the five resolution
+ *      tags in `CAPABILITY_TAGS` (`[DB_TOOL]`, `[API_TOOL]`,
+ *      `[AUTOMATION_TOOL]`, `[DOCS_TOOL]`, `[WEB_SEARCH_TOOL]`) without
+ *      declaring the matching capability. A tag in a legend table trips it,
+ *      so the fix is "declare it or drop the row", never a script allowlist.
+ *      The reverse (declared but no tag) is NOT checked: skills legitimately
+ *      instruct use through tool names or MCP names instead of tags. A skill
+ *      of kind `core` is skipped: it hosts the doctrine that describes the
+ *      tags and never uses them. WARN severity.
+ *
+ *  20. FILE-LINE — a `path.ext:N` / `:N-M` / `#LN` citation in the prose of any
+ *      committed markdown under .agents/ (community skills and generated
+ *      aggregates excluded) or in AGENTS.md, outside fenced blocks and the
+ *      frontmatter. A line number shifts on any edit above it; cite the file
+ *      plus a symbol or a heading. Per-line escape: `volatile-ok: <reason>`.
+ *      Severity: VOLATILE_SEVERITY (Critical Rule #17; canon
+ *      agentic-qa-core/references/volatile-facts.md).
+ *
+ *  21. CURRENT-STATE — a claim about the present in the same prose: "today",
+ *      "currently", "as of <year>", a dated "measured / verified", "since
+ *      <version>", a measured token or byte size, a tool version after a tool
+ *      name, and the Spanish equivalents. Same exclusions and escape hatch.
+ *      Severity: VOLATILE_SEVERITY.
+ *
+ *  22. STAGE-OWNER-DISPATCH — a SKILL.md whose frontmatter declares
+ *      `metadata.stage_owner: true` (the stage-owning workflow skills, the set
+ *      AGENTS.md §3 used to enumerate by hand) must carry a
+ *      `## Subagent Dispatch Strategy` section. ERROR severity.
+ *
+ *  23. CONTEXT-WRITES — the write scope a skill declares in `metadata.writes`
+ *      (skill-scaffold.md §2, the context-kind amendment). Only a
+ *      `metadata.kind: context` skill may declare it; every entry must be the
+ *      skill's own `references/` folder or a path under it; a context skill
+ *      that declares it must carry `references/refresh.md` (the procedure the
+ *      write path runs); and neither its SKILL.md nor that procedure may carry
+ *      the Jira resolution tags (`[ISSUE_TRACKER_TOOL]`, `[TMS_TOOL]`): a
+ *      context skill edits its own map, never a tracker. ERROR severity.
+ *
+ * Usage: bun run scripts/lint-skills.ts   (or: bun run skills:check)
+ */
+
+import type { VolatileKind } from './lib/volatile-facts';
+import { existsSync, lstatSync, readdirSync, readFileSync, statSync } from 'node:fs';
+
+import { dirname, join } from 'node:path';
+import { relativePosix } from './lib/posix-path';
+import { isVolatileExemptPath, scanVolatile, volatileRemedy } from './lib/volatile-facts';
+
+// -----------------------------------------------------------------------------
+// Constants
+// -----------------------------------------------------------------------------
+
+// `LINT_SKILLS_ROOT` exists for the regression tests (fixture repos); every
+// normal run resolves the repo from this file's location.
+const REPO_ROOT = process.env.LINT_SKILLS_ROOT ?? join(import.meta.dir, '..');
+const SKILLS_DIR = join(REPO_ROOT, '.agents/skills');
+const INSTALL_TS = join(REPO_ROOT, 'cli/install.ts');
+const AGENTS_MD = join(REPO_ROOT, 'AGENTS.md');
+
+/**
+ * Authoritative category list — mirrors §5.1 of
+ * .agents/skills/agentic-qa-core/references/skill-composition-strategy.md.
+ * If a new category is added there, mirror it here (or refactor both to read
+ * from a shared source).
+ */
+const KNOWN_CATEGORIES = new Set([
+  'testing-e2e',
+  'testing-api',
+  'testing-component',
+  'accessibility',
+  'vcs',
+  'issue-tracker',
+  'tms',
+  'meta-skill',
+  'automation-cli',
+  'ci-cd',
+  'framework-evolution',
+  'orchestration',
+]);
+
+/**
+ * Purpose axis vocabulary (`metadata.kind`) — mirrors §2b of the strategy doc.
+ * Orthogonal to the tier (ownership) and to `complementary_categories`
+ * (domain): a skill is exactly one of these. Checks 15-17.
+ */
+const KNOWN_KINDS = new Set(['context', 'workflow', 'utility', 'core']);
+
+/**
+ * Severity of the two volatile-facts checks (20-21). Both are ERROR: the
+ * hand-applied cleanup left no residue outside a `volatile-ok: <reason>` line
+ * or a `volatile-ok-file: <reason>` dated ledger, so a new hit is a regression.
+ */
+const VOLATILE_SEVERITY: Record<VolatileKind, Severity> = {
+  'FILE-LINE': 'ERROR',
+  'CURRENT-STATE': 'ERROR',
+};
+
+/**
+ * Slugs exempt from KIND-SUFFIX (check 17), in both directions. Every entry
+ * predates the suffix rule and is grandfathered BY NAME so the exemption stays
+ * visible here instead of hiding in a looser regex:
+ *   - `acli`: a utility without the `-cli` / `-tool` / `-app` suffix.
+ *   - `project-context`: a workflow whose slug ends `-context` (the suffix
+ *     the `context` kind reserves).
+ * A new skill picks a slug that matches its kind; it does not get added here.
+ */
+const KIND_SUFFIX_EXEMPT = new Set<string>(['acli', 'project-context']);
+
+/**
+ * Suffix ⇔ kind table for KIND-SUFFIX (check 17), enforced both ways: a slug
+ * carrying one of the suffixes must declare that kind, and a skill declaring
+ * that kind must carry one of its suffixes (unless in `KIND_SUFFIX_EXEMPT`).
+ * `workflow` and `core` are absent on purpose: they have no suffix rule.
+ */
+const KIND_SUFFIX_RULES: ReadonlyArray<{ kind: string, suffixes: readonly string[] }> = [
+  { kind: 'context', suffixes: ['-context'] },
+  { kind: 'utility', suffixes: ['-cli', '-tool', '-app'] },
+];
+
+/**
+ * MCP capability vocabulary (`metadata.requires_capabilities`) — mirrors §2 of
+ * .agents/skills/agentic-qa-core/references/mcp-capabilities.md. A skill
+ * declares the CAPABILITY it needs, never a server name, so the project
+ * `.mcp.json` server, a user-level server and a claude.ai connector all
+ * satisfy it. Add a name here AND in the reference, in the same change. Check 18.
+ */
+const KNOWN_CAPABILITIES = new Set(['web-search', 'library-docs', 'db', 'api-schema', 'diagrams']);
+
+/**
+ * Resolution tag → capability it resolves to (AGENTS.md §6). Drives the
+ * CAPABILITY-UNDECLARED heuristic (check 19): a SKILL.md body using the tag
+ * without declaring the capability is a WARN. `[AUTOMATION_TOOL]` is absent on
+ * purpose: it resolves to `/playwright-cli`, a CLI, so no MCP capability backs it.
+ */
+const CAPABILITY_TAGS: ReadonlyArray<{ tag: string, capability: string }> = [
+  { tag: '[DB_TOOL]', capability: 'db' },
+  { tag: '[API_TOOL]', capability: 'api-schema' },
+  { tag: '[DOCS_TOOL]', capability: 'library-docs' },
+  { tag: '[WEB_SEARCH_TOOL]', capability: 'web-search' },
+];
+
+/** Jira resolution tags a context skill with a write scope must never carry (check 23). */
+const JIRA_WRITE_TAGS = ['[ISSUE_TRACKER_TOOL]', '[TMS_TOOL]'];
+
+/**
+ * QA workflow skills subject to the anti-leak rule (check 6). The "Forbidden
+ * invocations" section is the ONLY place where `/sdd-*` may legitimately
+ * appear in their bodies.
+ */
+const ANTI_LEAK_SKILLS = [
+  'shift-left-testing',
+  'sprint-testing',
+  'test-automation',
+  'regression-testing',
+  'test-documentation',
+];
+
+const ANTI_LEAK_ALLOWED_SECTION = 'Forbidden invocations';
+
+/**
+ * Skills exempt from SKILL-LITERAL-TOOL — they legitimately own the HOW for a
+ * specific tool surface and MUST quote literal commands. `acli` owns Jira /
+ * Confluence CLI syntax; `xray-cli` owns Xray Cloud TMS CLI syntax. One-line
+ * to extend.
+ */
+const LITERAL_TOOL_ALLOWED_SKILLS = new Set<string>(['acli', 'xray-cli']);
+
+/**
+ * Skills exempt from SKILL-HARDCODED-CFID — tool-owner skills that teach users
+ * how to interact with Jira customfields and must quote concrete IDs in
+ * pedagogical examples (CSV payloads, REST shapes). Workflow skills consume
+ * customfields via the slug catalog (`{{jira.<slug>}}`); tool-owner skills
+ * document the underlying surface and need literal IDs to remain useful.
+ */
+const HARDCODED_CFID_ALLOWED_SKILLS = new Set<string>(['acli', 'xray-cli']);
+
+/**
+ * Files at the root of `.agents/skills/` (not inside any skill subdirectory)
+ * that are autogenerated aggregates of upstream skill metadata. Linting these
+ * is double-counting — the rules are enforced at the source skill. Lint the
+ * generators / sources, not the cache.
+ */
+const SKILL_AGGREGATE_FILES = new Set<string>(['REGISTRY.md']);
+
+// -----------------------------------------------------------------------------
+// Session-management contract (per agentic-qa-core/references/session-management.md §14)
+// -----------------------------------------------------------------------------
+
+/**
+ * Skills that adopted the session-management contract. Maps each skill slug to
+ * the regex its immediate `.session/<skill>/<scope>/` child directory must
+ * match, or `null` if the skill stores state directly under `.session/<skill>/`
+ * with no `<scope>` segment. Skills NOT in this map are exempt from the
+ * BANNER, PHASE-0, and SCOPE-INVALID checks.
+ */
+const SESSION_RETROFITTED_SKILLS: Record<string, RegExp | null> = {
+  'project-discovery': null,
+  'framework-development': /^[a-z0-9][a-z0-9-]*$/,
+  'test-automation': /^([A-Z]+-\d+|[a-z0-9][a-z0-9-]*)$/,
+  'sprint-testing': /^([A-Z]+-\d+|sprint-\d+)$/,
+  'regression-testing': /^[a-z]+-\d{4}-\d{2}-\d{2}$/,
+  // ad-hoc dated form `YYYY-MM-DD-adhoc` is a strict subset of the kebab-case
+  // module-slug alternative, so no separate branch is needed.
+  'test-documentation': /^([A-Z]+-\d+|[a-z0-9][a-z0-9-]*)$/,
+  'shift-left-testing': /^\d{4}-\d{2}-\d{2}-[a-z0-9][a-z0-9-]*$/,
+};
+
+/**
+ * Invariant prefix of the orchestration + session banner that every retrofitted
+ * SKILL.md must contain verbatim. The line continues differently between the
+ * standard form and any future progress-only variant — but the prefix up to
+ * "archive on completion)." is invariant in both. Contains an em-dash (U+2014)
+ * between "dispatch" and "main thread" — copy-paste from a retrofitted
+ * SKILL.md (e.g. framework-development); do NOT retype.
+ */
+const SESSION_BANNER_PREFIX = '> **Orchestration & Session contracts**: this skill follows `agentic-qa-core/references/orchestration-doctrine.md` (mandatory subagent dispatch — main thread is command center) AND `agentic-qa-core/references/session-management.md` (Phase 0 resume check, plan-first persistence at `.session/<skill-slug>/<scope>/`, archive on completion).';
+
+/**
+ * Matches `## Phase 0`, `## Phase 0.0`, `## Phase -1` (ASCII hyphen-minus), or
+ * `## Phase −1` (U+2212 minus). test-documentation/SKILL.md uses Phase `-1`
+ * (ASCII hyphen) to avoid colliding with its existing Phase 0.
+ */
+const PHASE_0_HEADING = /^## Phase (?:0(?:\.0)?|-1|−1)(?:\s|$)/m;
+
+// -----------------------------------------------------------------------------
+// Violations accumulator
+// -----------------------------------------------------------------------------
+
+type Severity = 'ERROR' | 'WARN' | 'INFO';
+
+interface Violation {
+  severity: Severity
+  scope: string
+  msg: string
+}
+
+const violations: Violation[] = [];
+
+function violation(severity: Severity, scope: string, msg: string): void {
+  violations.push({ severity, scope, msg });
+}
+
+const SEVERITY_COLORS: Record<Severity, string> = {
+  ERROR: '\x1B[31m',
+  WARN: '\x1B[33m',
+  INFO: '\x1B[34m',
+};
+
+function renderViolation(v: Violation): string {
+  const c = SEVERITY_COLORS[v.severity];
+  return `  ${c}[${v.severity}]\x1B[0m [${v.scope}] ${v.msg}`;
+}
+
+function exitCode(vs: Violation[]): 0 | 1 {
+  return vs.some(v => v.severity === 'ERROR') ? 1 : 0;
+}
+
+// -----------------------------------------------------------------------------
+// Frontmatter parser — minimal, no YAML lib needed for our shape
+// -----------------------------------------------------------------------------
+
+type CategoriesField
+  = { state: 'missing' }
+    | { state: 'present-empty' }
+    | { state: 'present-nonempty', values: string[] };
+
+interface SkillFrontmatter {
+  name?: string
+  categoriesField: CategoriesField
+  /** `metadata.kind` (purpose axis); undefined when the nested key is absent. */
+  kind?: string
+  /** `metadata.stage_owner: true` marks a stage-owning workflow skill (AGENTS.md §3 compliance). */
+  stageOwner: boolean
+  /** `metadata.requires_capabilities` (MCP capabilities); undefined when the nested key is absent. */
+  requiresCapabilities?: string[]
+  /** `metadata.writes` (a context skill's own write scope); undefined when the nested key is absent. */
+  writes?: string[]
+  raw: string
+}
+
+/**
+ * Extracts the YAML frontmatter (between leading `---` fences) and pulls out
+ * `name`, `complementary_categories`, `metadata.kind` and
+ * `metadata.requires_capabilities`. We only need a tiny subset, so we do not
+ * pull in a YAML dependency — the format we expect is:
+ *
+ *   ---
+ *   name: foo
+ *   complementary_categories: [a, b, c]
+ *   metadata:
+ *     kind: workflow
+ *     requires_capabilities: [db, api-schema]
+ *   ---
+ *
+ * If the categories field uses block-list YAML (- a / - b), we also handle
+ * that; everything else is best-effort.
+ *
+ * The `categoriesField` discriminated union distinguishes:
+ *   - 'missing'          → key not present in frontmatter at all
+ *   - 'present-empty'    → key present but value is an empty list []
+ *   - 'present-nonempty' → key present with at least one value
+ */
+function parseFrontmatter(content: string): SkillFrontmatter | null {
+  if (!content.startsWith('---')) { return null; }
+  const end = content.indexOf('\n---', 3);
+  if (end === -1) { return null; }
+  const block = content.slice(3, end);
+
+  const nameMatch = block.match(/^name:\s*(.+)$/m);
+  const name = nameMatch ? nameMatch[1].trim() : undefined;
+
+  const hasKey = block.includes('complementary_categories:');
+
+  const categories: string[] = [];
+  // Inline form: complementary_categories: [a, b, c]
+  const inlineMatch = block.match(/^complementary_categories:\s*\[([^\]]*)\]/m);
+  if (inlineMatch) {
+    for (const raw of inlineMatch[1].split(',')) {
+      const cat = raw.trim().replace(/^["']|["']$/g, '');
+      if (cat) { categories.push(cat); }
+    }
+  }
+  else {
+    // Block form: complementary_categories:\n  - a\n  - b
+    const blockMatch = block.match(/^complementary_categories:[ \t]*\n((?:[ \t]+-[ \t]+\S[^\n]*\n?)+)/m);
+    if (blockMatch) {
+      for (const line of blockMatch[1].split('\n')) {
+        const m = line.match(/^[ \t]+-[ \t]+(.+)$/);
+        if (m) { categories.push(m[1].trim().replace(/^["']|["']$/g, '')); }
+      }
+    }
+  }
+
+  let categoriesField: CategoriesField;
+  if (!hasKey) {
+    categoriesField = { state: 'missing' };
+  }
+  else if (categories.length === 0) {
+    categoriesField = { state: 'present-empty' };
+  }
+  else {
+    categoriesField = { state: 'present-nonempty', values: categories };
+  }
+
+  // Nested form only: `metadata:` followed by an indented block holding `kind:`.
+  // `metadata` is the extension point the Agent Skills frontmatter spec allows,
+  // so `kind` is never read from the top level.
+  let kind: string | undefined;
+  let stageOwner = false;
+  let requiresCapabilities: string[] | undefined;
+  let writes: string[] | undefined;
+  const metadataMatch = block.match(/^metadata:[ \t]*\n((?:[ \t]+\S[^\n]*\n?)+)/m);
+  if (metadataMatch) {
+    const kindMatch = metadataMatch[1].match(/^[ \t]+kind:[ \t]*["']?([\w-]+)["']?/m);
+    if (kindMatch) { kind = kindMatch[1]; }
+    stageOwner = /^[ \t]+stage_owner:[ \t]*true\b/m.test(metadataMatch[1]);
+    requiresCapabilities = parseNestedList(metadataMatch[1], 'requires_capabilities');
+    writes = parseNestedList(metadataMatch[1], 'writes');
+  }
+
+  return { name, categoriesField, kind, stageOwner, requiresCapabilities, writes, raw: block };
+}
+
+/**
+ * Reads one list-valued key out of an indented `metadata:` block, in either
+ * form: inline `  key: [a, b]` or block `  key:\n    - a\n    - b`. Returns
+ * undefined when the key is absent (so "not declared" and "declared empty"
+ * stay distinguishable); quotes around a value are stripped.
+ */
+function parseNestedList(metadataBlock: string, key: string): string[] | undefined {
+  const inline = metadataBlock.match(new RegExp(`^[ \\t]+${key}:[ \\t]*\\[([^\\]]*)\\]`, 'm'));
+  if (inline) {
+    return inline[1].split(',').map(v => v.trim().replace(/^["']|["']$/g, '')).filter(v => v.length > 0);
+  }
+  const blockList = metadataBlock.match(new RegExp(`^[ \\t]+${key}:[ \\t]*\\n((?:[ \\t]+-[ \\t]+\\S[^\\n]*\\n?)+)`, 'm'));
+  if (blockList) {
+    const values: string[] = [];
+    for (const line of blockList[1].split('\n')) {
+      const m = line.match(/^[ \t]+-[ \t]+(.+)$/);
+      if (m) { values.push(m[1].trim().replace(/^["']|["']$/g, '')); }
+    }
+    return values;
+  }
+  return metadataBlock.match(new RegExp(`^[ \\t]+${key}:`, 'm')) ? [] : undefined;
+}
+
+// -----------------------------------------------------------------------------
+// install.ts parser — extract the three arrays we care about
+// -----------------------------------------------------------------------------
+
+interface CommunitySkillEntry {
+  package?: string
+  skill?: string
+  raw: string
+}
+
+interface InstallTsParsed {
+  projectLevel: CommunitySkillEntry[]
+  userLevel: CommunitySkillEntry[]
+}
+
+/**
+ * Greedy-but-scoped parse of cli/install.ts. We do not run TypeScript — we
+ * just walk text looking for the three named const declarations and pull the
+ * array body between `[` and the matching `]`.
+ *
+ * Tolerates trailing-comma + comments + multi-line entries (the actual install.ts
+ * uses all three).
+ */
+function parseInstallTs(text: string): InstallTsParsed {
+  return {
+    projectLevel: extractCommunityArray(text, 'PROJECT_LEVEL_SKILLS'),
+    userLevel: extractCommunityArray(text, 'USER_LEVEL_SKILLS'),
+  };
+}
+
+function extractArrayBody(text: string, name: string): string | null {
+  // Match: const NAME ... = [ ... ]
+  // (we anchor on `const NAME` to avoid matching usages elsewhere).
+  const start = text.search(new RegExp(`const\\s+${name}\\b`));
+  if (start === -1) { return null; }
+  const open = text.indexOf('[', start);
+  if (open === -1) { return null; }
+  // Walk chars to find matching `]` accounting for nesting.
+  let depth = 0;
+  for (let i = open; i < text.length; i++) {
+    const ch = text[i];
+    if (ch === '[') { depth++; }
+    else if (ch === ']') {
+      depth--;
+      if (depth === 0) { return text.slice(open + 1, i); }
+    }
+  }
+  return null;
+}
+
+function extractCommunityArray(text: string, name: string): CommunitySkillEntry[] {
+  const body = extractArrayBody(text, name);
+  if (body === null) { return []; }
+  const out: CommunitySkillEntry[] = [];
+  // Each entry is an object literal {...}. Walk depth to slice them.
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i];
+    if (ch === '{') {
+      if (depth === 0) { start = i; }
+      depth++;
+    }
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        const obj = body.slice(start, i + 1);
+        out.push(parseObjectLiteral(obj));
+        start = -1;
+      }
+    }
+  }
+  return out;
+}
+
+function parseObjectLiteral(src: string): CommunitySkillEntry {
+  const entry: CommunitySkillEntry = { raw: src };
+  const pkgMatch = src.match(/package\s*:\s*['"]([^'"]+)['"]/);
+  if (pkgMatch) { entry.package = pkgMatch[1]; }
+  const skillMatch = src.match(/skill\s*:\s*['"]([^'"]+)['"]/);
+  if (skillMatch) { entry.skill = skillMatch[1]; }
+  return entry;
+}
+
+// -----------------------------------------------------------------------------
+// Anti-leak section-aware grep
+// -----------------------------------------------------------------------------
+
+/**
+ * Returns true if `/sdd-` appears in the body of `content` outside of the
+ * "Forbidden invocations" H2 section. Frontmatter (between leading `---`
+ * fences) is also excluded because category names there are inert.
+ */
+function hasAntiLeakViolation(content: string): boolean {
+  // Strip frontmatter.
+  let body = content;
+  if (body.startsWith('---')) {
+    const end = body.indexOf('\n---', 3);
+    if (end !== -1) { body = body.slice(end + 4); }
+  }
+
+  // Split into sections by H2 headers (lines starting with "## ").
+  const lines = body.split('\n');
+  const sections: Array<{ header: string, content: string }> = [];
+  let currentHeader = '';
+  let currentLines: string[] = [];
+  for (const line of lines) {
+    const m = line.match(/^##[ \t]+(.+?)[ \t]*$/);
+    if (m) {
+      // Push the previous section.
+      sections.push({ header: currentHeader, content: currentLines.join('\n') });
+      currentHeader = m[1];
+      currentLines = [];
+    }
+    else {
+      currentLines.push(line);
+    }
+  }
+  sections.push({ header: currentHeader, content: currentLines.join('\n') });
+
+  for (const sec of sections) {
+    if (sec.header.toLowerCase().includes(ANTI_LEAK_ALLOWED_SECTION.toLowerCase())) {
+      continue;
+    }
+    if (sec.content.includes('/sdd-')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// -----------------------------------------------------------------------------
+// Checks 7–10 (new)
+// -----------------------------------------------------------------------------
+
+// --- Check 7: TIER-MISMATCH ---
+
+interface AgentsMdSkillEntry {
+  name: string
+  sourceLine: number
+}
+
+const AGENTS_MD_SKILL_ROW = /^\|\s*`([\w-]+)`\s*\|/;
+const AGENTS_MD_H2 = /^## (.+)$/;
+const AGENTS_MD_H3 = /^### (.+)$/;
+
+/**
+ * Detects whether an H2 heading line belongs to §5 (Skills registry).
+ * Matches headings that start with "5." or are exactly "5" followed by
+ * optional punctuation/whitespace, e.g.:
+ *   "5. SKILLS + MODES + MCPs REGISTRY"
+ *   "5 Skills"
+ */
+function isSection5Heading(heading: string): boolean {
+  return /^5[.\s]/.test(heading.trim());
+}
+
+function parseAgentsMdSkillsRegistry(agentsMdPath: string): {
+  entries: AgentsMdSkillEntry[]
+  parseError?: string
+} {
+  const text = readFileSync(agentsMdPath, 'utf8');
+  const lines = text.split('\n');
+  const entries: AgentsMdSkillEntry[] = [];
+
+  // Walk lines tracking the current H2 section. Only collect skill-row matches
+  // when the nearest preceding H2 heading is §5 (Skills registry). This prevents
+  // the regex from matching table rows in other sections (e.g., §11 git-branches
+  // table which has | `main` | and | `staging` | rows).
+  let inSection5 = false;
+  // §5 also hosts the alias and capability tables; only the `### Skills` H3
+  // (or a §5 with no H3 at all) carries skill rows.
+  let inSkillsTable = true;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    const h2Match = line.match(AGENTS_MD_H2);
+    if (h2Match) {
+      inSection5 = isSection5Heading(h2Match[1]);
+      inSkillsTable = true;
+      continue;
+    }
+    const h3Match = line.match(AGENTS_MD_H3);
+    if (h3Match) {
+      inSkillsTable = /^skills\b/i.test(h3Match[1].trim());
+      continue;
+    }
+
+    if (!inSection5 || !inSkillsTable) { continue; }
+
+    const rowMatch = line.match(AGENTS_MD_SKILL_ROW);
+    if (rowMatch) {
+      entries.push({ name: rowMatch[1], sourceLine: i + 1 });
+    }
+  }
+
+  if (entries.length === 0) {
+    return {
+      entries: [],
+      parseError: 'AGENTS.md §5 table extracted 0 skill rows — format may have drifted',
+    };
+  }
+  return { entries };
+}
+
+function checkTierMismatch(
+  agentsEntries: AgentsMdSkillEntry[],
+  t1DirSlugs: Set<string>,
+  t2Slugs: Set<string>,
+  t3Slugs: Set<string>,
+  t4Slugs: Set<string>,
+): Violation[] {
+  const result: Violation[] = [];
+  const agentsNames = new Set(agentsEntries.map(e => e.name));
+
+  // T4 USER_LEVEL_SKILLS are auto-discovered at runtime and MUST NOT appear in
+  // AGENTS.md §5 by doctrine (see skill-composition-strategy.md §10). Exclude
+  // them from this check; include only T2 + T3 in the install-side set.
+  const checkedSlugs = new Set<string>([...t2Slugs, ...t3Slugs]);
+
+  // Skills in AGENTS.md that are not T1 and not in install.ts (T2/T3).
+  for (const entry of agentsEntries) {
+    if (t1DirSlugs.has(entry.name)) { continue; } // T1 exempt
+    if (t4Slugs.has(entry.name)) { continue; } // T4 exempt (auto-discovered)
+    if (!checkedSlugs.has(entry.name)) {
+      result.push({
+        severity: 'WARN',
+        scope: entry.name,
+        msg: `TIER-MISMATCH: skill is in AGENTS.md §5 (line ${entry.sourceLine}) but absent from cli/install.ts tier arrays`,
+      });
+    }
+  }
+
+  // Skills in install.ts that are not T1 and not in AGENTS.md.
+  for (const slug of checkedSlugs) {
+    if (t1DirSlugs.has(slug)) { continue; } // T1 exempt
+    if (!agentsNames.has(slug)) {
+      result.push({
+        severity: 'WARN',
+        scope: slug,
+        msg: 'TIER-MISMATCH: skill is in cli/install.ts tier arrays but absent from AGENTS.md §5',
+      });
+    }
+  }
+
+  return result;
+}
+
+// --- Check 8: STALE-PATH ---
+
+function stripFencedCodeBlocks(md: string): string {
+  return md.replace(/```[\s\S]*?```/g, '');
+}
+
+const INLINE_CODE_PATH
+  = /`((?:\.claude\/skills|scripts|cli|\.agents|tests|api|\.context)\/[\w./-]+)`/g;
+
+/** Why a legacy discovery output (`.context/PRD/`, `SRS/`, ...) is exempt: it is input now, never written. */
+const LEGACY_DISCOVERY_OUTPUT = 'legacy discovery output a project may still hold, no longer written; read as generator input by the context map skills (CONTEXT_MAP_SKILLS)';
+
+/**
+ * `.context/` paths a generator writes per project, or a legacy output a
+ * project may still hold, named by the generator that owns (or once owned)
+ * them. Discovery's synthesis now lives in the context map skills
+ * (`CONTEXT_MAP_SKILLS`, cli/lib/context-maps.ts), which read the legacy files
+ * as generator input and never delete them. None of these exist in the
+ * boilerplate checkout (the committed `.context/` tree holds only the ADRs,
+ * the README files and the PBI templates), yet the workflow skills cite them
+ * legitimately, so outside a context skill they are exempt in BOTH directions,
+ * present or absent, exactly like EXAMPLE_ARTIFACTS. Inside a
+ * `metadata.kind: context` skill the exemption does NOT apply: the scaffold
+ * requires the map to exist before the skill is born, so a cite that does not
+ * resolve there is the dead-map citation this check is for. `.context/PBI/`
+ * stays exempt everywhere: it is the gitignored Jira mirror.
+ */
+const CONTEXT_GENERATED_PREFIXES: ReadonlyArray<{ prefix: string, generator: string }> = [
+  { prefix: '.context/PBI/', generator: 'scripts/sync-jira-issues.ts (gitignored Jira mirror)' },
+  { prefix: '.context/business/', generator: LEGACY_DISCOVERY_OUTPUT },
+  { prefix: '.context/PRD/', generator: LEGACY_DISCOVERY_OUTPUT },
+  { prefix: '.context/SRS/', generator: LEGACY_DISCOVERY_OUTPUT },
+  { prefix: '.context/infrastructure/', generator: LEGACY_DISCOVERY_OUTPUT },
+  { prefix: '.context/reports/', generator: 'skill-owned reports (test-framework-adaptation, jira-administration, regression-testing)' },
+  { prefix: '.context/regression-history/', generator: 'regression-testing' },
+  { prefix: '.context/project-config.md', generator: 'project-discovery Phase 1' },
+  { prefix: '.context/risk-assessment.md', generator: 'legacy discovery output a project may still hold, no longer written; read as input by project-context mode test-plan' },
+  // Legacy: the MTP now lives in Jira and is cached under .context/PBI/ (ADR-0007).
+  // Kept because `project-context` mode `test-plan` names it as the seed input.
+  { prefix: '.context/master-test-plan.md', generator: 'legacy local MTP, read only as the seed of the MTP Epic (project-context test-plan)' },
+];
+
+/** The only `.context/` prefix a context skill may cite without it resolving on disk. */
+const CONTEXT_CACHE_PREFIX = '.context/PBI/';
+
+function isGeneratedContextPath(path: string, strictContext: boolean): boolean {
+  if (path.startsWith(CONTEXT_CACHE_PREFIX)) { return true; }
+  if (strictContext) { return false; }
+  return CONTEXT_GENERATED_PREFIXES.some(({ prefix }) => path === prefix || path.startsWith(prefix));
+}
+
+/**
+ * Relative `./file.md` citations, which `INLINE_CODE_PATH` cannot see because it
+ * anchors on a repo-rooted prefix.
+ *
+ * This is the shape a cross-skill doctrine cite goes stale in: from
+ * `sprint-testing/SKILL.md`, `./session-management.md` resolves to
+ * `sprint-testing/`, where nothing of that name exists — the file lives in
+ * `agentic-qa-core/references/`. A literal reader follows it and reads nothing,
+ * which is silent, so it stayed broken across eight skills until an audit found it.
+ * Resolved against the CITING FILE's own directory, which is where `./` points;
+ * a genuine same-directory sibling therefore still passes.
+ */
+const INLINE_CODE_DOT_PATH = /`(\.\/[\w-]+\.md)`/g;
+
+/**
+ * Paths exempt from STALE-PATH — inline-code path literals that are correct
+ * but resolve to nothing in a fresh checkout, in two families:
+ *   - gitignored generated/config artifacts (produced by `bun run api:sync` /
+ *     written at adapt time) that docs legitimately cite;
+ *   - illustrative example paths in doctrine docs (hypothetical components,
+ *     mock-naming-convention samples) that intentionally name no real file.
+ * Keep entries exact; NEVER add a stale reference to a real file here — fix
+ * the reference instead.
+ */
+const STALE_PATH_ALLOWED = new Set<string>([
+  // Gitignored generated/config artifacts (see .gitignore)
+  'api/openapi.json',
+  'api/.openapi-config.json',
+  // Illustrative examples (docs teach a naming shape, not a real file)
+  'tests/components/UsersPage.ts',
+  'tests/components/AdminFixture.ts',
+  'tests/data/mocks/auth/login/POST.200.json',
+  'tests/data/mocks/users/POST.201.json',
+  'tests/data/mocks/users/create/POST.400.json',
+  // pr-review-lead probes an EXTERNAL repo for this path (a doctrine tree the
+  // target may carry); it is never expected to exist in this checkout.
+  '.context/guidelines/tae/kata-architecture.md',
+]);
+
+/**
+ * The example artifacts the boilerplate SHIPS and `/test-framework-adaptation` DELETES.
+ *
+ * These exist in this repo and are gone in every adapted one, so their
+ * existence on disk says nothing about whether a doc reference is stale. Left
+ * to the plain existence check, a skill body that cites one lints clean here
+ * and fails in the consumer project — and `.husky/pre-commit` runs
+ * `bun run skills:check` unconditionally, so the whole team stops committing
+ * over a doc line that was correct all along. That is exactly how
+ * `tests/components/steps/ExampleSteps.ts` (test-automation) and
+ * `tests/data/fixtures/example.json` (test-framework-adaptation) broke adapted repos.
+ *
+ * Note the irony worth preserving: several of these citations appear in
+ * `test-framework-adaptation`'s own Definition of Done, whose whole job is to assert the
+ * file is GONE.
+ *
+ * Exempt in BOTH directions — present or absent, a citation here is fine.
+ * Prefix match, so a directory entry covers everything under it.
+ * Everything else still resolves normally; this is not a place to park a
+ * genuinely broken reference.
+ */
+const EXAMPLE_ARTIFACTS = [
+  'tests/components/api/ExampleApi.ts',
+  'tests/components/ui/ExamplePage.ts',
+  'tests/components/steps/ExampleSteps.ts',
+  'api/schemas/example.types.ts',
+  'tests/data/fixtures/example.json',
+  'tests/e2e/module-example',
+  'tests/integration/module-example',
+];
+
+function isExampleArtifact(path: string): boolean {
+  return EXAMPLE_ARTIFACTS.some(p => path === p || path.startsWith(`${p}/`));
+}
+
+/**
+ * `strictContext` is true for a `metadata.kind: context` skill: its `.context/`
+ * cites must resolve on disk (only the gitignored `.context/PBI/` cache is
+ * exempt). Every other skill gets the generator-output exemption.
+ */
+function checkStalePaths(
+  skillSlug: string,
+  skillDir: string,
+  body: string,
+  repoRoot: string,
+  sourceFile: string,
+  strictContext = false,
+): Violation[] {
+  const result: Violation[] = [];
+  const stripped = stripFencedCodeBlocks(body);
+
+  INLINE_CODE_PATH.lastIndex = 0;
+  for (const match of stripped.matchAll(INLINE_CODE_PATH)) {
+    const path = match[1];
+    // Skip absolute paths.
+    if (path.startsWith('/')) { continue; }
+    if (path.endsWith('/')) { continue; } // directory-shape illustration, not a file ref
+    if (path.endsWith('/...')) { continue; } // elided-tree illustration (`.context/...`), not a file ref
+    if (STALE_PATH_ALLOWED.has(path)) { continue; } // gitignored artifact / intentional example
+    if (isExampleArtifact(path)) { continue; } // shipped here, deleted once adapted
+    if (path.startsWith('.context/') && isGeneratedContextPath(path, strictContext)) { continue; } // written per project by a generator
+    // Skill-dir-first resolution: shorthand like `scripts/foo.ts` inside a skill
+    // body should resolve against the skill's own directory; fall back to repo
+    // root for paths that are genuinely repo-rooted (e.g. `.agents/skills/...`).
+    if (existsSync(join(skillDir, path))) { continue; }
+    if (existsSync(join(repoRoot, path))) { continue; }
+    result.push({
+      severity: 'ERROR',
+      scope: skillSlug,
+      msg: strictContext && path.startsWith('.context/')
+        ? `STALE-PATH: \`${path}\` referenced in ${sourceFile} body does not exist on disk — a context skill cites a map that exists (generate it first, or cite the right path); only \`${CONTEXT_CACHE_PREFIX}\` is exempt`
+        : `STALE-PATH: \`${path}\` referenced in ${sourceFile} body does not exist on disk`,
+    });
+  }
+
+  // `./x.md` resolves against the citing file's own directory, not the skill root:
+  // a cite inside `references/` points at a sibling reference, not at SKILL.md's peer.
+  const sourceDir = join(skillDir, dirname(sourceFile));
+  INLINE_CODE_DOT_PATH.lastIndex = 0;
+  for (const match of stripped.matchAll(INLINE_CODE_DOT_PATH)) {
+    const path = match[1];
+    if (existsSync(join(sourceDir, path))) { continue; }
+    result.push({
+      severity: 'ERROR',
+      scope: skillSlug,
+      msg: `STALE-PATH: \`${path}\` in ${sourceFile} resolves to ${dirname(sourceFile)}/ where it does not exist — expand cross-skill cites to their full path (e.g. \`agentic-qa-core/references/${path.slice(2)}\`)`,
+    });
+  }
+
+  return result;
+}
+
+// --- Check 10: DUPLICATE-TIER ---
+
+function checkDuplicateTier(
+  t2Slugs: Set<string>,
+  t3Slugs: Set<string>,
+  t4Slugs: Set<string>,
+): Violation[] {
+  const result: Violation[] = [];
+  const tierMap = new Map<string, string[]>();
+
+  const addToMap = (slugs: Set<string>, tierName: string): void => {
+    for (const slug of slugs) {
+      const existing = tierMap.get(slug) ?? [];
+      existing.push(tierName);
+      tierMap.set(slug, existing);
+    }
+  };
+
+  // T2 today is vendored (committed under .agents/skills/, surfaced via the T1
+  // dir walk). The param is preserved for symmetry; populate if a future
+  // install.ts-declared T2 model returns.
+  addToMap(t2Slugs, 'T2_VENDORED');
+  addToMap(t3Slugs, 'PROJECT_LEVEL_SKILLS');
+  addToMap(t4Slugs, 'USER_LEVEL_SKILLS');
+
+  for (const [slug, tiers] of tierMap) {
+    if (tiers.length > 1) {
+      result.push({
+        severity: 'ERROR',
+        scope: slug,
+        msg: `DUPLICATE-TIER: skill appears in multiple tier arrays: ${tiers.join(', ')}`,
+      });
+    }
+  }
+
+  return result;
+}
+
+// -----------------------------------------------------------------------------
+// Checks 11–12 — session-management contract
+// -----------------------------------------------------------------------------
+
+/** Check 22: a skill flagged `metadata.stage_owner: true` must carry the dispatch section AGENTS.md §3 demands. */
+function checkStageOwnerDispatch(slug: string, stageOwner: boolean, body: string): Violation[] {
+  if (!stageOwner || /^## Subagent Dispatch Strategy\b/m.test(body)) { return []; }
+  return [{
+    severity: 'ERROR',
+    scope: slug,
+    msg: 'STAGE-OWNER-DISPATCH: frontmatter declares `metadata.stage_owner: true` but the body has no `## Subagent Dispatch Strategy` section (AGENTS.md §3 workflow skill compliance)',
+  }];
+}
+
+function checkSessionBanner(slug: string, body: string): Violation[] {
+  if (!(slug in SESSION_RETROFITTED_SKILLS)) { return []; }
+  if (body.includes(SESSION_BANNER_PREFIX)) { return []; }
+  return [{
+    severity: 'ERROR',
+    scope: slug,
+    msg: 'SESSION-BANNER-MISSING: SKILL.md body missing the verbatim session-management banner prefix (see session-management.md §3)',
+  }];
+}
+
+function checkSessionPhase0(slug: string, body: string): Violation[] {
+  if (!(slug in SESSION_RETROFITTED_SKILLS)) { return []; }
+  const match = PHASE_0_HEADING.exec(body);
+  if (!match) {
+    return [{
+      severity: 'ERROR',
+      scope: slug,
+      msg: 'SESSION-PHASE-0-MISSING: SKILL.md has no `## Phase 0` (or `## Phase -1`) heading',
+    }];
+  }
+  const headingIdx = match.index;
+  const restAfter = body.slice(headingIdx + match[0].length);
+  const nextH2 = restAfter.search(/\n## /);
+  const sectionBody = nextH2 === -1 ? restAfter : restAfter.slice(0, nextH2);
+  if (!sectionBody.includes('.session/')) {
+    return [{
+      severity: 'ERROR',
+      scope: slug,
+      msg: 'SESSION-PHASE-0-MISSING: Phase 0 section does not mention `.session/` — must reference session-management resume path',
+    }];
+  }
+  return [];
+}
+
+function checkSessionScopes(repoRoot: string): Violation[] {
+  const result: Violation[] = [];
+  const sessionRoot = join(repoRoot, '.session');
+  if (!existsSync(sessionRoot)) { return result; }
+  for (const [skillSlug, scopeRegex] of Object.entries(SESSION_RETROFITTED_SKILLS)) {
+    const skillSessionDir = join(sessionRoot, skillSlug);
+    if (!existsSync(skillSessionDir)) { continue; }
+    let entries: string[];
+    try { entries = readdirSync(skillSessionDir); }
+    catch { continue; }
+    for (const e of entries) {
+      const full = join(skillSessionDir, e);
+      let s;
+      try { s = statSync(full); }
+      catch { continue; }
+      if (scopeRegex === null) {
+        if (s.isDirectory()) {
+          result.push({
+            severity: 'WARN',
+            scope: skillSlug,
+            msg: `SESSION-SCOPE-INVALID: .session/${skillSlug}/${e}/ exists but ${skillSlug} stores state directly under .session/${skillSlug}/ (no <scope> segment expected)`,
+          });
+        }
+      }
+      else {
+        if (!s.isDirectory()) { continue; }
+        if (!scopeRegex.test(e)) {
+          result.push({
+            severity: 'WARN',
+            scope: skillSlug,
+            msg: `SESSION-SCOPE-INVALID: .session/${skillSlug}/${e}/ does not match expected scope shape ${scopeRegex}`,
+          });
+        }
+      }
+    }
+  }
+  return result;
+}
+
+// -----------------------------------------------------------------------------
+// Repo-wide skill-content checks: hardcoded customfield IDs + literal tool commands
+// -----------------------------------------------------------------------------
+
+/**
+ * Recursive markdown walker. Returns absolute paths of every `*.md` file under
+ * `dir`. Silently tolerates unreadable paths.
+ */
+function walkSkillMarkdown(dir: string, files: string[] = []): string[] {
+  let entries;
+  try { entries = readdirSync(dir); }
+  catch { return files; }
+  for (const e of entries) {
+    const full = join(dir, e);
+    let s;
+    try { s = statSync(full); }
+    catch { continue; }
+    if (s.isDirectory()) { walkSkillMarkdown(full, files); }
+    else if (e.endsWith('.md')) { files.push(full); }
+  }
+  return files;
+}
+
+/** Map a SKILLS_DIR-rooted file path to its owning skill slug, or null. */
+function skillSlugForFile(file: string): string | null {
+  // Normalize separators before comparing. `SKILLS_DIR` and `file` are built with
+  // path.join (backslashes on Windows), but the prefix is forward-slash-suffixed.
+  // Without normalization every startsWith() fails on Windows, so no file maps to a
+  // skill slug and every tool-owner skill loses its SKILL-LITERAL-TOOL/CFID exemption.
+  const normFile = file.replace(/\\/g, '/');
+  const prefix = `${SKILLS_DIR.replace(/\\/g, '/')}/`;
+  if (!normFile.startsWith(prefix)) { return null; }
+  const rest = normFile.slice(prefix.length);
+  const slash = rest.indexOf('/');
+  return slash === -1 ? rest : rest.slice(0, slash);
+}
+
+/**
+ * Anti-pattern citations are lines that document the rule by stating it
+ * negatively (e.g. "NEVER hardcode customfield_NNNNN", "❌ No literal tool
+ * commands"). These lines legitimately include the banned token as an
+ * illustration; skipping them prevents the methodology's own rules from
+ * tripping their own lint.
+ */
+function isAntiPatternCitation(line: string): boolean {
+  if (/\b(?:NEVER|Never |Anti-pattern|Restrictions|never appear)\b/.test(line)) { return true; }
+  if (/❌/.test(line)) { return true; }
+  if (/\*\*No\s/.test(line)) { return true; }
+  if (/^\s*[-*]\s+No\s/.test(line)) { return true; }
+  return false;
+}
+
+/** Gather every `*.md` under `.agents/skills/` minus autogenerated aggregates. */
+function gatherAllSkillMarkdown(): string[] {
+  if (!existsSync(SKILLS_DIR)) { return []; }
+  return walkSkillMarkdown(SKILLS_DIR).filter((f) => {
+    // `/`-normalised: the `includes('/')` top-level guard below is dead on
+    // Windows otherwise. Latent today (every SKILL_AGGREGATE_FILES entry is a
+    // top-level name), live the moment a nested basename joins that set.
+    const rel = relativePosix(SKILLS_DIR, f);
+    if (!rel.includes('/') && SKILL_AGGREGATE_FILES.has(rel)) { return false; }
+    return true;
+  });
+}
+
+/**
+ * Every committed markdown file under `.agents/` that the project authors:
+ * community skill bodies (T3 / T4 tiers, real directories or symlinks) and the
+ * generated aggregates (`REGISTRY.md`, `.agents/prompts/`) are skipped.
+ */
+function gatherVolatileTargets(communitySlugs: ReadonlySet<string>): string[] {
+  const out: string[] = [];
+  const agentsDir = join(REPO_ROOT, '.agents');
+  const walk = (dir: string): void => {
+    for (const e of readdirSync(dir)) {
+      const full = join(dir, e);
+      if (lstatSync(full).isSymbolicLink()) { continue; }
+      const st = statSync(full);
+      if (st.isDirectory()) {
+        if (dir === agentsDir && e === 'prompts') { continue; }
+        if (dir === SKILLS_DIR && communitySlugs.has(e)) { continue; }
+        walk(full);
+      }
+      else if (e.endsWith('.md')) {
+        const rel = relativePosix(SKILLS_DIR, full);
+        if (!rel.includes('/') && SKILL_AGGREGATE_FILES.has(rel)) { continue; }
+        out.push(full);
+      }
+    }
+  };
+  if (existsSync(agentsDir)) { walk(agentsDir); }
+  if (existsSync(AGENTS_MD)) { out.push(AGENTS_MD); }
+  return out.filter(f => !isVolatileExemptPath(relativePosix(REPO_ROOT, f)));
+}
+
+/** Checks 20-21: FILE-LINE + CURRENT-STATE over the prose of the files above. */
+function checkVolatileFacts(files: string[]): void {
+  for (const file of files) {
+    let text: string;
+    try { text = readFileSync(file, 'utf8'); }
+    catch { continue; }
+    const rel = relativePosix(REPO_ROOT, file);
+    const seen = new Set<string>();
+    for (const hit of scanVolatile(text, { html: false })) {
+      const key = `${hit.line}:${hit.kind}`;
+      if (seen.has(key)) { continue; }
+      seen.add(key);
+      violation(VOLATILE_SEVERITY[hit.kind], rel, `${hit.kind}: \`${hit.match}\` (line ${hit.line}) — ${volatileRemedy(hit.kind)}`);
+    }
+  }
+}
+
+interface GrepFinding { file: string, line: number, text: string, match: string }
+
+function scanSkillLines(
+  files: string[],
+  pattern: RegExp,
+  predicate: (line: string, match: RegExpExecArray) => boolean,
+): GrepFinding[] {
+  const out: GrepFinding[] = [];
+  for (const file of files) {
+    let text: string;
+    try { text = readFileSync(file, 'utf8'); }
+    catch { continue; }
+    const lines = text.split('\n');
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      pattern.lastIndex = 0;
+      const m = pattern.exec(line);
+      if (m === null) { continue; }
+      if (!predicate(line, m)) { continue; }
+      out.push({ file, line: i + 1, text: line.trim(), match: m[0] });
+    }
+  }
+  return out;
+}
+
+function relScopeForSkillFile(file: string): string {
+  // `relative` + normalise, not a `${REPO_ROOT}/` string replace: on Windows both
+  // sides are backslash-separated, so the replace never matched and the finding
+  // printed an absolute path. `skillSlugForFile` above already gets this right.
+  return relativePosix(REPO_ROOT, file);
+}
+
+/**
+ * SKILL-HARDCODED-CFID — flag `customfield_NNNN` literals outside tool-owner
+ * skills. Workflow skills consume customfields via `{{jira.<slug>}}` resolved
+ * against `.agents/jira-fields.json`; literal IDs are workspace-coupled and
+ * break methodology portability.
+ */
+function checkSkillHardcodedCfid(files: string[]): void {
+  const re = /customfield_\d{4,}/;
+  const allowed = (file: string) => {
+    const slug = skillSlugForFile(file);
+    return slug !== null && HARDCODED_CFID_ALLOWED_SKILLS.has(slug);
+  };
+  const scoped = files.filter(f => !allowed(f));
+  const hits = scanSkillLines(scoped, re, line => !isAntiPatternCitation(line));
+  for (const h of hits) {
+    violation(
+      'ERROR',
+      relScopeForSkillFile(h.file),
+      `[SKILL-HARDCODED-CFID] line ${h.line}: hardcoded \`${h.match}\` — use {{jira.<slug>}} instead`,
+    );
+  }
+}
+
+/**
+ * SKILL-LITERAL-TOOL — flag literal CLI / MCP / REST commands outside tool-
+ * owner skills. Workflow skills must cite `[ISSUE_TRACKER_TOOL]` /
+ * `[TMS_TOOL]` / `[KNOWLEDGE_BASE_TOOL]` pseudo-code and load the owning tool
+ * skill (`/acli`, `/xray-cli`) for the HOW.
+ *
+ * Command-shape regex avoids prose false positives (`/acli`, `(acli is T1)`,
+ * "the acli CLI does X"):
+ *   - acli must be preceded by line-start / whitespace / `$` / backtick
+ *     AND followed by a real subcommand (jira / confluence / admin / rovodev /
+ *     auth / workitem).
+ *   - xray must be preceded by same context AND followed by xray-cli
+ *     subcommand (test / plan / execution / run / project / auth / import).
+ *   - mcp__atlassian__ + curl/...rest/api/3/... are always command-shape.
+ */
+function checkSkillLiteralTools(files: string[]): void {
+  const re = /(?:^|[\s$`])(?:acli (?:jira|confluence|admin|rovodev|auth|workitem)|xray (?:test|plan|execution|run|project|auth|import))\b|mcp__atlassian__|curl[^\n]*rest\/api\/3\//;
+  const allowed = (file: string) => {
+    const slug = skillSlugForFile(file);
+    return slug !== null && LITERAL_TOOL_ALLOWED_SKILLS.has(slug);
+  };
+  const scoped = files.filter(f => !allowed(f));
+  const hits = scanSkillLines(scoped, re, line => !isAntiPatternCitation(line));
+  for (const h of hits) {
+    violation(
+      'ERROR',
+      relScopeForSkillFile(h.file),
+      `[SKILL-LITERAL-TOOL] line ${h.line}: literal tool command — replace with \`[ISSUE_TRACKER_TOOL]\` / \`[TMS_TOOL]\` pseudo-code; HOW belongs in the owning tool skill`,
+    );
+  }
+}
+
+// -----------------------------------------------------------------------------
+// Main
+// -----------------------------------------------------------------------------
+
+function main(): void {
+  // ---- Load and parse install.ts ----
+  if (!existsSync(INSTALL_TS)) {
+    console.error(`FATAL: ${INSTALL_TS} not found`);
+    process.exit(1);
+  }
+  const installText = readFileSync(INSTALL_TS, 'utf8');
+  const install = parseInstallTs(installText);
+
+  // ---- Build tier slug sets ----
+  // T2 today is vendored (committed under .agents/skills/<slug>/ with `vendored_from`
+  // frontmatter) — captured via the T1 dir walk, not via a separate install.ts array.
+  // The empty Set is kept for symmetry with the DUPLICATE-TIER signature; if a
+  // future T2 declared-via-install model returns, populate it here.
+  const t2Slugs = new Set<string>();
+  const t3Slugs = new Set<string>();
+  for (const e of install.projectLevel) {
+    if (e.skill) { t3Slugs.add(e.skill); }
+  }
+  const t4Slugs = new Set<string>();
+  for (const e of install.userLevel) {
+    if (e.skill) { t4Slugs.add(e.skill); }
+  }
+
+  // ---- Walk .agents/skills/ to catalog T1 skills + collect categories ----
+  if (!existsSync(SKILLS_DIR)) {
+    console.error(`FATAL: ${SKILLS_DIR} not found`);
+    process.exit(1);
+  }
+
+  interface T1Skill {
+    slug: string
+    skillDir: string
+    skillMdPath: string
+    frontmatter: SkillFrontmatter | null
+    body: string
+  }
+  const t1Skills: T1Skill[] = [];
+  const t1WithFrameworkEvolution: string[] = [];
+  const committedCommunity = new Set<string>();
+
+  for (const entry of readdirSync(SKILLS_DIR)) {
+    const slugPath = join(SKILLS_DIR, entry);
+    // Symlinked entries (community skills linked from .agents/skills) are NOT
+    // T1 — their tier comes from install.ts. Mirrors the symlink-awareness in
+    // build-skill-registry.ts so tier classification stays consistent.
+    if (lstatSync(slugPath).isSymbolicLink()) { continue; }
+    if (!statSync(slugPath).isDirectory()) { continue; }
+
+    const skillMd = join(slugPath, 'SKILL.md');
+    if (!existsSync(skillMd)) {
+      // Check 1: directory present without SKILL.md → exempt only if T3.
+      if (!t3Slugs.has(entry)) {
+        violation('ERROR', entry, 'directory has no SKILL.md and is not a T3 community skill');
+      }
+      continue;
+    }
+
+    // A community skill committed as a real directory in the store (downstream
+    // projects commit their `bunx skills add` output) is still the tier
+    // install.ts says. Classifying it T1 linted a vendor body as if the project
+    // authored it and exempted it from the AGENTS.md §5 cross-check.
+    if (t3Slugs.has(entry) || t4Slugs.has(entry)) { committedCommunity.add(entry); continue; }
+
+    const content = readFileSync(skillMd, 'utf8');
+    // Extract body (everything after frontmatter) for STALE-PATH check.
+    let body = content;
+    if (body.startsWith('---')) {
+      const end = body.indexOf('\n---', 3);
+      if (end !== -1) { body = body.slice(end + 4); }
+    }
+    const fm = parseFrontmatter(content);
+    t1Skills.push({ slug: entry, skillDir: slugPath, skillMdPath: skillMd, frontmatter: fm, body });
+
+    // Check 1: frontmatter must declare at least one known category.
+    if (!fm) {
+      if (!t3Slugs.has(entry)) {
+        violation('ERROR', entry, 'SKILL.md has no parseable YAML frontmatter');
+      }
+      continue;
+    }
+
+    // `complementary_categories` is strictly OPTIONAL. We only audit values
+    // when present-nonempty (vocabulary + framework-evolution tracking).
+    // Absent and empty states are tolerated silently.
+    if (fm.categoriesField.state === 'present-nonempty') {
+      for (const cat of fm.categoriesField.values) {
+        if (!KNOWN_CATEGORIES.has(cat)) {
+          violation('ERROR', entry, `cites unknown category \`${cat}\` (not in §5.1 vocabulary)`);
+        }
+      }
+      if (fm.categoriesField.values.includes('framework-evolution')) {
+        t1WithFrameworkEvolution.push(entry);
+      }
+    }
+
+    // Checks 15-17: purpose axis (`metadata.kind`). Runs on every skill this
+    // walk classifies as T1 (project-authored) or vendored T2; the committed
+    // community skills were skipped above, so a vendor body is never linted.
+    if (fm.kind === undefined) {
+      violation('ERROR', entry, 'KIND-MISSING: frontmatter must declare `metadata.kind` (one of: context, workflow, utility, core); see skill-composition-strategy.md §2b');
+    }
+    else if (!KNOWN_KINDS.has(fm.kind)) {
+      violation('ERROR', entry, `KIND-VOCAB: \`metadata.kind: ${fm.kind}\` is not in the §2b vocabulary (context, workflow, utility, core)`);
+    }
+    else if (!KIND_SUFFIX_EXEMPT.has(entry)) {
+      for (const rule of KIND_SUFFIX_RULES) {
+        const matchedSuffix = rule.suffixes.find(suffix => entry.endsWith(suffix));
+        if (matchedSuffix && fm.kind !== rule.kind) {
+          violation('ERROR', entry, `KIND-SUFFIX: slug ends \`${matchedSuffix}\` so \`metadata.kind\` must be \`${rule.kind}\`, found \`${fm.kind}\``);
+        }
+        if (fm.kind === rule.kind && !matchedSuffix) {
+          violation('ERROR', entry, `KIND-SUFFIX: \`metadata.kind: ${rule.kind}\` requires a slug ending ${rule.suffixes.map(s => `\`${s}\``).join(' / ')} (grandfathered by name in KIND_SUFFIX_EXEMPT: ${[...KIND_SUFFIX_EXEMPT].join(', ')})`);
+        }
+      }
+    }
+
+    // Check 18: every declared MCP capability is in the vocabulary.
+    const declaredCapabilities = new Set(fm.requiresCapabilities ?? []);
+    for (const capability of declaredCapabilities) {
+      if (!KNOWN_CAPABILITIES.has(capability)) {
+        violation('ERROR', entry, `CAPABILITY-VOCAB: \`metadata.requires_capabilities\` names \`${capability}\`, not in the mcp-capabilities.md §2 vocabulary (${[...KNOWN_CAPABILITIES].join(', ')})`);
+      }
+    }
+
+    // Check 19 (heuristic, WARN): a resolution tag in the SKILL.md body without
+    // the matching declaration. Body only — references/ are out of scope. A
+    // `core` skill hosts doctrine that DESCRIBES the tags; it never uses them.
+    const bodyOutsideFences = fm.kind === 'core' ? '' : stripFencedCodeBlocks(body);
+    for (const { tag, capability } of CAPABILITY_TAGS) {
+      if (bodyOutsideFences.includes(tag) && !declaredCapabilities.has(capability)) {
+        violation('WARN', entry, `CAPABILITY-UNDECLARED: body uses \`${tag}\` but \`metadata.requires_capabilities\` does not declare \`${capability}\` (declare it, or drop the mention if the skill never uses it; mcp-capabilities.md §3)`);
+      }
+    }
+
+    // Check 23: a declared write scope is a context skill's own references/.
+    if (fm.writes !== undefined) {
+      if (fm.kind !== 'context') {
+        violation('ERROR', entry, `CONTEXT-WRITES: \`metadata.writes\` is the context-kind amendment; a \`${fm.kind ?? 'kind-less'}\` skill does not declare a write scope (skill-scaffold.md §2)`);
+      }
+      else {
+        for (const target of fm.writes) {
+          const norm = target.replace(/\\/g, '/').replace(/^\.\//, '');
+          if (!(norm === 'references' || norm.startsWith('references/')) || norm.includes('..')) {
+            violation('ERROR', entry, `CONTEXT-WRITES: \`metadata.writes\` names \`${target}\`; a context skill writes only under its own \`references/\``);
+          }
+        }
+        const refresh = join(slugPath, 'references', 'refresh.md');
+        if (!existsSync(refresh)) {
+          violation('ERROR', entry, 'CONTEXT-WRITES: a context skill that declares `metadata.writes` must carry `references/refresh.md`, the procedure its write path runs');
+        }
+        const procedure = `${body}\n${existsSync(refresh) ? readFileSync(refresh, 'utf8') : ''}`;
+        for (const tag of JIRA_WRITE_TAGS) {
+          if (procedure.includes(tag)) {
+            violation('ERROR', entry, `CONTEXT-WRITES: a context skill with a write scope carries \`${tag}\`; it edits its own map, never a tracker`);
+          }
+        }
+      }
+    }
+  }
+
+  // Build T1 dir slug set (available after the T1 walk).
+  const t1DirSlugs = new Set<string>(t1Skills.map(s => s.slug));
+
+  // ---- Check 2: PROJECT_LEVEL_SKILLS shape ----
+  for (const [i, e] of install.projectLevel.entries()) {
+    if (!e.package) { violation('ERROR', 'PROJECT_LEVEL_SKILLS', `entry #${i} missing \`package\` field`); }
+    if (!e.skill) { violation('ERROR', 'PROJECT_LEVEL_SKILLS', `entry #${i} missing \`skill\` field`); }
+  }
+
+  // ---- Check 3: USER_LEVEL_SKILLS shape ----
+  for (const [i, e] of install.userLevel.entries()) {
+    if (!e.package) { violation('ERROR', 'USER_LEVEL_SKILLS', `entry #${i} missing \`package\` field`); }
+    if (!e.skill) { violation('ERROR', 'USER_LEVEL_SKILLS', `entry #${i} missing \`skill\` field`); }
+  }
+
+  // ---- Check 5: framework-development exclusivity ----
+  const fwDev = t1Skills.find(s => s.slug === 'framework-development');
+  if (!fwDev) {
+    violation('ERROR', 'framework-development', 'expected T1 skill at .agents/skills/framework-development/SKILL.md not found');
+  }
+  else if (fwDev.frontmatter?.categoriesField.state !== 'present-nonempty'
+    || !fwDev.frontmatter.categoriesField.values.includes('framework-evolution')) {
+    violation('ERROR', 'framework-development', 'must declare category `framework-evolution` in frontmatter');
+  }
+  if (t1WithFrameworkEvolution.length > 1) {
+    const others = t1WithFrameworkEvolution.filter(s => s !== 'framework-development').join(', ');
+    violation('ERROR', 'framework-evolution', `category MUST be exclusive to \`framework-development\`; also claimed by: ${others}`);
+  }
+
+  // ---- Check 6: anti-leak ----
+  for (const slug of ANTI_LEAK_SKILLS) {
+    const skillMd = join(SKILLS_DIR, slug, 'SKILL.md');
+    if (!existsSync(skillMd)) {
+      violation('ERROR', slug, 'expected workflow SKILL.md missing — anti-leak rule cannot be checked');
+      continue;
+    }
+    const content = readFileSync(skillMd, 'utf8');
+    if (hasAntiLeakViolation(content)) {
+      violation('ERROR', slug, 'body contains `/sdd-` outside the "Forbidden invocations" section');
+    }
+  }
+
+  // ---- Checks 7–10 (new) ----
+
+  // Check 7: TIER-MISMATCH
+  if (!existsSync(AGENTS_MD)) {
+    violation('ERROR', '[lint-skills]', 'AGENTS.md missing at repo root — TIER-MISMATCH check skipped');
+  }
+  else {
+    const { entries, parseError } = parseAgentsMdSkillsRegistry(AGENTS_MD);
+    if (parseError) {
+      violation('WARN', '[lint-skills]', `TIER-MISMATCH parse failure: ${parseError}`);
+    }
+    else {
+      violations.push(...checkTierMismatch(entries, t1DirSlugs, t2Slugs, t3Slugs, t4Slugs));
+    }
+  }
+
+  // Check 8: STALE-PATH — SKILL.md bodies + each skill's references/*.md
+  for (const skill of t1Skills) {
+    // A context skill's `.context/` cites are strict: the map must exist.
+    const strictContext = skill.frontmatter?.kind === 'context';
+    violations.push(...checkStalePaths(skill.slug, skill.skillDir, skill.body, REPO_ROOT, 'SKILL.md', strictContext));
+    const refsDir = join(skill.skillDir, 'references');
+    if (!existsSync(refsDir)) { continue; }
+    for (const ref of readdirSync(refsDir)) {
+      if (!ref.endsWith('.md')) { continue; }
+      let refText: string;
+      try { refText = readFileSync(join(refsDir, ref), 'utf8'); }
+      catch { continue; }
+      violations.push(...checkStalePaths(skill.slug, skill.skillDir, refText, REPO_ROOT, `references/${ref}`, strictContext));
+    }
+  }
+
+  // Check 9: DUPLICATE-TIER
+  violations.push(...checkDuplicateTier(t2Slugs, t3Slugs, t4Slugs));
+
+  // Checks 11–14: session-management contract
+  for (const skill of t1Skills) {
+    violations.push(...checkSessionBanner(skill.slug, skill.body));
+    violations.push(...checkSessionPhase0(skill.slug, skill.body));
+    violations.push(...checkStageOwnerDispatch(skill.slug, skill.frontmatter?.stageOwner ?? false, skill.body));
+  }
+  violations.push(...checkSessionScopes(REPO_ROOT));
+
+  // Checks 13–14: repo-wide skill-content checks (slug + tool-abstraction doctrine).
+  const skillFiles = gatherAllSkillMarkdown();
+  checkSkillHardcodedCfid(skillFiles);
+  checkSkillLiteralTools(skillFiles);
+
+  // Checks 20-21: volatile facts (Critical Rule #17) over .agents/**/*.md + AGENTS.md.
+  checkVolatileFacts(gatherVolatileTargets(new Set([...t3Slugs, ...t4Slugs])));
+
+  // ---- Report ----
+  const communityNote = committedCommunity.size > 0
+    ? ` (+ ${committedCommunity.size} community skills committed in the store, tiers from cli/install.ts)`
+    : '';
+  console.log(`Scanning .agents/skills ... ${t1Skills.length} T1 skills${communityNote}`);
+  const checkNames = [
+    'T1 frontmatter parseability',
+    'T3 PROJECT_LEVEL_SKILLS shape',
+    'T4 USER_LEVEL_SKILLS shape',
+    'category vocabulary (only when declared)',
+    '`framework-development` exclusivity',
+    'anti-leak (`/sdd-` outside Forbidden invocations)',
+    'TIER-MISMATCH (AGENTS.md §5 vs install.ts)',
+    'STALE-PATH (inline-code path references in SKILL.md + references/*.md bodies)',
+    'DUPLICATE-TIER (skill slug in multiple tier arrays)',
+    'SESSION-BANNER-MISSING (retrofitted SKILL.md missing session-management banner)',
+    'SESSION-PHASE-0-MISSING (retrofitted SKILL.md missing Phase 0 with .session/ ref)',
+    'SESSION-SCOPE-INVALID (.session/<skill>/<scope>/ shape mismatch)',
+    'SKILL-HARDCODED-CFID (literal customfield_NNNN outside tool-owner allowlist)',
+    'SKILL-LITERAL-TOOL (literal acli / xray / mcp__atlassian__ / curl rest/api/3/ outside tool-owner allowlist)',
+    'KIND-MISSING (T1 / vendored T2 SKILL.md without `metadata.kind`)',
+    'KIND-VOCAB (`metadata.kind` outside context / workflow / utility / core)',
+    'KIND-SUFFIX (slug suffix `-context` / `-cli` / `-tool` / `-app` vs declared kind, both directions)',
+    'CAPABILITY-VOCAB (`metadata.requires_capabilities` outside web-search / library-docs / db / api-schema / diagrams)',
+    'CAPABILITY-UNDECLARED (resolution tag in SKILL.md body without the matching declaration; WARN)',
+    `FILE-LINE (path:line citation in .agents/**/*.md + AGENTS.md prose; ${VOLATILE_SEVERITY['FILE-LINE']})`,
+    `CURRENT-STATE (today / as of / dated measurement / since <version> / tool version in the same prose; ${VOLATILE_SEVERITY['CURRENT-STATE']})`,
+    'STAGE-OWNER-DISPATCH (`metadata.stage_owner: true` without a `## Subagent Dispatch Strategy` section)',
+    'CONTEXT-WRITES (`metadata.writes` outside a context skill, outside its own `references/`, without `references/refresh.md`, or next to a Jira tag)',
+  ];
+
+  if (violations.length === 0) {
+    console.log(`✓ lint:skills passed (${checkNames.length}/${checkNames.length} checks)`);
+    console.log('  Checks run:');
+    for (const c of checkNames) { console.log(`    - ${c}`); }
+    process.exit(0);
+  }
+  else {
+    const errCount = violations.filter(v => v.severity === 'ERROR').length;
+    const warnCount = violations.filter(v => v.severity === 'WARN').length;
+    const infoCount = violations.filter(v => v.severity === 'INFO').length;
+
+    console.error(`✗ lint:skills: ERROR: ${errCount}, WARN: ${warnCount}, INFO: ${infoCount}`);
+
+    const sorted = [...violations].sort((a, b) => {
+      const order: Record<Severity, number> = { ERROR: 0, WARN: 1, INFO: 2 };
+      return order[a.severity] - order[b.severity];
+    });
+
+    for (const v of sorted) { console.error(renderViolation(v)); }
+    console.error('');
+    console.error('  Doctrine: .agents/skills/agentic-qa-core/references/skill-composition-strategy.md');
+    process.exit(exitCode(violations));
+  }
+}
+
+main();

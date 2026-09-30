@@ -1,0 +1,19 @@
+# Framework gates, in one call: the full-repo checks pre-commit skips for speed
+# (format, lint, env-var parity, and the unconditional freshness/parity safety
+# nets). They live in `.husky/framework-gates.sh`, which the boilerplate updater
+# SYNCS, while this hook is project-owned and never overwritten — so a gate added
+# upstream lands here without rewriting your file. Read that file for what each
+# gate covers and why.
+#
+# The `-f` guard is required: `.husky/_/h` runs this under `sh -e`, and sourcing
+# a file that is not there would kill the hook.
+#
+# Your own pre-push gates go around this call; the ordering in this file is yours.
+GATES="$(dirname -- "$0")/framework-gates.sh"
+if [ -f "$GATES" ]; then
+  . "$GATES"
+  framework_gates_pre_push
+else
+  echo "⚠️  .husky/framework-gates.sh missing — framework pre-push gates SKIPPED."
+  echo "   Restore it with: bun run up"
+fi

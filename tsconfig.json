@@ -1,0 +1,38 @@
+{
+  "_comment": [
+    "PROJECT-OWNED — `bun run up` never overwrites this file.",
+    "",
+    "`tsconfig.base.json` is the synced half: compiler options and, above all,",
+    "the path aliases every synced file imports through. This file owns what is",
+    "genuinely the project's: which directories are type-checked.",
+    "",
+    "Override any compiler option by redeclaring it under `compilerOptions`",
+    "here — `extends` merges that object key by key. `paths` is the exception:",
+    "redeclaring it replaces the base map wholesale, so copy the base map and",
+    "append rather than listing only the new alias."
+  ],
+  "extends": "./tsconfig.base.json",
+  "include": [
+    "config/**/*.ts",
+    "tests/**/*.ts",
+    "api/**/*.ts",
+    "scripts/**/*.ts",
+    "cli/**/*.ts",
+    "packages/**/*.ts",
+    "playwright.config.ts",
+    "env.d.ts",
+    "eslint.config.js",
+    "eslint.config.base.js"
+  ],
+  "exclude": [
+    "node_modules",
+    "packages/*/node_modules",
+    "packages/*/dist",
+    "packages/kata-academy",
+    "playwright-report",
+    "test-results",
+    "allure-results",
+    "allure-report",
+    "reports"
+  ]
+}
