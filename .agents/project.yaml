@@ -147,16 +147,18 @@ git_strategy:
     feature_merge: n/a # merge-commit | squash | rebase-merge | n/a
     hotfix_policy: n/a # branch-off-prod-backmerge | via-integration | none | n/a
   policy: # how strictly protected branches are guarded (set by Strategy Setup Q4; defaults are safe)
-    direct_push_to_protected: confirm # forbidden | confirm | allowed. Ships `confirm` because meta.strategy_source is `inherited`: until Strategy Setup runs, nobody has authorized a direct push here.
+    direct_push_to_protected: allowed # forbidden | confirm | allowed. `allowed`: solo-main personal repo, the push credential is on the ruleset bypass list.
     admin_bypass: false # true only when the push credential is on the host ruleset's bypass list. While false, a "Bypassed rule violations" line from the remote is a real finding, not noise.
-    require_pr_reviews: 1 # required approving reviews on a protected branch. Reconcile against the host with `bun run git:policy verify`.
+    require_pr_reviews: 0 # required approving reviews on a protected branch. Reconcile against the host with `bun run git:policy verify`.
     # Host divergences that are ACCEPTED, not drift. Each `field` names a `git:policy verify`
     # finding verbatim (`<branch>.<policy_field>`); verify moves matching findings from DRIFT
     # to ACCEPTED (exit 0) and warns when an entry no longer matches anything (stale entry).
     # `apply` preserves the host's side for accepted fields instead of deriving its own rule.
     accepted_divergences:
       - field: main.direct_push_to_protected
-        reason: 'Repo personal solo-main, sin segundo revisor'
+        reason: 'Personal solo-main repo, no second reviewer'
+      - field: main.require_code_owner_review
+        reason: 'Host flag is inert without a CODEOWNERS file; solo repo, no code owners to assign'
   branch_prefixes:
     precedence: [feat, fix, refactor, test, docs, chore]
     naming_with_key: '{prefix}/{ISSUE-KEY}-{kebab-slug}'
@@ -164,12 +166,12 @@ git_strategy:
   meta:
     setup_version: 1
     created: null # YYYY-MM-DD stamped by Strategy Setup
-    policy_verified: null # YYYY-MM-DD of the last `bun run git:policy verify`. null = never reconciled against the host
-    policy_source: declared # verified | accepted | declared. `verified` = host matches the yaml exactly; `accepted` = every divergence is formally listed in policy.accepted_divergences (stamped by `git:policy verify --stamp`); `declared` = never reconciled, or an unaccepted drift is open.
+    policy_verified: 2026-10-01 # YYYY-MM-DD of the last `bun run git:policy verify`. null = never reconciled against the host
+    policy_source: accepted # verified | accepted | declared. `verified` = host matches the yaml exactly; `accepted` = every divergence is formally listed in policy.accepted_divergences (stamped by `git:policy verify --stamp`); `declared` = never reconciled, or an unaccepted drift is open.
     # Did anyone actually CHOOSE this strategy, or is it just the shipped default?
     # `strategy:` above is never null, so its value alone cannot answer that. Strategy
     # Setup flips this to `chosen` when the questionnaire actually runs.
-    strategy_source: inherited # inherited | chosen
+    strategy_source: chosen # inherited | chosen
 
 # Defaults for multi-session orchestration (supervised worker fleets via Orca —
 # see the orca-orchestration skill). Owned by that skill; read directly, NOT
