@@ -47,7 +47,9 @@
    terminal — the conductor owns that.
 
 7. **Write the long report BEFORE `worker_done`**, to the path the brief gives you
-   (`.session/orchestration/<slug>/reports/<label>.md`, or the scope the workflow skill declares).
+   (`<ABS>/.session/orchestration/<slug>/reports/<label>.md` in the PRIMARY checkout, or the scope
+   the workflow skill declares, always by absolute path: a report written inside your worktree dies
+   with it).
    Sections: `## Summary`, `## Files changed`, `## Commits` (sha + subject), `## Decisions taken`
    (and why), `## Verification` (commands + exit codes), `## Left open`. The message body is a
    summary; the file is the record.
@@ -151,6 +153,10 @@ breaks the resume path.
   Orphaned headless browsers once ran for hours before the owner noticed (G37).
 - One dev server and one browser per worktree. Splitting ports is NOT enough when two processes share
   a build directory in the same checkout.
+- Browser sessions are named and in memory; an owner's persistent profile is single-writer across
+  every worktree and repo on the machine, so check `playwright-cli list --all` before opening one and
+  never `kill-all` (it kills every session on the machine, G73). Canon:
+  `agentic-qa-core/references/browser-sessions.md`.
 - Check free disk before a long round. With a full disk, **writing the output fails, not the
   command**: the worker goes mute because the message command is also a shell process, while file
   writes keep working.

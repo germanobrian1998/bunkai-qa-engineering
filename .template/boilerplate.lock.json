@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 7,
+  "templateRepo": "upex-galaxy/agentic-qa-boilerplate",
+  "templateCommit": "83eae2505706f9d048dfa6749438c1dba18c949b",
+  "perComponentCommit": {
+    "skills": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "agent-compatibility": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "codex-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "scripts": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "docs": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "cli": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "vscode": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "husky": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "agents-docs": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "tooling": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "config-core": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "env-template": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "env-schema": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "worktree-include": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "orca-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "agent-root-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "playwright-cli-config": "83eae2505706f9d048dfa6749438c1dba18c949b"
+  },
+  "syncedComponents": [],
+  "ignoreFileSync": {
+    ".gitignore": {
+      "lastSyncedSha": "35a6378c3988fb596f1354845d24de01893cc67d",
+      "appendedLines": [
+        ".playwright/profiles/",
+        "storage-state-*.json"
+      ]
+    }
+  },
+  "packageJsonSync": {
+    "package.json": {
+      "scripts": {
+        "lastSyncedSha": "a1c3cc73d18a1a836163d61fa2b10e80008caaaa",
+        "appliedKeys": [
+          "worktree:audit"
+        ]
+      },
+      "devDependencies": {
+        "lastSyncedSha": "a1c3cc73d18a1a836163d61fa2b10e80008caaaa",
+        "appliedKeys": []
+      },
+      "dependencies": {
+        "lastSyncedSha": "a1c3cc73d18a1a836163d61fa2b10e80008caaaa",
+        "appliedKeys": []
+      },
+      "lint-staged": {
+        "lastSyncedSha": "a1c3cc73d18a1a836163d61fa2b10e80008caaaa",
+        "appliedKeys": []
+      }
+    }
+  },
+  "cliVersion": "8.5",
+  "lastSyncedAt": "2026-10-01T22:39:49.150Z",
+  "variableSystemVersion": 1
+}

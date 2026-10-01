@@ -106,7 +106,8 @@
     "worktree:provision": "bun scripts/provision-worktree.ts",
     "xray": "bun cli/xray/index.ts",
     "vars:schema": "bun scripts/env-schema.ts",
-    "vars:schema:check": "bun scripts/env-schema.ts --check"
+    "vars:schema:check": "bun scripts/env-schema.ts --check",
+    "worktree:audit": "bun scripts/worktree-audit.ts"
   },
   "dependencies": {
     "@clack/prompts": "^1.4.0",

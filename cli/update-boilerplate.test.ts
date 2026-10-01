@@ -1,11 +1,11 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { afterEach, describe, expect, test } from 'bun:test';
 
 import { cleanupDeprecated, componentOwnedPaths, isRepoOnlyPath, validateComponentRegistry } from './lib/updater-core.ts';
-import { COMPONENTS, DEPRECATED_FILES, GATE_SCRIPTS, gatesSummaryLine, parseArgs, resolveProtectedWatchlist, RETIRED_COMMAND_WRAPPERS, RETIRED_SKILL_FILES, runGate, summarizeGates } from './update-boilerplate.ts';
+import { COMPONENTS, DEPRECATED_FILES, GATE_SCRIPTS, gatesSummaryLine, parseArgs, resolveProtectedWatchlist, RETIRED_COMMAND_WRAPPERS, RETIRED_SKILL_FILES, runGate, summarizeGates, worktreeRefusal } from './update-boilerplate.ts';
 
 const temporaryRoots: string[] = [];
 
@@ -48,6 +48,18 @@ describe('component registry', () => {
     for (const p of ['.agents/skills', '.agents/hooks', '.opencode/plugins', '.codex', '.husky']) {
       expect(paths).toContain(p);
     }
+  });
+
+  test('.worktreeinclude ships once (bootstrap-only), so the lines a project adds survive every sync', () => {
+    expect(COMPONENTS.find(c => c.name === 'worktree-include')).toMatchObject({ type: 'file-list', paths: ['.'], files: ['.worktreeinclude'], bootstrapOnly: true });
+  });
+
+  test('.playwright/cli.config.json ships once (bootstrap-only): a project keeps its tuning, the legacy profile is a parity row', () => {
+    expect(COMPONENTS.find(c => c.name === 'playwright-cli-config')).toMatchObject({ type: 'file-list', paths: ['.playwright'], files: ['cli.config.json'], bootstrapOnly: true });
+    // Upstream's own copy is the shape the parity row asks for.
+    const shipped = JSON.parse(readFileSync(join(import.meta.dir, '..', '.playwright', 'cli.config.json'), 'utf8')) as { browser: Record<string, unknown> };
+    expect(shipped.browser.isolated).not.toBe(false);
+    expect(shipped.browser).not.toHaveProperty('userDataDir');
   });
 
   test('the retired command aliases leave the sync and are removed downstream, the project\'s own commands stay', () => {
@@ -176,6 +188,26 @@ describe('protected watchlist', () => {
       'updater.protected_paths (.agents/project.yaml): entrada ignorada "../outside.ts": outside the repo (`..` segment).',
       'updater.protected_paths (.agents/project.yaml): entrada ignorada ".git/config": under .git.',
     ]);
+  });
+});
+
+describe('worktree refusal', () => {
+  test('runs in the primary checkout, refuses in a linked worktree and names the primary', () => {
+    const base = temporaryRoot();
+    const primary = join(base, 'primary');
+    mkdirSync(primary);
+    const git = (cwd: string, ...args: string[]) => Bun.spawnSync(['git', '-C', cwd, ...args], { stdout: 'ignore', stderr: 'ignore' });
+    git(primary, 'init', '-q');
+    git(primary, '-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init');
+    const wt = join(base, 'wt');
+    git(primary, 'worktree', 'add', '-q', '-b', 'probe', wt);
+
+    expect(worktreeRefusal(primary)).toBeNull();
+    const refusal = worktreeRefusal(wt);
+    expect(refusal).toContain('bun run up');
+    expect(refusal).toContain('primary');
+    // Not a git checkout at all: not this guard's business.
+    expect(worktreeRefusal(temporaryRoot())).toBeNull();
   });
 });
 

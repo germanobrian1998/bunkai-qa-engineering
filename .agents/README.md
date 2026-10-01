@@ -119,6 +119,17 @@ Three families of syntax coexist across skills, commands and docs (`{{VAR}}`, `<
 
 The `{{…}}` vs `<<…>>` distinction is intentional: project data and ephemeral session data never share one syntax.
 
+### Checkout roots: `<<REPO_ROOT>>` and `<<PRIMARY_ROOT>>`
+
+Two session variables name a directory, and they differ the moment a session runs inside a linked git worktree (Orca, `claude --worktree`, a Codex-managed worktree, a plain `git worktree add`):
+
+| Variable | Resolves to | Use it for |
+|---|---|---|
+| `<<REPO_ROOT>>` | `git rev-parse --show-toplevel`: THIS checkout, the worktree when there is one | tracked files the session reads or edits: code, skills, docs, configs, the committed `test-specs/` |
+| `<<PRIMARY_ROOT>>` | `dirname "$(git rev-parse --path-format=absolute --git-common-dir)"`: the primary checkout, the same value from the primary and from every worktree of it | durable GITIGNORED state: `.session/**` (plans, progress, handoffs, refinements, upstream drafts), PBI `[LOCAL]` files and `evidence/`, `.context/reports/` |
+
+In the primary checkout both resolve to the same path. In a worktree, anything written under `<<REPO_ROOT>>` that git ignores dies when the worktree is removed, so durable state is always written to and resumed from `<<PRIMARY_ROOT>>`, by absolute path. `bun run worktree:audit <path>` lists what a worktree still holds before it is removed, and `--rescue` copies the state class to the same path under `<<PRIMARY_ROOT>>`.
+
 ### Active environment
 
 `project.yaml` has a top-level `environments:` map (the shipped set is the one `project.schema.yaml` lists; add or drop environments to match your project). Each environment declares the same leaves, listed under `environments:` in `project.yaml`. Skills don't hardcode "staging" or "local" anywhere — they reference the bare form (`{{WEB_URL}}` etc.) and the AI resolves it against the **active environment** for the current session:
@@ -141,6 +152,18 @@ When a document genuinely needs to compare environments (e.g. the constitution's
 Both `/sprint-testing` and `/test-documentation` resolve it at their modality gate, alongside `{{TMS_CLI}}`, and keep it sticky for the session. An unset or unrecognized value is treated as `auto` — a missing knob is the default, never a hard stop. The rationale for each value (and the cost of each override) is in `.agents/skills/sprint-testing/SKILL.md` §"Which stage creates the TCs", which is the authoritative section.
 
 Because it is a scalar leaf of a top-level section, `bun run vars:check` validates `{{TC_CREATION_STAGE}}` like any other flat project variable.
+
+### Browser pair mode
+
+`testing.browser.pair_mode` decides whether agentic browser sessions run in the AI's own browser or as **Agentic Pair Testing**, where the human and the AI test together in the human's own running Chrome (`playwright-cli attach`). Skills read it directly; it is not a `{{VAR}}` token.
+
+| Value | Meaning |
+|---|---|
+| `null` (shipped default) | not chosen yet: the first agentic browser session presents both modes, and the answer is saved here once as `true` or `false` |
+| `true` | pair testing is the default mode |
+| `false` | dedicated sessions by default; pair testing only on explicit request, after one confirmation |
+
+Unattended runs (CI, scheduled routines, a worker with no human watching) never pair, whatever the value. Canon, including what several sessions on one Chrome can and cannot share: `.agents/skills/agentic-qa-core/references/browser-sessions.md` §6.
 
 ## Workflows
 

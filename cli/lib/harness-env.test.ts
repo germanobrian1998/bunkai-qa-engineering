@@ -13,11 +13,13 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync,
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, test } from 'bun:test';
+import { CODEX_ENV_LOADER_ARGS } from './agent-compatibility-contracts.ts';
 import {
   buildAllowlist,
   check,
   CLAUDE_LOCAL_SETTINGS,
   claudeSettingsRoot,
+  codexNamesWithoutLoader,
   ensureOpencodePlaceholders,
   generate,
   OPENCODE_CONFIG,
@@ -143,6 +145,28 @@ describe('buildAllowlist', () => {
     expect(list.all).toEqual(['DBHUB_HOST', 'TAVILY_API_KEY']);
     expect(list.all).not.toContain('VAR');
     expect(list.all).not.toContain('VAR_NAME');
+  });
+
+  test('reports Codex variables only for servers that skip the .env loader', () => {
+    const root = makeRoot();
+    write(root, '.codex/config.toml', [
+      '[mcp_servers.wrapped]',
+      'command = "bunx"',
+      `args = [${[...CODEX_ENV_LOADER_ARGS, 'bunx', '-y', 'pkg@1'].map(a => JSON.stringify(a)).join(', ')}]`,
+      'env_vars = ["WRAPPED_VAR"]',
+      '',
+      '[mcp_servers.bare]',
+      'command = "bunx"',
+      'args = ["-y", "pkg@1"]',
+      'env_vars = ["BARE_VAR"]',
+      '',
+      '[mcp_servers.remote]',
+      'url = "https://example.test/mcp"',
+      'bearer_token_env_var = "REMOTE_TOKEN"',
+      '',
+    ].join('\n'));
+
+    expect(codexNamesWithoutLoader(root)).toEqual(['BARE_VAR', 'REMOTE_TOKEN']);
   });
 
   test('skips a Codex [mcp_servers.*].env table, whose values Codex supplies itself', () => {
@@ -497,6 +521,64 @@ describe('worktree redirection', () => {
     const serialised = JSON.stringify(check(wt));
     expect(serialised).not.toContain('worktree-value');
     expect(serialised).not.toContain('main-value');
+  });
+
+  /** A main checkout holding a real env block, and one worktree of it with no `.env`. */
+  function mainWithWorktree(): { main: string, wt: string, settings: string } {
+    const parent = makeRoot();
+    const main = join(parent, 'main');
+    mkdirSync(main, { recursive: true });
+    run(main, ['init', '-q']);
+    run(main, ['-c', 'user.email=t@t.invalid', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'init']);
+    scaffold(main, 'TAVILY_API_KEY=tk\nDBHUB_HOST=db.invalid\n');
+    generate(main);
+    const wt = join(parent, 'wt');
+    run(main, ['worktree', 'add', '-q', wt, '-b', 'probe']);
+    scaffold(wt, '');
+    rmSync(join(wt, '.env'));
+    return { main, wt, settings: join(main, CLAUDE_LOCAL_SETTINGS) };
+  }
+
+  test('refuses to write from a worktree with no .env, and leaves the main env block intact', () => {
+    if (process.platform === 'win32') { return; }
+    const { wt, settings } = mainWithWorktree();
+    const before = readFileSync(settings, 'utf8');
+
+    const result = generate(wt);
+    expect(result.refused).toContain('bun run worktree:provision');
+    expect(result.changed).toBe(false);
+    expect(readFileSync(settings, 'utf8')).toBe(before);
+    // Emitter B is held back too: nothing is written while the run is refused.
+    expect(existsSync(join(wt, OPENCODE_SECRET_DIR))).toBe(false);
+    // No override reaches a run with nothing to generate from.
+    expect(generate(wt, { allowPrimaryRemoval: true }).refused).toBeDefined();
+    expect(readFileSync(settings, 'utf8')).toBe(before);
+  });
+
+  test('refuses a worktree .env that would strip credentials from the main block, unless overridden', () => {
+    if (process.platform === 'win32') { return; }
+    const { wt, settings } = mainWithWorktree();
+    // The shape an unprovisioned worktree invites: `.env` copied from the template.
+    write(wt, '.env', 'TAVILY_API_KEY=\nDBHUB_HOST=\n');
+    const before = readFileSync(settings, 'utf8');
+
+    const refused = generate(wt);
+    expect(refused.refused).toContain('TAVILY_API_KEY');
+    expect(refused.refused).toContain('--allow-primary-removal');
+    expect(JSON.stringify(refused)).not.toContain('db.invalid');
+    expect(readFileSync(settings, 'utf8')).toBe(before);
+
+    const allowed = generate(wt, { allowPrimaryRemoval: true });
+    expect(allowed.refused).toBeUndefined();
+    expect(allowed.claude.removed).toEqual(['DBHUB_HOST', 'TAVILY_API_KEY']);
+    expect(readFileSync(settings, 'utf8')).not.toContain('TAVILY_API_KEY');
+  });
+
+  test('a provisioned worktree is not refused', () => {
+    if (process.platform === 'win32') { return; }
+    const { wt } = mainWithWorktree();
+    write(wt, '.env', 'TAVILY_API_KEY=tk\nDBHUB_HOST=db.invalid\n');
+    expect(generate(wt).refused).toBeUndefined();
   });
 
   test('a plain checkout is never redirected', () => {

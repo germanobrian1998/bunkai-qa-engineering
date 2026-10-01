@@ -6,17 +6,24 @@ import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, test } from 'bun:test';
 
 import {
+  agentContextLines,
+  MISSING_ENV_LINE,
   orcaAvailable,
   PERSONALITY_CONTRACT,
   proposeSessionTitle,
   resolveWorktree,
   sessionLabel,
+  UNPROVISIONED_WORKTREE_LINE,
+  worktreeUnprovisioned,
 } from '../../.agents/hooks/personality-reinject.mjs';
-import { PersonalityReinject } from '../../.opencode/plugins/personality-reinject.js';
+import opencodePlugin from '../../.opencode/plugins/personality-reinject.js';
 import {
   CLAUDE_HOOK_COMMAND,
+  CODEX_ENV_LOADER_ARGS,
+  CODEX_ENV_LOADER_COMMAND,
   CODEX_HOOK_COMMAND,
   CODEX_HOOK_COMMAND_WINDOWS,
+  CODEX_STARTUP_TIMEOUT_SEC,
   declaredMcpIds,
   EXPECTED_MCP,
   HOOK_IDENTITY_MARKER,
@@ -24,9 +31,12 @@ import {
   hookScriptPath,
   KNOWN_MCP_IDS,
   stripJsonComments,
+  unwrapCodexEnvLoader,
   validateEslintBlockWiring,
   validateHookCompatibility,
   validateMcpParity,
+  validateMcpParityFindings,
+  validateOpenCodePluginEntrypoints,
 } from './agent-compatibility-contracts.ts';
 import {
   checkAgentCompatibility,
@@ -333,11 +343,15 @@ const OPENCODE_SERVERS: Record<string, string> = {
     },`,
 };
 
+/** The `.env` loader every Codex stdio fixture starts through (CODEX_ENV_LOADER_*). */
+const CODEX_LOADER = [...CODEX_ENV_LOADER_ARGS, CODEX_ENV_LOADER_COMMAND].map(arg => JSON.stringify(arg)).join(', ');
+
 const CODEX_SERVERS: Record<string, string> = {
   'context7': `[mcp_servers.context7]
 command = "bunx"
 enabled = true
-args = ["-y", "@upstash/context7-mcp@4.0.3"]
+startup_timeout_sec = 30
+args = [${CODEX_LOADER}, "-y", "@upstash/context7-mcp@4.0.3"]
 `,
   'tavily': `[mcp_servers.tavily]
 url = "https://mcp.tavily.com/mcp/"
@@ -347,12 +361,13 @@ enabled = true
   'playwright': `[mcp_servers.playwright]
 command = "bunx"
 enabled = true
-args = ["@playwright/mcp@0.0.79", "--caps", "vision,pdf,testing,tracing,tabs", "--timeout-action", "10000", "--timeout-navigation", "30000", "--viewport-size", "1920x1080"]
+args = [${CODEX_LOADER}, "@playwright/mcp@0.0.79", "--caps", "vision,pdf,testing,tracing,tabs", "--timeout-action", "10000", "--timeout-navigation", "30000", "--viewport-size", "1920x1080"]
 `,
   'slack-aurora': `[mcp_servers.slack-aurora]
 command = "bunx"
 enabled = true
-args = ["-y", "slack-mcp-server@latest", "--transport", "stdio"]
+startup_timeout_sec = 30
+args = [${CODEX_LOADER}, "-y", "slack-mcp-server@latest", "--transport", "stdio"]
 env_vars = ["SLACK_MCP_XOXP_TOKEN", "SLACK_MCP_REACTION_TOOL"]
 
 [mcp_servers.slack-aurora.env]
@@ -361,13 +376,15 @@ SLACK_MCP_ADD_MESSAGE_TOOL = "true"
   'dbhub': `[mcp_servers.dbhub]
 command = "bunx"
 enabled = true
-args = ["-y", "@bytebase/dbhub@1.2.1", "--config", "dbhub.toml"]
+startup_timeout_sec = 30
+args = [${CODEX_LOADER}, "-y", "@bytebase/dbhub@1.2.1", "--config", "dbhub.toml"]
 env_vars = ["DBHUB_DATABASE", "DBHUB_HOST", "DBHUB_PASSWORD", "DBHUB_PORT", "DBHUB_TYPE", "DBHUB_USER"]
 `,
   'openapi': `[mcp_servers.openapi]
 command = "bunx"
 enabled = true
-args = ["-y", "@ivotoby/openapi-mcp-server@1.16.1", "--tools", "dynamic"]
+startup_timeout_sec = 30
+args = [${CODEX_LOADER}, "-y", "@ivotoby/openapi-mcp-server@1.16.1", "--tools", "dynamic"]
 env_vars = ["API_BASE_URL", "OPENAPI_SPEC_PATH"]
 `,
   'postman': `[mcp_servers.postman]
@@ -378,7 +395,7 @@ enabled = true
   'supabase': `[mcp_servers.supabase]
 command = "bunx"
 enabled = true
-args = ["-y", "@supabase/mcp-server-supabase@latest", "--read-only"]
+args = [${CODEX_LOADER}, "-y", "@supabase/mcp-server-supabase@latest", "--read-only"]
 env_vars = ["SUPABASE_ACCESS_TOKEN"]
 
 [mcp_servers.supabase.env]
@@ -459,8 +476,8 @@ describe('shared personality hook', () => {
     expect(PERSONALITY_CONTRACT).not.toContain('CLAUDE.md');
   });
 
-  test('OpenCode mutates the system array in place with the same payload', async () => {
-    const plugin = await PersonalityReinject();
+  test('OpenCode 1 (server entrypoint) mutates the system array in place with the same payload', async () => {
+    const plugin = await opencodePlugin.server();
     const transform = plugin['experimental.chat.system.transform'];
     const output = { system: ['base system'] };
     const originalArray = output.system;
@@ -475,6 +492,26 @@ describe('shared personality hook', () => {
     expect(output.system[1]).toBe(PERSONALITY_CONTRACT);
     // The label degrades to the raw id: OpenCode exposes no session name.
     expect(output.system[2]).toContain('session=test harness=opencode');
+  });
+
+  test('OpenCode 2 (setup entrypoint) registers a context hook that pushes text parts once', async () => {
+    const hooks: Record<string, (event: { sessionID: string, system: Array<{ type: string, text: string }> }) => void> = {};
+    await opencodePlugin.setup({
+      session: { hook: async (name: string, callback: (typeof hooks)[string]) => { hooks[name] = callback; } },
+    });
+    const event = { sessionID: 'test', system: [{ type: 'text', text: 'base system' }] };
+    const originalArray = event.system;
+
+    hooks.context(event);
+    const afterFirst = event.system.length;
+    hooks.context(event);
+
+    expect(opencodePlugin.id).toBe('agentic-qa.personality-reinject');
+    expect(Object.keys(hooks)).toEqual(['context']);
+    expect(event.system).toBe(originalArray);
+    expect(event.system.length).toBe(afterFirst);
+    expect(event.system[1]).toEqual({ type: 'text', text: PERSONALITY_CONTRACT });
+    expect(event.system[2].text).toContain('session=test harness=opencode');
   });
 });
 
@@ -568,6 +605,31 @@ describe('agent identity', () => {
     const primary = temporaryRoot('agent identity primary ');
     mkdirSync(join(primary, '.git'));
     expect(resolveWorktree({ ORCA_WORKTREE_ID: 'repo-id::/work/orca/BK-123-login' }, primary)).toBe('primary');
+  });
+
+  test('an unprovisioned linked worktree gets one warning line; a primary or a submodule never does', () => {
+    const linked = temporaryRoot('agent identity unprovisioned ');
+    write(linked, '.git', 'gitdir: /elsewhere/.git/worktrees/wt-a\n');
+    expect(worktreeUnprovisioned({ repoRoot: linked })).toBe(true);
+    mkdirSync(join(linked, 'node_modules'));
+    expect(worktreeUnprovisioned({ repoRoot: linked })).toBe(true);
+    mkdirSync(join(linked, '.husky', '_'), { recursive: true });
+    expect(worktreeUnprovisioned({ repoRoot: linked })).toBe(false);
+
+    const submodule = temporaryRoot('agent identity submodule ');
+    write(submodule, '.git', 'gitdir: ../.git/modules/vendored\n');
+    expect(worktreeUnprovisioned({ repoRoot: submodule })).toBe(false);
+    const primary = temporaryRoot('agent identity primary checkout ');
+    mkdirSync(join(primary, '.git'));
+    expect(worktreeUnprovisioned({ repoRoot: primary })).toBe(false);
+
+    const identity = { worktree: 'wt-a', label: 'x', harness: 'claude-code' };
+    const lines = agentContextLines({ identity, orca: false, envMissing: false, worktreeUnprovisioned: true });
+    expect(lines).toContain(UNPROVISIONED_WORKTREE_LINE);
+    // One setup warning at most: a missing `.env` already names the provisioner.
+    const both = agentContextLines({ identity, orca: false, envMissing: true, worktreeUnprovisioned: true });
+    expect(both).toContain(MISSING_ENV_LINE);
+    expect(both).not.toContain(UNPROVISIONED_WORKTREE_LINE);
   });
 
   test('the session label follows the name-source ladder', () => {
@@ -795,6 +857,45 @@ describe('hook adapters', () => {
     expect(validateHookCompatibility(root)).toContain('OpenCode personality adapter must mutate output.system in place.');
   });
 
+  test('rejects a V1-only OpenCode adapter: OpenCode 2 refuses to load it', () => {
+    const root = contractFixture();
+    write(root, '.opencode/plugins/personality-reinject.js', [
+      'import { agentContextLines } from \'../../.agents/hooks/personality-reinject.mjs\';',
+      'export const PersonalityReinject = async () => ({',
+      '  \'experimental.chat.system.transform\': async (input, output) => {',
+      '    output.system.push(...agentContextLines({ harness: \'opencode\' }));',
+      '  },',
+      '});',
+      '',
+    ].join('\n'));
+
+    const errors = validateHookCompatibility(root);
+    expect(errors.some(e => e.includes('must default-export one plugin definition'))).toBe(true);
+    expect(errors.some(e => e.includes('OpenCode 2 entrypoint'))).toBe(true);
+  });
+
+  test('rejects an OpenCode adapter that dropped the V1 entrypoint', () => {
+    const root = contractFixture();
+    write(root, '.opencode/plugins/personality-reinject.js', [
+      'import { agentContextLines } from \'../../.agents/hooks/personality-reinject.mjs\';',
+      'export default {',
+      '  id: \'agentic-qa.personality-reinject\',',
+      '  async setup(ctx) {',
+      '    await ctx.session.hook(\'context\', (event) => {',
+      '      for (const text of agentContextLines({ harness: \'opencode\' })) { event.system.push({ type: \'text\', text }); }',
+      '    });',
+      '  },',
+      '};',
+      '',
+    ].join('\n'));
+
+    expect(validateHookCompatibility(root)).toContain('OpenCode personality adapter must keep the OpenCode 1 entrypoint: server() returning experimental.chat.system.transform.');
+  });
+
+  test('accepts the shipped dual-entrypoint OpenCode adapter', () => {
+    expect(validateOpenCodePluginEntrypoints(readFileSync(join(REPO_ROOT, '.opencode/plugins/personality-reinject.js'), 'utf8'))).toEqual([]);
+  });
+
   test('reads the emitter path out of every adapter form', () => {
     expect(hookScriptPath(CLAUDE_HOOK_COMMAND)).toBe('.agents/hooks/personality-reinject.mjs');
     expect(hookScriptPath(CODEX_HOOK_COMMAND)).toBe('.agents/hooks/personality-reinject.mjs');
@@ -1007,6 +1108,99 @@ describe('project-declared MCP set', () => {
     expect(errors).toHaveLength(1);
     expect(errors[0]).toStartWith('codex MCP openapi mismatch: expected ');
     expect(errors[0]).toContain('--read-only');
+  });
+
+  test('in the boilerplate, requires the .env loader on a Codex server that needs .env values, known or not', () => {
+    const root = contractFixture(undefined, PROJECT_IDS);
+    const configPath = join(root, '.codex/config.toml');
+    // Strip the loader from every server: the unknown `supabase` still needs a variable.
+    writeFileSync(configPath, readFileSync(configPath, 'utf8').replaceAll(`${CODEX_LOADER}, `, ''));
+
+    const errors = validateMcpParity(root, { schemaOwner: true });
+    expect(errors.some(e => e.startsWith('codex MCP supabase must launch through the .env loader'))).toBe(true);
+    expect(errors.some(e => e.startsWith('codex MCP openapi must launch through the .env loader'))).toBe(true);
+    // A server with nothing to load is left alone by the generic rule.
+    expect(errors.some(e => e.startsWith('codex MCP context7 must launch'))).toBe(false);
+  });
+
+  test('downstream, a missing Codex loader is a warning that names the file and what to add', () => {
+    const root = contractFixture(undefined, PROJECT_IDS);
+    const configPath = join(root, '.codex/config.toml');
+    writeFileSync(configPath, readFileSync(configPath, 'utf8').replaceAll(`${CODEX_LOADER}, `, ''));
+
+    const { errors, warnings } = validateMcpParityFindings(root, { schemaOwner: false });
+    expect(errors).toEqual([]);
+    // The unknown server gets the generic loader warning; a known one gets
+    // ONE launch warning, never a second one from the generic rule.
+    const supabase = warnings.filter(w => w.startsWith('codex MCP supabase '));
+    expect(supabase).toHaveLength(1);
+    expect(supabase[0]).toContain('starts without the .env loader in .codex/config.toml');
+    expect(supabase[0]).toContain(`set command = "${CODEX_ENV_LOADER_COMMAND}"`);
+    expect(supabase[0]).toContain(JSON.stringify(CODEX_ENV_LOADER_ARGS));
+    const openapi = warnings.filter(w => w.startsWith('codex MCP openapi '));
+    expect(openapi).toHaveLength(1);
+    expect(openapi[0]).toStartWith('codex MCP openapi launch is out of date in .codex/config.toml: set command = ');
+    // context7 needs no variable, but it is a known server: its pinned shape
+    // carries the loader, so it is warned about too.
+    expect(warnings.some(w => w.startsWith('codex MCP context7 launch is out of date'))).toBe(true);
+    // The compat error group stays MCP, so the doctor and the updater place it.
+    expect(warnings.every(w => /\bMCP\b/.test(w))).toBe(true);
+  });
+
+  test('ownership comes from package.json: the boilerplate errors, any other name warns', () => {
+    const root = contractFixture(undefined, PROJECT_IDS);
+    const configPath = join(root, '.codex/config.toml');
+    writeFileSync(configPath, readFileSync(configPath, 'utf8').replaceAll(`${CODEX_LOADER}, `, ''));
+
+    expect(validateMcpParity(root)).toEqual([]);
+    write(root, 'package.json', JSON.stringify({ name: 'my-qa-project' }));
+    expect(validateMcpParity(root)).toEqual([]);
+    write(root, 'package.json', JSON.stringify({ name: 'agentic-qa-boilerplate' }));
+    expect(validateMcpParity(root).some(e => e.includes('must launch through the .env loader'))).toBe(true);
+  });
+
+  test('in the boilerplate, pins the Codex startup budget of a known server', () => {
+    const root = contractFixture(undefined, PROJECT_IDS);
+    const configPath = join(root, '.codex/config.toml');
+    writeFileSync(configPath, readFileSync(configPath, 'utf8')
+      .replace('[mcp_servers.openapi]\ncommand = "bunx"\nenabled = true\nstartup_timeout_sec = 30\n', '[mcp_servers.openapi]\ncommand = "bunx"\nenabled = true\n'));
+
+    const errors = validateMcpParity(root, { schemaOwner: true });
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toStartWith('codex MCP openapi mismatch: expected ');
+    expect(errors[0]).toContain(`"startupTimeoutSec":${CODEX_STARTUP_TIMEOUT_SEC}`);
+  });
+
+  test('downstream, a missing Codex startup budget is a warning; any other shape difference still fails', () => {
+    const root = contractFixture(undefined, PROJECT_IDS);
+    const configPath = join(root, '.codex/config.toml');
+    writeFileSync(configPath, readFileSync(configPath, 'utf8')
+      .replace('[mcp_servers.openapi]\ncommand = "bunx"\nenabled = true\nstartup_timeout_sec = 30\n', '[mcp_servers.openapi]\ncommand = "bunx"\nenabled = true\n'));
+
+    const budget = validateMcpParityFindings(root, { schemaOwner: false });
+    expect(budget.errors).toEqual([]);
+    expect(budget.warnings).toEqual([
+      `codex MCP openapi launch is out of date in .codex/config.toml: set startup_timeout_sec = ${CODEX_STARTUP_TIMEOUT_SEC} (Codex's 10-second default is too short for a bunx-fetched server on a cold cache). Upstream never overwrites this file, so add it by hand.`,
+    ]);
+
+    writeFileSync(configPath, readFileSync(configPath, 'utf8').replace('"--tools", "dynamic"]', '"--tools", "dynamic", "--read-only"]'));
+    const shape = validateMcpParityFindings(root, { schemaOwner: false });
+    expect(shape.warnings).toEqual([]);
+    expect(shape.errors).toHaveLength(1);
+    expect(shape.errors[0]).toStartWith('codex MCP openapi mismatch: expected ');
+  });
+
+  test('reads a loader-wrapped Codex command as the server it starts', () => {
+    expect(unwrapCodexEnvLoader('bunx', [...CODEX_ENV_LOADER_ARGS, 'bunx', '-y', 'pkg@1'])).toEqual({ command: 'bunx', args: ['-y', 'pkg@1'], envLoader: true });
+    expect(unwrapCodexEnvLoader('bunx', ['-y', 'pkg@1'])).toEqual({ command: 'bunx', args: ['-y', 'pkg@1'], envLoader: false });
+    // A prefix with nothing after it is not a launch.
+    expect(unwrapCodexEnvLoader('bunx', [...CODEX_ENV_LOADER_ARGS]).envLoader).toBe(false);
+  });
+
+  test('pins the loader to the dotenv-cli major the repo installs', () => {
+    const pkg = JSON.parse(readFileSync(join(REPO_ROOT, 'package.json'), 'utf8')) as { devDependencies: Record<string, string> };
+    const pinned = CODEX_ENV_LOADER_ARGS[1].replace('dotenv-cli@', '');
+    expect(pkg.devDependencies['dotenv-cli'].replace(/^[\^~]/, '').split('.')[0]).toBe(pinned.split('.')[0]);
   });
 
   test('compares the .env contract of an unknown server across hosts', () => {
@@ -1231,7 +1425,26 @@ describe('checkAgentCompatibility', () => {
     const root = repositoryFixture();
     repairClaudeSkillsAlias(root, 'linux');
 
-    expect(checkAgentCompatibility(root, 'linux')).toMatchObject({ ok: true, errors: [], alias: { status: 'valid' } });
+    expect(checkAgentCompatibility(root, 'linux')).toMatchObject({ ok: true, errors: [], warnings: [], alias: { status: 'valid' } });
+  });
+
+  test('a downstream Codex launch gap passes with a warning; the boilerplate fails on the same file', () => {
+    const root = repositoryFixture();
+    repairClaudeSkillsAlias(root, 'linux');
+    const configPath = join(root, '.codex/config.toml');
+    writeFileSync(configPath, readFileSync(configPath, 'utf8').replaceAll(`${CODEX_LOADER}, `, ''));
+
+    const downstream = checkAgentCompatibility(root, 'linux');
+    expect(downstream.ok).toBe(true);
+    expect(downstream.errors).toEqual([]);
+    expect(downstream.warnings.length).toBeGreaterThan(0);
+    expect(downstream.warnings.every(w => w.includes('.codex/config.toml'))).toBe(true);
+
+    write(root, 'package.json', JSON.stringify({ name: 'agentic-qa-boilerplate' }));
+    const owner = checkAgentCompatibility(root, 'linux');
+    expect(owner.ok).toBe(false);
+    expect(owner.warnings).toEqual([]);
+    expect(owner.errors.some(e => e.includes('must launch through the .env loader'))).toBe(true);
   });
 
   test('reports the missing alias together with every contract error', () => {
