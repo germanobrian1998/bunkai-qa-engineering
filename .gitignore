@@ -237,3 +237,6 @@ dbhub.local.toml
 # ----- 2026-10-01 (sync) -----
 .playwright/profiles/
 storage-state-*.json
+
+# ----- 2026-10-02 (sync) -----
+.playwright-cli/

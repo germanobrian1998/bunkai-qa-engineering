@@ -3,15 +3,15 @@
   "templateRepo": "upex-galaxy/agentic-qa-boilerplate",
   "templateCommit": "83eae2505706f9d048dfa6749438c1dba18c949b",
   "perComponentCommit": {
-    "skills": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "agent-compatibility": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "skills": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
+    "agent-compatibility": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
     "codex-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "scripts": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "docs": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "cli": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "scripts": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
+    "docs": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
+    "cli": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
     "vscode": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "husky": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "agents-docs": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "husky": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
+    "agents-docs": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
     "tooling": "83eae2505706f9d048dfa6749438c1dba18c949b",
     "config-core": "83eae2505706f9d048dfa6749438c1dba18c949b",
     "env-template": "83eae2505706f9d048dfa6749438c1dba18c949b",
@@ -24,10 +24,11 @@
   "syncedComponents": [],
   "ignoreFileSync": {
     ".gitignore": {
-      "lastSyncedSha": "35a6378c3988fb596f1354845d24de01893cc67d",
+      "lastSyncedSha": "0220d9c6003680067b5d4cc70d358603a6208310",
       "appendedLines": [
         ".playwright/profiles/",
-        "storage-state-*.json"
+        "storage-state-*.json",
+        ".playwright-cli/"
       ]
     }
   },
@@ -41,11 +42,31 @@
       },
       "devDependencies": {
         "lastSyncedSha": "a1c3cc73d18a1a836163d61fa2b10e80008caaaa",
-        "appliedKeys": []
+        "appliedKeys": [],
+        "keptKeys": {
+          "@antfu/eslint-config": "^4.16.0",
+          "@faker-js/faker": "^9.8.0",
+          "@playwright/test": "^1.60.0",
+          "@types/bun": "^1.3.7",
+          "@types/node": "^24.10.1",
+          "allure": "^3.14.1",
+          "allure-js-commons": "^3.10.2",
+          "allure-playwright": "^3.10.2",
+          "eslint": "^9.28.0",
+          "lint-staged": "^16.2.7",
+          "openapi-typescript": "^7.10.1",
+          "prettier": "^3.7.4",
+          "typescript": "^5.8.3"
+        }
       },
       "dependencies": {
         "lastSyncedSha": "a1c3cc73d18a1a836163d61fa2b10e80008caaaa",
-        "appliedKeys": []
+        "appliedKeys": [],
+        "keptKeys": {
+          "@clack/prompts": "^1.4.0",
+          "@inquirer/prompts": "^8.1.0",
+          "yaml": "^2.8.2"
+        }
       },
       "lint-staged": {
         "lastSyncedSha": "a1c3cc73d18a1a836163d61fa2b10e80008caaaa",
@@ -54,6 +75,6 @@
     }
   },
   "cliVersion": "8.5",
-  "lastSyncedAt": "2026-10-01T22:39:49.150Z",
+  "lastSyncedAt": "2026-10-02T22:28:13.615Z",
   "variableSystemVersion": 1
 }
