@@ -13,7 +13,16 @@ inherit = "core"
 [mcp_servers.context7]
 command = "bunx"
 enabled = true
+startup_timeout_sec = 30
 args = [
+  "-p",
+  "dotenv-cli@8.0.0",
+  "dotenv",
+  "-o",
+  "-e",
+  ".env",
+  "--",
+  "bunx",
   "-y",
   "@upstash/context7-mcp@4.0.3",
 ]
@@ -25,7 +34,16 @@ args = [
 [mcp_servers.slack-aurora]
 command = "bunx"
 enabled = true
+startup_timeout_sec = 30
 args = [
+  "-p",
+  "dotenv-cli@8.0.0",
+  "dotenv",
+  "-o",
+  "-e",
+  ".env",
+  "--",
+  "bunx",
   "-y",
   "slack-mcp-server@latest",
   "--transport",
@@ -42,7 +60,16 @@ SLACK_MCP_ADD_MESSAGE_TOOL = "true"
 [mcp_servers.dbhub]
 command = "bunx"
 enabled = true
+startup_timeout_sec = 30
 args = [
+  "-p",
+  "dotenv-cli@8.0.0",
+  "dotenv",
+  "-o",
+  "-e",
+  ".env",
+  "--",
+  "bunx",
   "-y",
   "@bytebase/dbhub@1.2.1",
   "--config",
@@ -66,7 +93,16 @@ env_vars = [
 [mcp_servers.openapi]
 command = "bunx"
 enabled = true
+startup_timeout_sec = 30
 args = [
+  "-p",
+  "dotenv-cli@8.0.0",
+  "dotenv",
+  "-o",
+  "-e",
+  ".env",
+  "--",
+  "bunx",
   "-y",
   "@ivotoby/openapi-mcp-server@1.16.1",
   "--tools",
