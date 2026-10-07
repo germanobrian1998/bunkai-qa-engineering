@@ -3,45 +3,50 @@
   "templateRepo": "upex-galaxy/agentic-qa-boilerplate",
   "templateCommit": "83eae2505706f9d048dfa6749438c1dba18c949b",
   "perComponentCommit": {
-    "skills": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
-    "agent-compatibility": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
-    "codex-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "scripts": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
-    "docs": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
-    "cli": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
-    "vscode": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "husky": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
-    "agents-docs": "cb99ab6bd16ced1b207b3a3b0a31e40f5c9d3be8",
+    "skills": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "agent-compatibility": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "codex-config": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "scripts": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "docs": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "cli": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "vscode": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "husky": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "agents-docs": "c56ab92090c654d442439f8dd5c024602321cde3",
     "tooling": "83eae2505706f9d048dfa6749438c1dba18c949b",
     "config-core": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "env-template": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "env-schema": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "env-template": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "env-schema": "c56ab92090c654d442439f8dd5c024602321cde3",
     "worktree-include": "83eae2505706f9d048dfa6749438c1dba18c949b",
     "orca-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
     "agent-root-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "playwright-cli-config": "83eae2505706f9d048dfa6749438c1dba18c949b"
+    "playwright-cli-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
+    "instructions": "c56ab92090c654d442439f8dd5c024602321cde3"
   },
   "syncedComponents": [],
   "ignoreFileSync": {
     ".gitignore": {
-      "lastSyncedSha": "0220d9c6003680067b5d4cc70d358603a6208310",
+      "lastSyncedSha": "6b57602b158a4c84ab1565849cecc55928402a20",
       "appendedLines": [
         ".playwright/profiles/",
         "storage-state-*.json",
-        ".playwright-cli/"
+        ".playwright-cli/",
+        "!.env.provider.schema"
       ]
     }
   },
   "packageJsonSync": {
     "package.json": {
       "scripts": {
-        "lastSyncedSha": "a1c3cc73d18a1a836163d61fa2b10e80008caaaa",
+        "lastSyncedSha": "a8b6d772a122c3523b239e8dbf42edea5d26a026",
         "appliedKeys": [
-          "worktree:audit"
+          "worktree:audit",
+          "env:set",
+          "instructions:audit",
+          "instructions:check"
         ]
       },
       "devDependencies": {
-        "lastSyncedSha": "a1c3cc73d18a1a836163d61fa2b10e80008caaaa",
+        "lastSyncedSha": "a8b6d772a122c3523b239e8dbf42edea5d26a026",
         "appliedKeys": [],
         "keptKeys": {
           "@antfu/eslint-config": "^4.16.0",
@@ -60,7 +65,7 @@
         }
       },
       "dependencies": {
-        "lastSyncedSha": "a1c3cc73d18a1a836163d61fa2b10e80008caaaa",
+        "lastSyncedSha": "a8b6d772a122c3523b239e8dbf42edea5d26a026",
         "appliedKeys": [],
         "keptKeys": {
           "@clack/prompts": "^1.4.0",
@@ -69,12 +74,12 @@
         }
       },
       "lint-staged": {
-        "lastSyncedSha": "a1c3cc73d18a1a836163d61fa2b10e80008caaaa",
+        "lastSyncedSha": "a8b6d772a122c3523b239e8dbf42edea5d26a026",
         "appliedKeys": []
       }
     }
   },
   "cliVersion": "8.5",
-  "lastSyncedAt": "2026-10-02T22:28:13.615Z",
+  "lastSyncedAt": "2026-10-07T22:26:23.768Z",
   "variableSystemVersion": 1
 }

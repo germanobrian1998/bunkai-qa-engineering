@@ -538,7 +538,7 @@ Rules:
   - On 429 or 5xx: retry with exponential backoff up to 3 times.
   - On 4xx (excluding 429): stop the chunk and report partial state.
   - Critical Rule #8 (File Operations): never overwrite an existing TC silently — if the summary already exists, report and skip.
-  - Critical Rule #1 (Login Credentials): ATLASSIAN_API_TOKEN comes from .env, never hardcode.
+  - Critical Rule #1 (credentials by NAME, never by value): use ATLASSIAN_API_TOKEN by name; never open .env, print or hardcode it.
 ```
 
 ##### Aggregation in the main thread
@@ -657,7 +657,6 @@ For N <= 10 TCs, classify inline — the dispatch overhead is not justified. The
   issue: {STORY_KEY}
   fields:
     {{jira.acceptance_test_plan}}: {Test Analysis body}
-  labels: +shift-left-reviewed
 
 [ISSUE_TRACKER_TOOL] Add Comment:
   issue: {STORY_KEY}
@@ -685,8 +684,6 @@ For N <= 10 TCs, classify inline — the dispatch overhead is not justified. The
 [ISSUE_TRACKER_TOOL] Update Issue:
   issue: {TEST_KEY}
   description: {full TC template}
-  fields:
-    Test Status: Draft
 
 # With a Test Set work type (ATS exists): membership is a TC→ATS issue link
 [ISSUE_TRACKER_TOOL] Link Issues:

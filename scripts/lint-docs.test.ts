@@ -153,6 +153,39 @@ describe('lint-docs roster and scripts', () => {
     expect(findings.map(f => `${f.file}:${f.target}`)).toEqual(['AGENTS.md:ghost-flow']);
   });
 
+  test('once the instructions are split, the router is read from the skills section, not from AGENTS.md', () => {
+    skill('alpha-flow');
+    skill('ghost-flow');
+    write('AGENTS.md', router(['alpha-flow', 'ghost-flow']));
+    write('.agents/instructions/agent-skills-and-mcps.md', router(['alpha-flow']));
+    write('.agents/instructions/30-tools.md', 'Run `bun run gone-script`.');
+    write('package.json', '{"scripts":{}}');
+    const findings = lintDocs(root).findings.filter(f => f.kind === 'roster' || f.kind === 'script');
+    expect(findings.map(f => `${f.file}:${f.target}`)).toEqual([
+      '.agents/instructions/agent-skills-and-mcps.md:ghost-flow',
+      '.agents/instructions/30-tools.md:gone-script',
+    ]);
+  });
+
+  test('a skill the project added is routed from its own agent-project.md table, which bun run up never overwrites', () => {
+    skill('alpha-flow');
+    skill('beta-flow');
+    skill('ghost-flow');
+    write('.agents/instructions/agent-skills-and-mcps.md', router(['alpha-flow']));
+    write('.agents/instructions/agent-project.md', [
+      '# Project',
+      '## Project context skills',
+      '| Skill | Trigger | Purpose |',
+      '|---|---|---|',
+      '| `beta-flow` | "beta" | Project workflow. |',
+      '## Other',
+      '| `ghost-flow` | a table under another heading does not route |',
+      '',
+    ].join('\n'));
+    const findings = lintDocs(root).findings.filter(f => f.kind === 'roster');
+    expect(findings.map(f => `${f.file}:${f.target}`)).toEqual(['.agents/instructions/agent-skills-and-mcps.md:ghost-flow']);
+  });
+
   test('the human pages are not a skill list: a README that names no skill passes (Critical Rule #17)', () => {
     write('packages/create-agentic-qa/package.json', '{}');
     skill('alpha-flow');
@@ -247,5 +280,43 @@ describe('lint-docs published site (Pages portal and decks)', () => {
       'packages/decks/a/x.html:1:gone:one',
       'packages/pages-home/index.html:1:missing-two',
     ]);
+  });
+});
+
+describe('lint-docs agent markdown (links only)', () => {
+  function gitAdd(): void {
+    Bun.spawnSync(['git', 'init', '-q'], { cwd: root });
+    Bun.spawnSync(['git', 'add', '-A'], { cwd: root });
+  }
+
+  test('reports a dead ](…) link in committed .agents, .context and .claude markdown', () => {
+    write('.agents/skills/demo/references/ok.md', '# ok');
+    write('.agents/skills/demo/SKILL.md', 'See [ok](references/ok.md#top) and [gone](references/gone.md).');
+    write('.context/ADR/ADR-0001-x.md', 'Back to [index](../missing-index.md).');
+    write('.claude/notes.md', '[x](./nowhere.md)');
+    gitAdd();
+    const findings = lintDocs(root).findings.filter(f => f.kind === 'link');
+    expect(findings.map(f => `${f.file}:${f.line}:${f.target}`)).toEqual([
+      '.agents/skills/demo/SKILL.md:1:references/gone.md',
+      '.claude/notes.md:1:./nowhere.md',
+      '.context/ADR/ADR-0001-x.md:1:../missing-index.md',
+    ]);
+  });
+
+  test('skips URLs, anchors, placeholders, code spans, fences and every non-link check', () => {
+    write('.agents/skills/demo/SKILL.md', [
+      '[a](https://example.com) [b](#section) [c](<<PRIMARY_ROOT>>/x.md) [d]({{DOC_PATH}}) [e](./{slug}.md)',
+      'Write `[label](./not-a-real-link.md)` in the brief. `docs/nope/file.md` and x.ts:12 today.',
+      '```',
+      '[f](./inside-a-fence.md)',
+      '```',
+    ].join('\n'));
+    gitAdd();
+    expect(lintDocs(root).findings).toEqual([]);
+  });
+
+  test('does not walk uncommitted markdown', () => {
+    write('.context/PBI/cache.md', '[gone](./gone.md)');
+    expect(lintDocs(root).findings).toEqual([]);
   });
 });

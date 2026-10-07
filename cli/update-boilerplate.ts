@@ -10,7 +10,7 @@
 import type { CompatibilityCheck } from './lib/agent-compatibility.ts';
 import type { ProtectedWatchEntry } from './lib/updater-drift';
 import type { HarnessMigrationResult } from './lib/updater-harness-migration.ts';
-import type { GateResult, HeldBackComponent, ParityFinding, ParityReport } from './lib/updater-parity';
+import type { GateResult, HeldBackComponent, InstructionRowInput, ParityFinding, ParityReport } from './lib/updater-parity';
 import type { PbiCacheFact } from './lib/updater-pbi';
 import type { Component, DeprecatedFile, ReportSink, RunSummary, UpdaterConfig } from './lib/updater-types';
 import { execSync, spawnSync } from 'node:child_process';
@@ -21,6 +21,7 @@ import * as path from 'node:path';
 import pc from 'picocolors';
 import { checkAgentCompatibility, repairAgentSurfaces, SHADOWING_COMMANDS_BACKUP_DIR, SKILLS_ALIAS_DEFERRED_MARKER } from './lib/agent-compatibility.ts';
 import { applyInsertions, planInsertions, projectDelta, SCHEMA_FILE, SCHEMA_SOURCE } from './lib/agents-schema.ts';
+import { declaredHarnesses, isUnderAny, unusedHarnessPaths } from './lib/harness-selection.ts';
 import * as tui from './lib/tui';
 import {
   cleanupTempDir,
@@ -48,6 +49,17 @@ import {
 } from './lib/updater-harness-migration.ts';
 import { groupIgnoreLines } from './lib/updater-ignore';
 import {
+  deliverProjectInstructions,
+  INSTRUCTIONS_COMPONENT,
+  INSTRUCTIONS_DIR,
+  LEGACY_PROJECT_INSTRUCTIONS,
+  moveLegacyProjectInstructions,
+  PROJECT_INSTRUCTIONS,
+  PROJECT_INSTRUCTIONS_TEMPLATE,
+  RETIRED_SECTION_FILES,
+  runLegacyMigrationCheck,
+} from './lib/updater-instructions';
+import {
   ABORTED_OUTRO,
   archivedSkillsToReport,
   collectParityFindings,
@@ -59,7 +71,7 @@ import {
   runVerdict,
 } from './lib/updater-parity';
 import { makePbiCacheMigrationHook } from './lib/updater-pbi';
-import { CLAUDE_SETTINGS_FILE, mergeAllowList } from './lib/updater-settings';
+import { CLAUDE_SETTINGS_FILE, formatHookCommand, mergeHookGroups, mergePermissionLists, readDeclinedDenies, readDeclinedHooks } from './lib/updater-settings';
 import { parseDotEnvExampleKeys, requiredNow, VAR_MANIFEST } from './lib/variables-manifest.ts';
 import { checkoutRoots } from './lib/worktree.ts';
 
@@ -214,12 +226,23 @@ export const RETIRED_SKILL_FILES: DeprecatedFile[] = [
   ].map(path => ({ path, component: 'skills', reason: RETIRED_SYNC_REASON, deprecatedSince: '8.5' })),
 ];
 
-export const DEPRECATED_FILES: DeprecatedFile[] = [...RETIRED_COMMAND_WRAPPERS, ...RETIRED_SKILL_FILES];
+// The instruction sections once carried a number (`80-git.md`): the renamed
+// files arrive through the `instructions` component, the numbered copies leave
+// here, each saved to `.backups/` first because a project may have kept a merge
+// in one (`updater.protected_paths`).
+export const DEPRECATED_FILES: DeprecatedFile[] = [...RETIRED_COMMAND_WRAPPERS, ...RETIRED_SKILL_FILES, ...RETIRED_SECTION_FILES];
 
 export const COMPONENTS: Component[] = [
   // `skills` stays its own component (not folded into `agent-compatibility` as
   // upstream dev does): `bun run up skills --skill a,b` narrows it by subdirectory.
   { name: 'skills', type: 'directory', paths: [SKILLS_CANONICAL_DIR] },
+  // The progressive-disclosure sections behind the AGENTS.md ROUTER. Synced
+  // like a skill (overwrite, `.backups/` copy, an "overwritten edit" row,
+  // `updater.protected_paths` to keep a merge), EXCEPT `agent-project.md`: that one
+  // is the project's own (excludePaths below) and arrives once, written from
+  // the generic `agent-project.md.template` this component ships
+  // (`deliverProjectInstructions`, afterApply).
+  { name: INSTRUCTIONS_COMPONENT, type: 'directory', paths: [INSTRUCTIONS_DIR] },
   // One source, three harnesses: the hook emitter and the OpenCode hook
   // adapter. `.claude/skills` is NOT here: it is the generated alias, rebuilt
   // by the afterApply compatibility hook. The `commands` component (the alias
@@ -372,8 +395,14 @@ REPORTE DE PARIDAD (al final de cada corrida, incluido --dry-run):
   .husky/pre-commit, .husky/pre-push, .husky/commit-msg, allurerc.mjs, playwright.config.ts, las
   bases KATA de tests/components/, los workflows de CI, …) nunca se
   sobrescriben: solo aparecen en ese reporte. .claude/settings.json, .codex/ y
-  los hooks de .husky/ se entregan UNA vez si faltan. El proyecto suma sus
-  propias rutas protegidas en .agents/project.yaml -> updater.protected_paths
+  los hooks de .husky/ se entregan UNA vez si faltan. De .claude/settings.json
+  solo crecen permissions.allow, permissions.deny y hooks (se agrega lo que
+  upstream tiene y falta, nunca se quita; un hook que falta llega como grupo
+  nuevo, antes del chequeo de compatibilidad); una regla deny que el proyecto
+  no quiere va en updater.declined_denies, un comando de hook en
+  updater.declined_hooks. A opencode.jsonc nunca se le escribe: las reglas
+  deny que le faltan salen como bloque para pegar en el reporte. El proyecto
+  suma sus propias rutas protegidas en .agents/project.yaml -> updater.protected_paths
   (archivos sincronizados que fusiono a mano): mismo trato que la lista de
   upstream. Un archivo sincronizado que el proyecto habia editado y la corrida
   sobrescribio gana una fila (backup en .backups/) que dice como protegerlo.
@@ -544,13 +573,27 @@ interface RunFacts {
   promptKept: boolean
   /** `.context/PBI/` paths still tracked in git, and where the migration recipe was saved. */
   pbiCache: PbiCacheFact | null
-  /** Permission allow-list entries the additive merge added to `.claude/settings.json`. */
+  /** Permission allow-list entries the additive merge added to `.claude/settings.json` (on --dry-run: would add). */
   allowListAdded: string[]
+  /** `permissions.deny` entries the same merge appended (on --dry-run: would append). */
+  denyListAdded: string[]
+  /** Upstream deny entries left out because the project lists them in `updater.declined_denies`. */
+  denyListDeclined: string[]
+  /** Hook commands the additive hook merge appended to `.claude/settings.json`, formatted (on --dry-run: would append). */
+  hooksAdded: string[]
+  /** Upstream hook commands left out because the project lists them in `updater.declined_hooks`. */
+  hooksDeclined: string[]
+  /** Upstream hook commands left out because the script they run is missing in the project. */
+  hooksSkipped: string[]
+  /** Keys `.claude/settings.json` repeated (a git auto-merge), folded into one list (on --dry-run: would fold). */
+  settingsDuplicatesFolded: string[]
   /** One-line evidence for the unresolved-doctrine ledger row, when AGENTS.md carries debt. */
   doctrineDebt: string | null
+  /** Rows about the instruction sections: the `agent-project.md` stub delivery and a pre-split AGENTS.md. */
+  instructionRows: InstructionRowInput[]
   parity: { findings: ParityFinding[], report: ParityReport } | null
 }
-const runFacts: RunFacts = { compat: null, envNewKeys: [], migration: null, migrationPlanned: false, aliasDeferred: false, shadowingCommandsMoved: [], gates: [], gatesSkippedReason: null, promptKept: false, pbiCache: null, allowListAdded: [], doctrineDebt: null, parity: null };
+const runFacts: RunFacts = { compat: null, envNewKeys: [], migration: null, migrationPlanned: false, aliasDeferred: false, shadowingCommandsMoved: [], gates: [], gatesSkippedReason: null, promptKept: false, pbiCache: null, allowListAdded: [], denyListAdded: [], denyListDeclined: [], hooksAdded: [], hooksDeclined: [], hooksSkipped: [], settingsDuplicatesFolded: [], doctrineDebt: null, instructionRows: [], parity: null };
 
 // --- ENV-VAR DRIFT DETECTION (afterApply hook) ---
 //
@@ -639,46 +682,112 @@ async function detectEnvVarDrift(
   }
 }
 
-// --- CLAUDE PERMISSION ALLOW LIST (afterApply hook) ---
+// --- CLAUDE PERMISSION ALLOW + DENY LISTS (afterApply hook) ---
 //
 // `.claude/settings.json` is bootstrap-only AND watched, so a skill shipped
-// upstream used to arrive without the `Skill(<name>)` entry that authorizes it
-// and silently could not be invoked. This merges ONE array additively —
-// `permissions.allow` — and leaves `deny`, `ask`, `hooks`, `env` and every
-// other key exactly as the project wrote them. See `updater-settings.ts` for
-// why removals are deliberately not remembered.
+// upstream used to arrive without the `Skill(<name>)` entry that authorizes it,
+// and a project scaffolded before the secret deny rules never received them.
+// This merges TWO arrays additively, `permissions.allow` and
+// `permissions.deny`, and leaves `ask`, `hooks`, `env` and every other key
+// exactly as the project wrote them. A deny the project does not want is
+// declined by name in `.agents/project.yaml` -> `updater.declined_denies`.
+// See `updater-settings.ts` for why removals are deliberately not remembered.
 //
 // Backup before write, like every other mutation the run makes: the file is on
-// the watchlist, so a consumer who dislikes the addition restores it from
-// `.backups/` and expresses the removal in `deny`.
-function makeAllowListHook(
+// the watchlist, so a consumer who dislikes an addition restores it from
+// `.backups/` and expresses the removal (`deny` for an allow entry,
+// `updater.declined_denies` for a deny entry).
+function makePermissionListHook(
   templateDir: string,
   sink: ReportSink,
   dryRun: boolean,
 ): (summary: RunSummary) => Promise<void> {
   return async (summary: RunSummary): Promise<void> => {
+    // No Claude Code here: its settings file is not this project's (ADR-0012).
+    if (!declaredHarnesses(process.cwd()).harnesses.includes('claude')) { return; }
+    const declined = readDeclinedDenies(process.cwd());
+    if (declined.error) { sink.warn(`${declined.error}; se ignora y se agregan todas las reglas deny de upstream.`); }
+    const { allowAdded, denyAdded, denyDeclined, merged } = mergePermissionLists(process.cwd(), templateDir, { declinedDenies: declined.entries });
+    runFacts.denyListDeclined = denyDeclined;
     if (dryRun) {
-      runFacts.allowListAdded = mergeAllowList(process.cwd(), templateDir).added;
+      runFacts.allowListAdded = allowAdded;
+      runFacts.denyListAdded = denyAdded;
       return;
     }
-    const localPath = path.join(process.cwd(), CLAUDE_SETTINGS_FILE);
-    const { added, merged } = mergeAllowList(process.cwd(), templateDir);
     if (merged === null) { return; }
+    const localPath = path.join(process.cwd(), CLAUDE_SETTINGS_FILE);
     try {
-      // This run's backup dir when it made one; otherwise its own, so the
-      // pre-write backup contract holds even on a run that wrote nothing else.
-      const dir = summary.backupDir ?? createBackupDir(process.cwd());
-      const backupPath = path.join(dir, CLAUDE_SETTINGS_FILE);
-      fs.mkdirSync(path.dirname(backupPath), { recursive: true });
-      fs.copyFileSync(localPath, backupPath);
+      backupSettingsOnce(summary);
       fs.writeFileSync(localPath, merged, 'utf-8');
     }
     catch (err) {
-      sink.warn(`No se pudo fusionar la allow list de ${CLAUDE_SETTINGS_FILE}: ${err instanceof Error ? err.message : String(err)}`);
+      sink.warn(`No se pudieron fusionar los permisos de ${CLAUDE_SETTINGS_FILE}: ${err instanceof Error ? err.message : String(err)}`);
       return;
     }
-    runFacts.allowListAdded = added;
-    sink.step(`Permisos agregados a ${CLAUDE_SETTINGS_FILE}: ${added.length}`);
+    runFacts.allowListAdded = allowAdded;
+    runFacts.denyListAdded = denyAdded;
+    sink.step(`Permisos agregados a ${CLAUDE_SETTINGS_FILE}: ${allowAdded.length} allow, ${denyAdded.length} deny`);
+  };
+}
+
+// The pre-write backup of `.claude/settings.json`, taken ONCE per run: the
+// hook merge and the permission merge both write the file, and a second copy
+// over the first would make `--rollback` restore the half-merged file.
+let settingsBackupTaken = false;
+
+function backupSettingsOnce(summary: RunSummary): void {
+  if (settingsBackupTaken) { return; }
+  // This run's backup dir when it made one; otherwise its own, so the
+  // pre-write backup contract holds even on a run that wrote nothing else.
+  const dir = summary.backupDir ?? createBackupDir(process.cwd());
+  const backupPath = path.join(dir, CLAUDE_SETTINGS_FILE);
+  fs.mkdirSync(path.dirname(backupPath), { recursive: true });
+  fs.copyFileSync(path.join(process.cwd(), CLAUDE_SETTINGS_FILE), backupPath);
+  settingsBackupTaken = true;
+}
+
+// --- CLAUDE HOOK GROUPS (afterApply hook, BEFORE the compatibility hook) ---
+//
+// The same additive merge for `hooks` (`mergeHookGroups`): an upstream hook
+// command the project lacks under the same event and matcher is appended as a
+// new group, and the project's own groups are never touched. It runs before
+// `makeAgentCompatibilityHook` because `agents:compat:check` REQUIRES some of
+// these groups (the route re-surface `PostToolUse` group, the `SessionStart`
+// re-arm groups): run after it, the check would judge the old file and a
+// project would leave the sync failing its own pre-commit. A command the
+// project does not want is declined by exact text in
+// `.agents/project.yaml` -> `updater.declined_hooks`. Only Claude: Codex's
+// `hooks.json` and the OpenCode plugin are framework files the sync rewrites.
+function makeHookMergeHook(
+  templateDir: string,
+  sink: ReportSink,
+  dryRun: boolean,
+): (summary: RunSummary) => Promise<void> {
+  return async (summary: RunSummary): Promise<void> => {
+    if (!declaredHarnesses(process.cwd()).harnesses.includes('claude')) { return; }
+    const declined = readDeclinedHooks(process.cwd());
+    if (declined.error) { sink.warn(`${declined.error}; se ignora y se agregan todos los hooks de upstream.`); }
+    const { added, declined: left, skipped, duplicatesFolded, merged } = mergeHookGroups(process.cwd(), templateDir, { declinedHooks: declined.entries });
+    runFacts.hooksDeclined = left.map(formatHookCommand);
+    runFacts.hooksSkipped = skipped.map(formatHookCommand);
+    if (dryRun) {
+      runFacts.hooksAdded = added.map(formatHookCommand);
+      runFacts.settingsDuplicatesFolded = duplicatesFolded;
+      return;
+    }
+    if (merged === null) { return; }
+    try {
+      backupSettingsOnce(summary);
+      fs.writeFileSync(path.join(process.cwd(), CLAUDE_SETTINGS_FILE), merged, 'utf-8');
+    }
+    catch (err) {
+      sink.warn(`No se pudieron fusionar los hooks de ${CLAUDE_SETTINGS_FILE}: ${err instanceof Error ? err.message : String(err)}`);
+      return;
+    }
+    runFacts.hooksAdded = added.map(formatHookCommand);
+    runFacts.settingsDuplicatesFolded = duplicatesFolded;
+    if (added.length > 0) { sink.step(`Hooks agregados a ${CLAUDE_SETTINGS_FILE}: ${added.length}`); }
+    if (duplicatesFolded.length > 0) { sink.step(`${CLAUDE_SETTINGS_FILE}: clave(s) repetida(s) unificada(s) en una lista: ${duplicatesFolded.join(', ')}`); }
   };
 }
 
@@ -1205,7 +1314,10 @@ export function resolveProtectedWatchlist(cwd: string, warn: (message: string) =
   for (const r of declared.rejected) {
     warn(`updater.protected_paths (.agents/project.yaml): entrada ignorada "${r.value}": ${r.reason}.`);
   }
-  return mergeProtectedWatchlist(PROTECTED_WATCHLIST, declared.paths);
+  // A harness the project does not use (ADR-0012): its registries are neither
+  // delivered when missing nor reported when upstream changes them.
+  const unused = unusedHarnessPaths(cwd);
+  return mergeProtectedWatchlist(PROTECTED_WATCHLIST.filter(e => !isUnderAny(e.path, unused)), declared.paths);
 }
 
 // NOT on the watchlist, deliberately — do not "fix" this asymmetry:
@@ -1224,6 +1336,58 @@ export function resolveProtectedWatchlist(cwd: string, warn: (message: string) =
 //  - `CLAUDE.md` is generated too (see GENERATED_PATHS): its only legitimate
 //    content is `@AGENTS.md`, so "drift" there is a defect, not a merge.
 //  - `README.md` is rewritten wholesale per project; an advisory would be noise.
+
+// --- INSTRUCTION SECTIONS (afterApply hook) ---
+//
+// `agent-project.md` is never synced (excludePaths): a project that still has
+// it under its old name `project.md` gets it moved, content kept; a project
+// without either gets the generic stub, once, behind the leak gate. A project still on the pre-split
+// monolith AGENTS.md gets one row mapping its old headings to the sections;
+// its AGENTS.md is never rewritten. Under --dry-run nothing is written.
+function makeInstructionsHook(sink: ReportSink, dryRun: boolean): () => Promise<void> {
+  return async () => {
+    const cwd = process.cwd();
+    runFacts.instructionRows = [];
+    const legacy = moveLegacyProjectInstructions(cwd, { dryRun });
+    if (legacy.kind === 'moved') {
+      sink.step(`${dryRun ? '[dry-run] Se movería' : 'Movido'} \`${LEGACY_PROJECT_INSTRUCTIONS}\` a \`${PROJECT_INSTRUCTIONS}\` (mismo contenido; las secciones ahora se llaman agent-<tema>).`);
+      runFacts.instructionRows.push({
+        path: PROJECT_INSTRUCTIONS,
+        evidence: `informational: ${dryRun ? 'would be' : 'was'} moved from ${LEGACY_PROJECT_INSTRUCTIONS} byte for byte (the instruction sections carry readable agent- names now); still this project's own and never synced`,
+        suggested: 'keep project',
+      });
+    }
+    else if (legacy.kind === 'both') {
+      runFacts.instructionRows.push({
+        path: LEGACY_PROJECT_INSTRUCTIONS,
+        evidence: `both ${LEGACY_PROJECT_INSTRUCTIONS} (old name) and ${PROJECT_INSTRUCTIONS} exist; only the second is read: merge the old file's rules into it by hand, then delete the old one`,
+        suggested: 'merge',
+      });
+    }
+    // A dry-run move left the file under its old name: the stub would not be delivered.
+    const outcome = legacy.kind === 'moved' ? { kind: 'present' as const } : deliverProjectInstructions(cwd, UPSTREAM_DIR, { dryRun });
+    if (outcome.kind === 'delivered') {
+      sink.step(`${dryRun ? '[dry-run] Se crearía' : 'Creado'} \`${PROJECT_INSTRUCTIONS}\` desde la plantilla generica (tus reglas propias van ahi).`);
+      runFacts.instructionRows.push({
+        path: PROJECT_INSTRUCTIONS,
+        evidence: `informational: ${dryRun ? 'would be' : 'was'} delivered once from upstream's generic stub (${PROJECT_INSTRUCTIONS_TEMPLATE}); it is this project's own from now on and never synced`,
+        suggested: 'keep project',
+      });
+    }
+    else if (outcome.kind === 'refused') {
+      sink.warn(`Plantilla de \`${PROJECT_INSTRUCTIONS}\` rechazada: ${outcome.reasons.join('; ')}.`);
+      runFacts.instructionRows.push({
+        path: PROJECT_INSTRUCTIONS_TEMPLATE,
+        evidence: `upstream's stub was NOT delivered, it carries the boilerplate's identity: ${outcome.reasons.join('; ')}; create ${PROJECT_INSTRUCTIONS} by hand (frontmatter id: project) and report the stub upstream`,
+        suggested: 'decide',
+      });
+    }
+    const migration = runLegacyMigrationCheck(cwd, UPSTREAM_DIR);
+    if (migration) {
+      runFacts.instructionRows.push({ path: DOCTRINE_FILE, evidence: migration.evidence, suggested: 'merge', side: 'kept', note: migration.note });
+    }
+  };
+}
 
 /** The PBI cache migration recipe (gitignored, single-use); the parity table carries one row pointing here. */
 const PBI_MIGRATION_PROMPT_PATH = path.join('.agents', 'prompts', 'pbi-cache-migration.md');
@@ -1436,8 +1600,15 @@ function makeParityHook(sink: ReportSink, priorLockSha: string, dryRun: boolean,
       heldBack,
       envNewKeys: runFacts.envNewKeys,
       allowListAdded: runFacts.allowListAdded,
+      denyListAdded: runFacts.denyListAdded,
+      denyListDeclined: runFacts.denyListDeclined,
+      hooksAdded: runFacts.hooksAdded,
+      hooksDeclined: runFacts.hooksDeclined,
+      hooksSkipped: runFacts.hooksSkipped,
+      settingsDuplicatesFolded: runFacts.settingsDuplicatesFolded,
       doctrineDebt: runFacts.doctrineDebt,
       doctrineFile: DOCTRINE_FILE,
+      instructionRows: runFacts.instructionRows,
       localEdits: (summary.localEditsOverwritten ?? []).map(edit => ({
         ...edit,
         backupPath: summary.backupDir ? path.join(summary.backupDir, edit.path) : null,
@@ -1929,6 +2100,12 @@ async function main(): Promise<void> {
     // silent replacement.
     excludePaths: [
       ...GENERATED_PATHS,
+      // Upstream's own overlay carries the boilerplate's own exceptions (its
+      // Git Strategy): it never travels. A project gets the stub instead.
+      PROJECT_INSTRUCTIONS,
+      // Its name before the `agent-` prefix: the project's own copy is moved by
+      // the instructions hook, never classified by the sync.
+      LEGACY_PROJECT_INSTRUCTIONS,
     ],
     // The boilerplate's own design material. `docs` is a synced component, so
     // without this every consumer project inherits our proposals and backlogs as
@@ -1940,6 +2117,9 @@ async function main(): Promise<void> {
     // so ADRs only ever travel through the scaffold tarball, which prunes them.
     repoOnlyPaths: [
       'docs/reports',
+      // The files of a harness this project does not use (ADR-0012): it
+      // deleted them on purpose, so no detection path re-delivers them.
+      ...unusedHarnessPaths(process.cwd()),
     ],
     // Watchlist files are NOT synced — included in the sparse clone only so
     // the protected-drift detection can read their upstream copies.
@@ -1957,27 +2137,36 @@ async function main(): Promise<void> {
             sink,
             async () => { runFacts.envNewKeys = computeEnvNewKeys(UPSTREAM_DIR); },
             // Read-only: records what the real run would add, writes nothing.
-            makeAllowListHook(UPSTREAM_DIR, sink, true),
+            makeHookMergeHook(UPSTREAM_DIR, sink, true),
+            makePermissionListHook(UPSTREAM_DIR, sink, true),
             async () => { runFacts.doctrineDebt = runDoctrineLedger(process.cwd(), UPSTREAM_DIR, { dryRun: true }); },
+            makeInstructionsHook(sink, true),
             // Read-only detection so the preview's table matches the real run's.
             makePbiCacheMigrationHook({ promptOutPath: path.join(process.cwd(), PBI_MIGRATION_PROMPT_PATH), dryRun: true }, sink, (fact) => { runFacts.pbiCache = fact; }),
             makeParityHook(sink, priorLockSha, true, watchlist),
           )
         : composeHooks(
             sink,
-            // Alias first: a Claude Code session opened right after
+            // Hook groups before the compat check that requires them: a
+            // sync must never leave the project failing its own gates.
+            makeHookMergeHook(UPSTREAM_DIR, sink, false),
+            // Alias next: a Claude Code session opened right after
             // the sync must already resolve skills through `.claude/skills`.
             makeAgentCompatibilityHook(sink),
             makeKataManifestHook(sink),
-            // Before the compat check reads settings.json? No: after. The merge
-            // only ADDS allow entries, which no compatibility contract asserts
-            // on, and running it late keeps the hook order above untouched.
-            makeAllowListHook(UPSTREAM_DIR, sink, false),
+            // Before the compat check reads settings.json? No: after. This merge
+            // only ADDS allow and deny entries, which no compatibility contract
+            // asserts on (the hook groups, which one does, merged first).
+            makePermissionListHook(UPSTREAM_DIR, sink, false),
             // The unresolved-doctrine ledger. Content-tracked, so unlike every
             // other watched-file nudge it survives `keep project` and clears
             // only when the section is actually written. Runs before the parity
             // hook, which folds its one row in.
             async () => { runFacts.doctrineDebt = runDoctrineLedger(process.cwd(), UPSTREAM_DIR); },
+            // After the sync delivered the sections: the project's own
+            // `agent-project.md` from the stub (once), and the migration row for a
+            // pre-split AGENTS.md. Before the parity hook, which folds them in.
+            makeInstructionsHook(sink, false),
             async () => detectEnvVarDrift(UPSTREAM_DIR, sink, nonInteractive),
             // ONE schema-driven hook for `.agents/project.yaml`, replacing the
             // two hand-written ones (`git_strategy`, `qa_epics`). The two

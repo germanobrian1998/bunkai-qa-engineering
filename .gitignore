@@ -240,3 +240,6 @@ storage-state-*.json
 
 # ----- 2026-10-02 (sync) -----
 .playwright-cli/
+
+# ----- 2026-10-07 (sync) -----
+!.env.provider.schema
