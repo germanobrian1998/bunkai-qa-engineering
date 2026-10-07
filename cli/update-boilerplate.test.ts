@@ -1,10 +1,12 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, test } from 'bun:test';
 
+import { unusedHarnessPaths } from './lib/harness-selection.ts';
 import { cleanupDeprecated, componentOwnedPaths, isRepoOnlyPath, validateComponentRegistry } from './lib/updater-core.ts';
+import { RETIRED_SECTION_FILES } from './lib/updater-instructions.ts';
 import { COMPONENTS, DEPRECATED_FILES, GATE_SCRIPTS, gatesSummaryLine, parseArgs, resolveProtectedWatchlist, RETIRED_COMMAND_WRAPPERS, RETIRED_SKILL_FILES, runGate, summarizeGates, worktreeRefusal } from './update-boilerplate.ts';
 
 const temporaryRoots: string[] = [];
@@ -100,7 +102,7 @@ describe('component registry', () => {
     const retired = RETIRED_SKILL_FILES.map(d => d.path);
     expect(retired).toContain('.agents/skills/adapt-framework/SKILL.md');
     expect(retired).toContain('.agents/skills/adapt-framework/references/adaptation-workflow.md');
-    expect(DEPRECATED_FILES.map(d => d.path)).toEqual([...RETIRED_COMMAND_WRAPPERS, ...RETIRED_SKILL_FILES].map(d => d.path));
+    expect(DEPRECATED_FILES.map(d => d.path)).toEqual([...RETIRED_COMMAND_WRAPPERS, ...RETIRED_SKILL_FILES, ...RETIRED_SECTION_FILES].map(d => d.path));
     expect(retired).toContain('.agents/skills/sync-ai-context/SKILL.md');
     expect(retired).toContain('.agents/skills/sync-ai-context/references/sync.md');
     for (const d of RETIRED_SKILL_FILES) {
@@ -188,6 +190,34 @@ describe('protected watchlist', () => {
       'updater.protected_paths (.agents/project.yaml): entrada ignorada "../outside.ts": outside the repo (`..` segment).',
       'updater.protected_paths (.agents/project.yaml): entrada ignorada ".git/config": under .git.',
     ]);
+  });
+});
+
+describe('one-harness projects (ADR-0012)', () => {
+  test('a Claude-only project gets no OpenCode or Codex file delivered, watched or reported', () => {
+    const root = temporaryRoot();
+    for (const file of ['CLAUDE.md', '.mcp.json', '.claude/settings.json']) {
+      mkdirSync(dirname(join(root, file)), { recursive: true });
+      writeFileSync(join(root, file), '{}\n');
+    }
+    const unused = unusedHarnessPaths(root);
+    expect(unused).toEqual(['opencode.jsonc', '.opencode/plugins', '.codex']);
+
+    const watched = resolveProtectedWatchlist(root).map(e => e.path);
+    expect(watched).toContain('.mcp.json');
+    expect(watched).not.toContain('opencode.jsonc');
+    expect(watched).not.toContain('.codex/config.toml');
+
+    // `repoOnlyPaths` is the filter every detection path (bootstrap, content
+    // reconcile, git-log delta) goes through: nothing below these is delivered.
+    const shipped = ['.opencode/plugins/personality-reinject.js', '.codex/hooks.json', '.codex/config.toml', '.codex/environments/environment.toml', 'opencode.jsonc'];
+    for (const file of shipped) { expect(isRepoOnlyPath(file, unused)).toBe(true); }
+    expect(isRepoOnlyPath('.agents/hooks/personality-reinject.mjs', unused)).toBe(false);
+    expect(isRepoOnlyPath('.opencode/commands/mine.md', unused)).toBe(false);
+  });
+
+  test('a project with all three (or none detected) keeps the full delivery', () => {
+    expect(unusedHarnessPaths(temporaryRoot())).toEqual([]);
   });
 });
 

@@ -1,6 +1,6 @@
 ---
 name: agentic-qa-onboard
-description: "Walks new users through this repo's QA flow — Playwright + KATA + Allure + Xray stack, Jira QA state machine (statuses read from `.agents/jira-workflows.json`, never from memory), the IQL stages by name, /shift-left-testing for pre-sprint AC refinement on backlog Stories, /sprint-testing for in-sprint manual QA, /test-documentation for TMS test cases, /test-automation for KATA-compliant E2E/API tests, /regression-testing for CI suite execution, /framework-development for boilerplate evolution, MCPs available (the servers `.mcp.json` declares; web search and Postman connect at harness level and resolve by capability; Atlassian is opt-in via agentic-qa-core/references/mcp-atlassian-optin.md), env vars by scope (framework / tooling / project-under-test, never a blocker), and the ordered 4-phase NEW-PROJECT setup path (foundation → Jira catalogs → /project-discovery + /test-framework-adaptation → git Strategy Setup). ALSO the front desk for anyone who is lost or wants to understand how the repo or any workflow skill works — conceptually AND visually: it explains in plain human language (suspending caveman/compressed register) and can open per-skill how-it-works presentations (Spanish, technical terms in English) in the user's default browser after asking. Triggers on: `onboard me to QA`, `explain this QA repo`, `first time using this`, `primer vez en QA`, `/agentic-qa-onboard`, `I don't know how to use this`, `how does sprint-testing / test-automation work`, `how does this skill work`, `show me how it works`, `teach me how QA works here`, `walk me through this skill`, `no sé cómo usar esto`, `no entiendo cómo funciona el repo`, `cómo funciona este skill`, `explícame cómo funciona`, `enséñame cómo se hace`, `how do I set this repo up for my app`, `full setup for a new project`, `cómo configuro el repo para mi proyecto`, `setup completo del repo`. Do NOT use for: pre-sprint refinement (use /shift-left-testing), feature QA on a ticket (use /sprint-testing), authoring test cases in TMS (use /test-documentation), writing automated tests (use /test-automation), running regression suites (use /regression-testing), launching or supervising a fleet of parallel worker sessions (use /orca-orchestration — this skill only explains that the option exists)."
+description: "Walks new users through this repo's QA flow — Playwright + KATA + Allure + Xray stack, Jira QA state machine (statuses read from `.agents/jira-workflows.json`, never from memory), the IQL stages by name, /shift-left-testing for pre-sprint AC refinement on backlog Stories, /sprint-testing for in-sprint manual QA, /test-documentation for TMS test cases, /test-automation for KATA-compliant E2E/API tests, /regression-testing for CI suite execution, /framework-development for boilerplate evolution, MCPs available (the servers `.mcp.json` declares; web search and Postman connect at harness level and resolve by capability; Atlassian is opt-in via agentic-qa-core/references/mcp-atlassian-optin.md), env vars by scope (framework / tooling / project-under-test, never a blocker), and the ordered 4-phase NEW-PROJECT setup path (foundation → Jira catalogs → /project-discovery + /test-framework-adaptation → git Strategy Setup). ALSO the front desk for anyone who is lost or wants to understand how the repo or any workflow skill works — conceptually AND visually: it explains in plain human language (suspending the terse working register) and can open per-skill how-it-works presentations (Spanish, technical terms in English) in the user's default browser after asking. Triggers on: `onboard me to QA`, `explain this QA repo`, `first time using this`, `primer vez en QA`, `/agentic-qa-onboard`, `I don't know how to use this`, `how does sprint-testing / test-automation work`, `how does this skill work`, `show me how it works`, `teach me how QA works here`, `walk me through this skill`, `no sé cómo usar esto`, `no entiendo cómo funciona el repo`, `cómo funciona este skill`, `explícame cómo funciona`, `enséñame cómo se hace`, `how do I set this repo up for my app`, `full setup for a new project`, `cómo configuro el repo para mi proyecto`, `setup completo del repo`. Do NOT use for: pre-sprint refinement (use /shift-left-testing), feature QA on a ticket (use /sprint-testing), authoring test cases in TMS (use /test-documentation), writing automated tests (use /test-automation), running regression suites (use /regression-testing), launching or supervising a fleet of parallel worker sessions (use /orca-orchestration — this skill only explains that the option exists)."
 license: MIT
 compatibility: [claude-code, opencode, codex]
 phase: bootstrap
@@ -8,16 +8,6 @@ complementary_categories: [meta-skill]
 metadata:
   kind: workflow
 ---
-
-<!-- Model preferences (advisory; dispatchers may use to route) -->
-<!--
-model_preferences:
-  foundation: opus       # high-leverage architectural work
-  planning: sonnet       # structured writing
-  implementation: sonnet # default for code work
-  review: opus           # critical analysis
-  archive: haiku         # mechanical close-out
--->
 
 # Agentic QA Onboard — First-time tour of this repo
 
@@ -31,7 +21,7 @@ This skill is specific to **this** Playwright + KATA QA boilerplate and points a
 
 - DO: act as a guided tour, not an executor. The tour ends the moment the user knows which skill to call; hand off there and step back.
 - DO NOT: do the downstream work yourself. Pre-sprint refinement is `/shift-left-testing`, per-ticket QA `/sprint-testing`, TMS authoring `/test-documentation`, automated tests `/test-automation`, suite runs `/regression-testing`, a new target repo `/project-discovery`, KATA adaptation `/test-framework-adaptation`.
-- WHEN someone is lost or asks how a skill works: suspend the compressed / caveman register for the whole explanation — full sentences, warm tone, and each technical term defined the first time it appears. Resume the normal register once they are oriented.
+- WHEN someone is lost or asks how a skill works: suspend the terse working register for the whole explanation — full sentences, warm tone, and each technical term defined the first time it appears. Resume the normal register once they are oriented.
 - DO: mirror the user's language in the explanation. The visual decks ship in Spanish only (technical terms stay English) — say so before opening one for an English speaker.
 - WHEN the goal is unclear: ask ONE question first (testing a ticket, or understanding the whole flow?). Never dump every stage on someone who asked about one.
 - DO: name a stage by its word (Shift-Left, Planning, Execution, Reporting, Documentation, Automation, Regression, Observation), never by number. A "Stage N" in an older doc resolves through `agentic-qa-core/references/stage-gates.md`; the why behind the stages is `iql-context`.
@@ -52,7 +42,7 @@ This skill is specific to **this** Playwright + KATA QA boilerplate and points a
 
 This skill is also the **front desk** for anyone who is confused: *"I don't know how to use this"*, *"how does `/sprint-testing` actually work?"*, *"what does this repo even do?"*, *"explain test-automation to me"*, *"no entiendo cómo funciona esto"*. When that happens, step into the scene as a friendly guide and follow these rules:
 
-1. **Speak like a human, not a terminal.** For the whole explanation, **suspend any compressed / caveman register** — full sentences, warm tone, simple words, zero unexplained jargon. Define each technical term the first time you use it ("an ATC — basically one complete test case, start to finish"). This is an explicit in-skill override of the default register; resume your normal style once the person is oriented.
+1. **Speak like a human, not a terminal.** For the whole explanation, **suspend the terse working register** — full sentences, warm tone, simple words, zero unexplained jargon. Define each technical term the first time you use it ("an ATC — basically one complete test case, start to finish"). This is an explicit in-skill override of the default register; resume your normal style once the person is oriented.
 2. **Mirror the user's language.** Spanish in → explain in Spanish. English in → explain in English — but note that the visual decks ship in Spanish only (technical terms stay in English inside them).
 3. **Start from where they are.** If the goal is unclear, ask ONE quick question ("are you trying to test a ticket, or understand the whole flow?"). Don't dump every stage on someone who asked about one.
 4. **Concept first, in plain words** — what the activity is and *why* it matters — before any command, flag, or file path.
@@ -195,7 +185,7 @@ If you cloned this repo and you don't yet have `bun run setup` complete, start t
 | Language    | TypeScript (strict mode)                     |
 | Runtime     | bun                                          |
 | Lint/format | ESLint + Prettier (pre-commit hooks)         |
-| AI agent    | the hosts declared in `AGENTS.md` (§4.5)     |
+| AI agent    | the hosts declared in `.agents/instructions/agent-harnesses.md`     |
 
 The stack is intentionally locked. If your QA project needs a different stack (Cypress, Robot Framework, etc.), this boilerplate is not the right starting point — the KATA architecture is Playwright-specific.
 
@@ -209,9 +199,9 @@ Run the interactive installer once after cloning:
 bun run setup
 ```
 
-This bootstraps `.agents/`, installs the gentle-ai `engram` component (minimal preset), configures the MCPs in `.mcp.json`, downloads Playwright browsers, installs the community skills `cli/install.ts` declares (`USER_LEVEL_SKILLS` + `PROJECT_LEVEL_SKILLS`), verifies the `${VAR}` placeholders in the committed `.mcp.json` against your `.env`, and generates the per-harness credential surfaces from it (the same thing `bun run harness:env` does). Full details in [`INSTALLER.md`](../../../INSTALLER.md).
+This bootstraps `.agents/`, records the agents you select in `harnesses:` (`.agents/project.yaml`) and offers to delete the files of the harnesses left out, asks where secret values live (`.env` by default, or a secret manager), wires Engram persistent memory into each selected agent (`engram setup`), configures the MCPs in `.mcp.json`, downloads Playwright browsers, installs the community skills `cli/install.ts` declares (`USER_LEVEL_SKILLS` + `PROJECT_LEVEL_SKILLS`), verifies the variables each MCP server's `.env` loader `--filter` names against your `.env`, and retires any plaintext MCP credential copy an older install left behind (the same thing `bun run harness:env` does). Full details in [`INSTALLER.md`](../../../INSTALLER.md).
 
-After setup, fill `.env` with the credentials the rest of the workflow expects (see "Critical env vars" below), then run `bun run harness:env` and restart the agent session: MCP servers read credentials at startup. `bun run setup:doctor` is the health check.
+After setup, fill `.env` with the credentials the rest of the workflow expects (see "Critical env vars" below), then restart the agent session: MCP servers read `.env` through the `.env` loader when the harness spawns them. `bun run setup:doctor` is the health check.
 
 ---
 
@@ -221,7 +211,7 @@ After setup, fill `.env` with the credentials the rest of the workflow expects (
 
 | Phase | Goal | How |
 | ----- | ---- | --- |
-| 1. Foundation | Tooling green on this machine | `bun run setup` → fill `.env` → `bun run harness:env` + restart the agent session → `bun run agents:setup` (project identity + environments in `.agents/project.yaml`) → `bun run pw:install` → `bun run jira:check` |
+| 1. Foundation | Tooling green on this machine | `bun run setup` → fill `.env` → restart the agent session → `bun run agents:setup` (project identity + environments in `.agents/project.yaml`) → `bun run pw:install` → `bun run jira:check` |
 | 2. Jira side | The tracker's catalogs mirrored locally | `bun run jira:sync-fields` + `jira:sync-workflows` + `jira:sync-link-types` (generate the `.agents/*.json` catalogs every skill reads) → `/jira-administration components` (reconcile Jira Components against the app's real modules). First-time Jira provisioning: `docs/core/setup/jira-xray.html` (docs site, `bun run docs`) |
 | 3. App under test | The framework knows and fits YOUR app | `/project-discovery` (reverse-engineers the target repo → the domain and infra maps inside `business-domain-context` and `infra-context`, plus `.context/project-config.md`) → `/project-context data` (the `business-data-context` map; mode `api` too when no OpenAPI spec is reachable) → `/test-framework-adaptation` (adapts KATA, config, CI, MCPs to the stack; its Phase 0 GATES on those maps through `bun run context:map <slug> --list` and on `project-config.md`, so the order is enforced) |
 | 4. Git strategy | Branch policy is a decision, not an inherited default | Ask **"set up our git strategy"** (git-flow-master's Strategy Setup: 4 questions → `git_strategy:` block in `.agents/project.yaml`), then optionally `bun run git:policy apply` to mirror it on GitHub. If you skip this, git-flow-master OFFERS it on your first real git action anyway (template-trap guard) — and `bun run git:policy verify` runs on every push via the pre-push hook |
@@ -236,8 +226,8 @@ The QA work in this boilerplate runs as named stages: Shift-Left before the spri
 
 | Stage | Skill | When | What happens |
 | ----- | ----- | ---- | ------------ |
-| Shift-Left | `/shift-left-testing` | PRE-SPRINT (batch) | AC refinement on a batch of backlog Stories, gap-spotting, early authoring of the Story's single ATP into the `{{jira.acceptance_test_plan}}` field (outline maturity, no Test Plan item yet: `/sprint-testing` Planning creates the item FROM that field and refines the same ATP), tracked by a `[QA] Shift-Left Review` subtask, transition `backlog → shift_left_qa → estimation`. Adds labels `shift-left-reviewed` + `shift-left-{YYYY-MM-DD}` (the dated one powers the <30-day short-circuit). |
-| Planning → Execution → Reporting | `/sprint-testing` | IN-SPRINT (ticket) | Per-ticket: ATS, ATP, then ATR. Smoke + trifuerza (UI/API/DB) exploration. Planning short-circuits its first phases if the Story passed Shift-Left <30 days ago. |
+| Shift-Left | `/shift-left-testing` | PRE-SPRINT (batch) | AC refinement on a batch of backlog Stories, gap-spotting, early authoring of the Story's single ATP into the `{{jira.acceptance_test_plan}}` field (outline maturity, no Test Plan item yet: `/sprint-testing` Planning creates the item FROM that field and refines the same ATP), tracked by a `[QA] Shift-Left Review` subtask, transition `backlog → shift_left_qa → estimation`. Adds labels `shift-left-reviewed` + `shift-left-{YYYY-MM-DD}` (the dated one dates the pass for the freshness window `/sprint-testing` declares; the Stage 1 short-circuit opens only on the published ATP body, never on the labels alone). |
+| Planning → Execution → Reporting | `/sprint-testing` | IN-SPRINT (ticket) | Per-ticket: ATS, ATP, then ATR. Smoke + trifuerza (UI/API/DB) exploration. Planning short-circuits its first phases only when the Story's published ATP body backs a Shift-Left pass within the window `/sprint-testing` declares (the labels alone open nothing). |
 | Documentation | `/test-documentation` | IN-SPRINT (post-QA) | Refine the executed test cases into TMS Tests, one ROI verdict per scenario (Candidate/Manual/Deferred), Candidates added to the RTP. |
 | Automation | `/test-automation` | POST-SPRINT | KATA-compliant E2E + API tests on Playwright. Plan → Code → Review, with a required separate verifier. |
 | Regression | `/regression-testing` | PRE-RELEASE | CI suite execution. Failure classification. GO/CAUTION/NO-GO release verdict. |
@@ -289,7 +279,7 @@ You confirm at the gates.
 | Authoring new automated test for a Candidate TC                            | `/test-automation`                                                   |
 | Refactor of the boilerplate itself — KATA bases, fixtures, cli/, scripts/  | `/framework-development`                                             |
 
-`/framework-development` covers framework evolution (changes to the boilerplate's own infrastructure, not per-ticket test writing). Self-contained Plan → Code → Verify → Archive pipeline; works under the minimal install preset (no SDD-* skills required).
+`/framework-development` covers framework evolution (changes to the boilerplate's own infrastructure, not per-ticket test writing). Self-contained Plan → Code → Verify → Archive pipeline; needs nothing outside the repo.
 
 ---
 
@@ -323,7 +313,7 @@ A remote server whose only project-side content was an API key is the harness's 
 - Use `/acli` for ticket WRITES (create, transition, comment, link); for detailed READS (custom fields, ACs, ATP/ATR, comments) use `bun run jira:sync-issues get`/`jql`
 - Use `/playwright-cli` for every browser interaction, ad-hoc or scripted: there is no browser MCP
 
-`.mcp.json` lives at the repo root and is **committed**: it is secret-free, referencing secrets as `${VAR}` placeholders. The value reaches each harness from `.env` through a generated surface (`bun run harness:env`): Claude Code reads the `env` block of `.claude/settings.local.json`, OpenCode reads `.auth/opencode/<VAR>` via `{file:}`, Codex starts every stdio server through a `.env` loader declared in `.codex/config.toml` (`CODEX_ENV_LOADER_*` in `cli/lib/agent-compatibility-contracts.ts`), so even a bare or Dock launch sees the values. Only `.mcp.local.json` (personal overrides) is gitignored.
+`.mcp.json` lives at the repo root and is **committed**: it is secret-free, naming secrets only in each server's `.env` loader `--filter`. Every MCP server that needs `.env` values starts through that loader on all three hosts (`.mcp.json`, `opencode.jsonc`, `.codex/config.toml`; `MCP_ENV_LOADER_*` in `cli/lib/agent-compatibility-contracts.ts`), which reads `.env` from the project root itself, so even a desktop or Dock launch sees the values and no plaintext copy is written anywhere. Only `.mcp.local.json` (personal overrides) is gitignored.
 
 ---
 
@@ -335,7 +325,7 @@ Not in `.env`: web search and Postman are MCP servers connected at harness level
 
 `.env` is **gitignored**. Never commit it. `.agents/project.yaml` (committed) holds non-secret context (URLs, project key, environment names); `.env` holds the matching secrets.
 
-`.mcp.json` is **committed** and safe to commit: it never holds a secret value, only `${VAR}` placeholders. `.env` is the single source; `bun run harness:env` derives the Claude and OpenCode surfaces from it, and `bun run setup:doctor` reports drift. Personal overrides go in the gitignored `.mcp.local.json`.
+`.mcp.json` is **committed** and safe to commit: it never holds a secret value, only variable names in each loader's `--filter`. `.env` is the single source, read by the loader at spawn time; `bun run setup:doctor` reports any plaintext copy an older `bun run harness:env` left behind, and `bun run harness:env` retires it. Personal overrides go in the gitignored `.mcp.local.json`.
 
 Verify your config with `bun run vars:check` (should report 0 errors when fully configured). The full health check is `bun run setup:doctor`.
 
@@ -343,21 +333,15 @@ Verify your config with `bun run vars:check` (should report 0 errors when fully 
 
 ## Local skills (committed in this repo)
 
-The committed skills, with their triggers and purpose, are listed in `AGENTS.md` §5 and indexed in `.agents/skills/REGISTRY.md` (generated by `bun run skills:registry`); this skill keeps no copy.
+The committed skills, with their triggers and purpose, are listed in `.agents/instructions/agent-skills-and-mcps.md` (a project's own skills, in the `## Project context skills` table of `.agents/instructions/agent-project.md`) and indexed in `.agents/skills/REGISTRY.md` (generated by `bun run skills:registry`); this skill keeps no copy.
 
 ---
 
-## What `bun run setup` installs via gentle-ai
+## Persistent memory (Engram)
 
-`bun run setup` runs `gentle-ai install --preset minimal` — installs ONLY the **`engram`** component (persistent memory binary + MCP adapter + agent config). No SDD-* skills, no foundation skills.
+`bun run setup` wires **Engram** into each selected agent with the engram binary's own `engram setup <agent>`: it registers the Engram MCP server and nothing else. On Claude Code the installer then offers the Engram plugin (`claude plugin install engram@engram`), which adds the session hooks the MCP registration does not install ([`INSTALLER.md`](../../../INSTALLER.md), "What `engram setup` adds"). The boilerplate does not use gentle-ai's workflow layer; its own workflow skills (`/shift-left-testing`, `/sprint-testing`, `/test-automation`, `/test-documentation`, `/regression-testing`) cover Plan → Code → Verify natively.
 
-Rationale: this repo already covers Plan → Code → Verify natively in its workflow skills (`/shift-left-testing`, `/sprint-testing`, `/test-automation`, `/test-documentation`, `/regression-testing`). SDD ceremony does not apply to test authoring.
-
-Want the explicit SDD ceremony for an architectural change of your own? Run manually:
-
-```bash
-gentle-ai install --components engram,sdd --agent <claude-code|opencode|cursor>
-```
+Two things worth telling a new user: the agent saves memories only when it decides to (`mem_save`), and search matches keywords, not meaning, so a short keyword query finds more than a full question.
 
 Full details in [`INSTALLER.md`](../../../INSTALLER.md).
 
@@ -391,7 +375,7 @@ Plus the project-level community skills in the `PROJECT_LEVEL_SKILLS` array of `
 
 - [ ] Did you run `bun run setup`?
 - [ ] Did you fill `.env` with what your work needs (`.env.example` documents each variable and its scope) and connect web search at harness level?
-- [ ] Did you run `bun run harness:env` after filling `.env`, then restart the agent session?
+- [ ] Did you restart the agent session after filling `.env`?
 - [ ] Did you populate `.agents/project.yaml` (run `bun run agents:setup` if not yet)?
 - [ ] Does `bun run vars:check` exit clean (0 errors)?
 - [ ] Did you run `bun run jira:check` to verify Jira credentials?

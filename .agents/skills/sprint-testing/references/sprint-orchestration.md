@@ -372,7 +372,7 @@ Rules:
   - Do NOT modify the issue in the issue tracker (read-only operation; no comments, no transitions).
   - Do NOT load all of .context/ — only the docs listed above.
   - Environment reachability was already gated orchestrator-side by Session Start §0.6 before this dispatch — do NOT re-probe the env. If the ticket is email / magic-link / auth-token dependent, set inbox_check_required=true so the orchestrator runs (or has run) the inbox receive-check before Stage 1.
-  - Critical Rule #1 (Login Credentials): if any tool needs auth, reference .env keys; never hardcode.
+  - Critical Rule #1 (credentials by NAME, never by value): if any tool needs auth, reference the variable name; never open .env, print or hardcode a value.
   - Never ask the user for confirmation — the orchestrator handles user interaction.
 ```
 
@@ -393,9 +393,9 @@ Skills to load: /acli (for ATP/ATR WRITE + Story link); in Modality jira-xray al
 
 Exact instructions:
   1. Bug branch: run the veto decision tree per acceptance-test-planning.md §"Phase 0 — Triage" (SKIP -> emit veto_outcome=skip, write minimal Bug Analysis, exit; REQUIRE -> continue).
-  2. Risk triage per acceptance-test-planning.md §"0.2 Risk score" (impact x likelihood -> P0|P1|P2 distribution).
+  2. Risk triage per acceptance-test-planning.md §"0.2 Risk score" (LOW / MEDIUM / HIGH); each outline carries its Phase 3 Priority (Critical / High / Medium / Low).
   3. Translate ACs into ATP rows (one row per testable behavior); apply Phases 1-4 of acceptance-test-planning.md (Critical Analysis, Story Quality, Refined ACs, Test Outlines).
-  4. Draft TC outlines (summary + steps + expected) — full TC bodies are formalized in Stage 4 (test-documentation), not here.
+  4. Draft TC outlines (summary + steps + expected). TC work items follow SKILL.md §"TC creation timing" (step 5 + Rules); persistent regression TCs are formalized in Stage 4 (test-documentation).
   5. Create ATP + ATS + ATR per the modality branch in acceptance-test-planning.md §"Phase 6 — Traceability + Ticket updates":
        - Modality jira-xray — Set-first order (AUTHORITATIVE):
            ① Create the sprint Test issues per the TC-timing rule, then [TMS_TOOL] Find-or-create TestSet `ATS: <TICKET_KEY>: {title}` (parent QA Test Artifacts, components inherited from the Story — mandatory) holding ALL of them (Xray-internal membership PLUS one TC→ATS `test` link per TC — traceability-linking.md §9); link ATS→Story via the `test` slug — THE coverage link (fills the Xray coverage panel).
@@ -428,8 +428,8 @@ Report format:
     "assignees_set": true|false,
     "unmapped_slugs": [{ "slug": "...", "asked": true|false, "resolution": "live id <n> | skipped by user" }],
     "light_verifier": "8/8 (N/A: <stated reasons>)",
-    "atc_drafts": [{ "title": "...", "type": "Positive|Negative|Boundary|Edge", "priority": "P0|P1|P2" }],
-    "risk_distribution": { "P0": <int>, "P1": <int>, "P2": <int> },
+    "atc_drafts": [{ "title": "...", "type": "Positive|Negative|Boundary|Edge", "priority": "Critical|High|Medium|Low" }],
+    "risk_level": "LOW|MEDIUM|HIGH",
     "veto_outcome": "proceed | skip | require | escalate",
     "ac_gaps": [...],
     "open_questions": [...],
@@ -470,7 +470,7 @@ Exact instructions:
   1a. **Self-assign QA ownership** when the Story is taken into testing (per `agentic-qa-core/references/defect-management-doctrine.md` Part 2): set `{{jira.qa_assignee}}` to the AUTHENTICATED session user (self-assign — same identity that becomes `reporter`). **Never-overwrite** — read the current value first (from the synced `.md` or a GET); write only if empty, or on an explicit, justified handover. `qa_assignee` is the QA owner, DISTINCT from the native dev `assignee` (do NOT touch `assignee`). Customfield write mechanics (REST `PUT`, read-before-write) → doctrine Part 6 + `/acli`. Non-blocking — surface a skip reason in the report and proceed if it cannot be set.
   1b. **Check `assignee` AFTER the step-1 transition** — some workflows carry an undocumented assign post-function. Measured on one instance (ADR-0006): `start_testing` (and `qa_sign_off` in Stage 3) silently moved the native `assignee` from the developer to the QA engineer who fired the transition, on an instance whose own doctrine keeps the two owners distinct. The transition did not advertise it and nothing in the catalog records it. So: read `assignee` BEFORE firing (step 1 already does a GET for the available transitions — take it from the same read), read it again after, and if the transition moved it, **restore the previous owner** and note the post-function in the Transition Trail. Never leave a dev's Story silently reassigned; if the project genuinely wants QA as `assignee` during testing, that is the user's call — ask once and record it. Full rule: `agentic-qa-core/references/defect-management-doctrine.md` Part 2 §"Transitions that reassign".
   2. Configure evidence: **do NOT repoint the shared `.playwright/cli.config.json`** — its `outputDir` stays at the tool-owned directory it ships with (`agentic-qa-core/references/evidence-conventions.md` §1 Bucket A + §5). Every capture instead carries its **full destination path** into <PBI_FOLDER>/evidence/, which is mandatory anyway because `outputDir` does not apply to `.png`. Browser: a named session per ticket (`-s=<KEY>`, in memory under the shipped config, so the name IS the isolation) that `state-load`s `<repo>/.auth/<env>-<role>.json` for each role the ticket needs; never an edit to the shared config. Canon: `agentic-qa-core/references/browser-sessions.md`.
-  3. Smoke (5-10 min, ALWAYS FIRST): validate the happy path of every P0 ATC. If smoke fails, emit smoke_result=fail and STOP — do NOT proceed to deep exploration.
+  3. Smoke (5-10 min, ALWAYS FIRST): validate the happy path of every Critical-priority outline. If smoke fails, emit smoke_result=fail and STOP — do NOT proceed to deep exploration.
   4. Triforce UI: explore edge cases, empty states, validation errors per exploration-patterns.md §1.
   5. Triforce API: hit the relevant endpoints with valid + invalid + boundary payloads via the API MCP per exploration-patterns.md §2.
   6. Triforce DB: verify state changes via the DB MCP for write-side ATCs per exploration-patterns.md §3.
@@ -499,7 +499,8 @@ Rules:
   - `severity` is an option slug of `{{jira.severity}}` (the five impact levels of `agentic-qa-core/references/defect-management-doctrine.md` Part 5.1), never a Priority word: Priority is derived from it at filing time.
   - Do NOT file the bug in the issue tracker yet — Stage 3 handles filing per the bug-report template in reporting-templates.md.
   - Do NOT modify production data; for write-side checks use staging entities flagged in the ATP.
-  - Critical Rule #1 (Login Credentials): credentials always from .env; never hardcode.
+  - Critical Rule #1 (credentials by NAME, never by value): use each credential through its variable name; never open .env, print or hardcode a value.
+  - Identity: every role signs in through the app's own login only (UI form → `.auth/<env>-<role>.json`, or `bun run api:login --role <role>`). NEVER obtain a session through a service-role / admin key, an admin user-management API, a server-generated magic link or reset token, a locally signed JWT or a database session row; seeding test DATA through API / DB stays allowed. An auth story runs end to end through a real inbox (`/resend-cli`). A check that seems to need a shortcut is a blocker to report, not a step to take (`agentic-qa-core/references/browser-sessions.md` §4).
   - A blocking finding (env down, auth failure, infra issue, data corruption, security-exploitable) STOPS the pass — surface to orchestrator, do NOT auto-retry. A non-blocking finding does NOT stop the pass — log it, finish the remaining TCs, and report it at the end (set pass_completed=true).
 ```
 
@@ -582,9 +583,9 @@ Rules:
   - All TMS content in English (Critical Rule from AGENTS.md §"Language").
 ```
 
-### Shared sub-agent shell (legacy — kept for memory bookkeeping)
+### Sub-agent memory contract
 
-The four briefings above replace the previous narrative shell. The memory-update + checklist-tick contract that every subagent must honor is summarized below — each briefing's "Exact instructions" already references it explicitly.
+Every sub-agent honors the memory-update + checklist-tick contract below; each briefing's "Exact instructions" references it.
 
 ```
 MEMORY UPDATE: before finishing, update the relevant section of test-session-memory.md
@@ -593,7 +594,7 @@ MEMORY UPDATE: before finishing, update the relevant section of test-session-mem
 EXIT CHECKLIST: in memory.md > Checklist > {Stage}, mark [x] every completed item.
   Leave [ ] + explanation in Observations for any uncompleted item.
 
-IMPORTANT: credentials always from .env. Never hardcode. Never ask the user for
+IMPORTANT: credentials by NAME, never by value. Never hardcode. Never ask the user for
   confirmation — the orchestrator handles user interaction.
 ```
 

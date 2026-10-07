@@ -38,7 +38,7 @@ Three phases, always in this order: **Execute → Analyze → Report**. Do not s
 - DO: clear the readiness preflight before triggering anything — `gh` authenticated, the suite's workflow file present, GitHub Actions secrets set, Allure resolvable, active env confirmed. A long run that 401s mid-way is the expensive failure.
 - DO: persist `RUN_ID` the moment the trigger returns, before anything else. Resume re-attaches to a live run instead of re-triggering CI; a trigger that landed without the id saved costs the whole run again.
 - DO NOT: mark a failure REGRESSION without checking its history first — the single most common misclassification. A first-ever failure with no history is NEW TEST, unverified, not a regression.
-- DO: classify every failure into exactly one of KNOWN-BLOCKED / KNOWN ISSUE / ENVIRONMENT / NEW TEST / FLAKY / REGRESSION, and assess severity on a separate axis — a FLAKY test on checkout is still CRITICAL.
+- DO: classify every failure into exactly one of KNOWN-BLOCKED / KNOWN ISSUE / ENVIRONMENT / NEW TEST / FLAKY / REGRESSION, and assess severity on a separate axis — a FLAKY test on checkout is still CRITICAL. Classification is fail-closed: every class but REGRESSION cites its evidence (the `@blocked:{BUG-KEY}` marker; a ticket created BEFORE the run; the matching log line plus the other failures on that host; the empty history query; the ids and results of at least 5 runs on an unchanged build). No citation, or a ticket this session filed, = REGRESSION.
 - DO: exclude `@blocked:{BUG-KEY}` tests from the gating pass-rate and report their count with each blocking key. They are parked behind an already-filed bug: never REGRESSION, and never a new bug.
 - DO NOT: use ENVIRONMENT as a scapegoat. Many unrelated tests failing on one host is environment; one test failing on an endpoint other tests reach fine is more likely a REGRESSION.
 - DO NOT: call a test flaky on fewer than 5 runs of history — mark "insufficient history" and re-evaluate rather than guessing.
@@ -77,7 +77,7 @@ Three phases, always in this order: **Execute → Analyze → Report**. Do not s
 
 This skill is **per-run scope**: `<scope>` = `<env>-<YYYY-MM-DD>` (e.g. `staging-2026-05-20`). Session state lives at `.session/regression-testing/<scope>/{plan.md, progress.md}` per `agentic-qa-core/references/session-management.md` §3 + §9. The single highest-value resume case: if the Monitor subagent dies while watching a long CI run but `RUN_ID` was captured in `plan.md`, Phase 0 re-attaches via `gh run view <RUN_ID>` instead of re-triggering CI (saves the whole run's wall-clock; read the last `gh run view` duration).
 
-This skill is compliant with the doctrine in `AGENTS.md` §"Orchestration Mode (Subagent Strategy)" and the session contract in `.agents/skills/agentic-qa-core/references/session-management.md`. Every dispatch follows the 7-component briefing format defined in `.agents/skills/agentic-qa-core/references/briefing-template.md`, and the pattern selected per stage matches the decision guide in `.agents/skills/agentic-qa-core/references/dispatch-patterns.md`. The two CI-bound stages (long-running watch, multi-artifact download) and the high-volume failure classification step are the hotspots — everything else stays inline because the dispatch overhead is not justified.
+This skill is compliant with the doctrine in `AGENTS.md` §3 "Orchestration Mode" and the session contract in `.agents/skills/agentic-qa-core/references/session-management.md`. Every dispatch follows the 7-component briefing format defined in `.agents/skills/agentic-qa-core/references/briefing-template.md`, and the pattern selected per stage matches the decision guide in `.agents/skills/agentic-qa-core/references/dispatch-patterns.md`. The two CI-bound stages (long-running watch, multi-artifact download) and the high-volume failure classification step are the hotspots — everything else stays inline because the dispatch overhead is not justified.
 
 | Stage                                                      | Pattern    | Subagent role                                                                                                  |
 |------------------------------------------------------------|------------|----------------------------------------------------------------------------------------------------------------|
@@ -156,8 +156,8 @@ Allure (major pinned in `package.json`) is a devDep — `bunx allure` resolves t
 
 | Use case | Script | Underlying command |
 |---|---|---|
-| Run tests + auto-generate report (human review) | `bun allure:run` | `bunx allure run -- bun test` |
-| Run tests + emit markdown for AI review | `bun allure:agent` | `bunx allure agent -- bun test` |
+| Run tests + auto-generate report (human review) | `bun allure:run` | `bunx allure run -- bunx playwright test`, through the env launcher like the `test*` scripts |
+| Run tests + emit markdown for AI review | `bun allure:agent` | `bunx allure agent -- bunx playwright test`, through the env launcher like the `test*` scripts |
 | Generate report from existing `./allure-results` | `bun allure:generate` | `bunx allure generate ./allure-results` |
 | Serve last generated report locally | `bun allure:open` | `bunx allure open` |
 | Live-refresh report during iterative dev | `bun allure:watch` | `bunx allure watch ./allure-results` |
@@ -369,14 +369,16 @@ Failed test
   └── Passed in last ≤ 5 runs, now fails? ───► REGRESSION   (release blocker)
 ```
 
-| Category | Impact | Action |
-|----------|--------|--------|
-| KNOWN-BLOCKED | LOW | Already tracked by `{BUG-KEY}` — exclude from gating pass-rate, list in report with the blocking bug key. **No new Jira bug** (the marker already names the open bug) |
-| REGRESSION | HIGH | Block release, file Jira Bug/Defect (Phase 3 §File defects in Jira, doctrine Part 1), assign |
-| FLAKY | MEDIUM | Schedule stabilization, do not block — **no Jira bug** |
-| KNOWN ISSUE | LOW | Document against existing ticket, do not block — **no new Jira bug** |
-| ENVIRONMENT | MEDIUM | Re-run after infra check — **no Jira bug** |
-| NEW TEST | LOW | Manual verification → if a genuine product defect, file Jira Bug/Defect; else accept or fix |
+| Category | Impact | Action | Evidence the classification must cite |
+|----------|--------|--------|------|
+| KNOWN-BLOCKED | LOW | Already tracked by `{BUG-KEY}` — exclude from gating pass-rate, list in report with the blocking bug key. **No new Jira bug** (the marker already names the open bug) | the `@blocked:{BUG-KEY}` tag in the spec and its bug key |
+| REGRESSION | HIGH | Block release, file Jira Bug/Defect (Phase 3 §File defects in Jira, doctrine Part 1), assign | none: it is the closed value |
+| FLAKY | MEDIUM | Schedule stabilization, do not block — **no Jira bug** | the run ids and results of at least 5 runs, and the build each ran on (unchanged across them) |
+| KNOWN ISSUE | LOW | Document against existing ticket, do not block — **no new Jira bug** | the ticket key, created before this run started, that names the ATC ID or test title |
+| ENVIRONMENT | MEDIUM | Re-run after infra check — **no Jira bug** | the log line matching an environment pattern, plus the other tests that failed on the same host in the same run |
+| NEW TEST | LOW | Manual verification → if a genuine product defect, file Jira Bug/Defect; else accept or fix | the history query (Allure history, TMS runs) that returned no earlier execution |
+
+**Classification is a fail-closed gate** (`agentic-qa-core/references/orchestration-doctrine.md`, FAIL-CLOSED GATES). Every class except REGRESSION lets a failure past the release gate, and the classifier is the one who picks it, so a non-blocking class stands only with its citation from the last column. No citation, an empty one, or a ticket this session filed to make the failure "known" → the failure counts as REGRESSION. The same holds for a parallel chunk: a classification returned without its `evidence` is merged as REGRESSION (`references/failure-classification.md` §Parallel classification).
 
 > **KNOWN-BLOCKED — consuming the blocked-test marker.** The `@blocked:{BUG-KEY}`
 > tag + `test.fail('Blocked by {BUG-KEY}')` marker is **defined in
@@ -414,7 +416,7 @@ An analysis block with: metrics table, trend delta, one section per failure cate
 
 ### GO / CAUTION / NO-GO scoring
 
-Compute a weighted score from the analysis. Maximum is 9.
+Compute a weighted score from the analysis. Maximum is 10.
 
 | Factor | +3 | +1 | 0 | -1 | -2 | -3 |
 |--------|----|----|---|----|----|----|
@@ -545,7 +547,7 @@ Save to `.context/reports/regression-{env}-{date}.md`. Use `references/failure-c
 
 ## Executive Summary
 **Verdict: {GO / CAUTION / NO-GO}**
-Score: {score}/9. {one-line rationale}
+Score: {score}/10. {one-line rationale}
 
 | Metric | Value | Threshold | Status |
 |--------|-------|-----------|--------|
@@ -646,11 +648,11 @@ On Verdict = NO-GO with regressions still being filed as issues, archive WAITS u
 
 ## Anti-patterns — NEVER do these
 
-- **R1.** NEVER classify a failure as FLAKY without re-running the test in isolation — masks real regressions.
+- **R1.** NEVER classify a failure as FLAKY without the ≥5-run history citation (§Step 4 table) — masks real regressions.
 - **R2.** NEVER emit GO when known REGRESSION class > 0 — quality gate is binary: regressions block.
 - **R3.** NEVER auto-retry failing tests in CI without surfacing the retry count in the report.
 - **R4.** NEVER skip Allure artifact download on red builds — evidence vanishes after the retention window.
-- **R5.** NEVER trigger a regression workflow without `--ref <commit-sha>` pinned — different commit = different baseline.
+- **R5.** Record the tested commit (`gh run view <RUN_ID> --json headSha`) in the report; compare trends only between runs whose commits are known — different commit = different baseline.
 - **R6.** NEVER mix smoke + regression suite results into one pass-rate number — different SLOs.
 - **R7.** NEVER mark a test KNOWN-failure without a Jira ticket linking the suppression to a tracking issue.
 
