@@ -107,7 +107,8 @@
     "worktree:audit": "bun scripts/worktree-audit.ts",
     "env:set": "bun --no-env-file scripts/env-set.ts",
     "instructions:audit": "bun scripts/instructions-audit.ts",
-    "instructions:check": "bun scripts/lint-instructions.ts"
+    "instructions:check": "bun scripts/lint-instructions.ts",
+    "browser:profiles": "bun scripts/browser-profiles.ts"
   },
   "dependencies": {
     "@clack/prompts": "1.4.0",
