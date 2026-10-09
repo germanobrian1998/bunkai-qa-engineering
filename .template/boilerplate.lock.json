@@ -3,12 +3,12 @@
   "templateRepo": "upex-galaxy/agentic-qa-boilerplate",
   "templateCommit": "83eae2505706f9d048dfa6749438c1dba18c949b",
   "perComponentCommit": {
-    "skills": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "skills": "bf4c787cc9a2998832d6bf573e8e1896576afbc1",
     "agent-compatibility": "c56ab92090c654d442439f8dd5c024602321cde3",
     "codex-config": "c56ab92090c654d442439f8dd5c024602321cde3",
-    "scripts": "c56ab92090c654d442439f8dd5c024602321cde3",
-    "docs": "c56ab92090c654d442439f8dd5c024602321cde3",
-    "cli": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "scripts": "bf4c787cc9a2998832d6bf573e8e1896576afbc1",
+    "docs": "bf4c787cc9a2998832d6bf573e8e1896576afbc1",
+    "cli": "bf4c787cc9a2998832d6bf573e8e1896576afbc1",
     "vscode": "c56ab92090c654d442439f8dd5c024602321cde3",
     "husky": "c56ab92090c654d442439f8dd5c024602321cde3",
     "agents-docs": "c56ab92090c654d442439f8dd5c024602321cde3",
@@ -20,7 +20,7 @@
     "orca-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
     "agent-root-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
     "playwright-cli-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "instructions": "c56ab92090c654d442439f8dd5c024602321cde3"
+    "instructions": "bf4c787cc9a2998832d6bf573e8e1896576afbc1"
   },
   "syncedComponents": [],
   "ignoreFileSync": {
@@ -37,16 +37,17 @@
   "packageJsonSync": {
     "package.json": {
       "scripts": {
-        "lastSyncedSha": "a8b6d772a122c3523b239e8dbf42edea5d26a026",
+        "lastSyncedSha": "e61a440de623e69f5583be64a2e689f5874be310",
         "appliedKeys": [
           "worktree:audit",
           "env:set",
           "instructions:audit",
-          "instructions:check"
+          "instructions:check",
+          "browser:profiles"
         ]
       },
       "devDependencies": {
-        "lastSyncedSha": "a8b6d772a122c3523b239e8dbf42edea5d26a026",
+        "lastSyncedSha": "e61a440de623e69f5583be64a2e689f5874be310",
         "appliedKeys": [],
         "keptKeys": {
           "@antfu/eslint-config": "^4.16.0",
@@ -65,7 +66,7 @@
         }
       },
       "dependencies": {
-        "lastSyncedSha": "a8b6d772a122c3523b239e8dbf42edea5d26a026",
+        "lastSyncedSha": "e61a440de623e69f5583be64a2e689f5874be310",
         "appliedKeys": [],
         "keptKeys": {
           "@clack/prompts": "^1.4.0",
@@ -74,12 +75,12 @@
         }
       },
       "lint-staged": {
-        "lastSyncedSha": "a8b6d772a122c3523b239e8dbf42edea5d26a026",
+        "lastSyncedSha": "e61a440de623e69f5583be64a2e689f5874be310",
         "appliedKeys": []
       }
     }
   },
   "cliVersion": "8.5",
-  "lastSyncedAt": "2026-10-07T22:26:23.768Z",
+  "lastSyncedAt": "2026-10-09T13:59:46.189Z",
   "variableSystemVersion": 1
 }
