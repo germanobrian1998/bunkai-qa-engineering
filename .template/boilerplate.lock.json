@@ -3,24 +3,24 @@
   "templateRepo": "upex-galaxy/agentic-qa-boilerplate",
   "templateCommit": "83eae2505706f9d048dfa6749438c1dba18c949b",
   "perComponentCommit": {
-    "skills": "bf4c787cc9a2998832d6bf573e8e1896576afbc1",
-    "agent-compatibility": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "skills": "869e4200e340a4cf38968aee786327fceb222d6d",
+    "agent-compatibility": "869e4200e340a4cf38968aee786327fceb222d6d",
     "codex-config": "c56ab92090c654d442439f8dd5c024602321cde3",
-    "scripts": "bf4c787cc9a2998832d6bf573e8e1896576afbc1",
-    "docs": "bf4c787cc9a2998832d6bf573e8e1896576afbc1",
-    "cli": "bf4c787cc9a2998832d6bf573e8e1896576afbc1",
+    "scripts": "869e4200e340a4cf38968aee786327fceb222d6d",
+    "docs": "869e4200e340a4cf38968aee786327fceb222d6d",
+    "cli": "869e4200e340a4cf38968aee786327fceb222d6d",
     "vscode": "c56ab92090c654d442439f8dd5c024602321cde3",
     "husky": "c56ab92090c654d442439f8dd5c024602321cde3",
-    "agents-docs": "c56ab92090c654d442439f8dd5c024602321cde3",
-    "tooling": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "config-core": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "env-template": "c56ab92090c654d442439f8dd5c024602321cde3",
-    "env-schema": "c56ab92090c654d442439f8dd5c024602321cde3",
+    "agents-docs": "869e4200e340a4cf38968aee786327fceb222d6d",
+    "tooling": "869e4200e340a4cf38968aee786327fceb222d6d",
+    "config-core": "869e4200e340a4cf38968aee786327fceb222d6d",
+    "env-template": "869e4200e340a4cf38968aee786327fceb222d6d",
+    "env-schema": "869e4200e340a4cf38968aee786327fceb222d6d",
     "worktree-include": "83eae2505706f9d048dfa6749438c1dba18c949b",
     "orca-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
     "agent-root-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
     "playwright-cli-config": "83eae2505706f9d048dfa6749438c1dba18c949b",
-    "instructions": "bf4c787cc9a2998832d6bf573e8e1896576afbc1"
+    "instructions": "869e4200e340a4cf38968aee786327fceb222d6d"
   },
   "syncedComponents": [],
   "ignoreFileSync": {
@@ -37,17 +37,19 @@
   "packageJsonSync": {
     "package.json": {
       "scripts": {
-        "lastSyncedSha": "e61a440de623e69f5583be64a2e689f5874be310",
+        "lastSyncedSha": "d63a1ef0460976a9514a284368674abf0e34a0db",
         "appliedKeys": [
           "worktree:audit",
           "env:set",
           "instructions:audit",
           "instructions:check",
-          "browser:profiles"
+          "browser:profiles",
+          "shared:check",
+          "sync"
         ]
       },
       "devDependencies": {
-        "lastSyncedSha": "e61a440de623e69f5583be64a2e689f5874be310",
+        "lastSyncedSha": "d63a1ef0460976a9514a284368674abf0e34a0db",
         "appliedKeys": [],
         "keptKeys": {
           "@antfu/eslint-config": "^4.16.0",
@@ -66,7 +68,7 @@
         }
       },
       "dependencies": {
-        "lastSyncedSha": "e61a440de623e69f5583be64a2e689f5874be310",
+        "lastSyncedSha": "d63a1ef0460976a9514a284368674abf0e34a0db",
         "appliedKeys": [],
         "keptKeys": {
           "@clack/prompts": "^1.4.0",
@@ -75,12 +77,12 @@
         }
       },
       "lint-staged": {
-        "lastSyncedSha": "e61a440de623e69f5583be64a2e689f5874be310",
+        "lastSyncedSha": "d63a1ef0460976a9514a284368674abf0e34a0db",
         "appliedKeys": []
       }
     }
   },
   "cliVersion": "8.5",
-  "lastSyncedAt": "2026-10-09T13:59:46.189Z",
+  "lastSyncedAt": "2026-10-12T23:03:09.424Z",
   "variableSystemVersion": 1
 }
