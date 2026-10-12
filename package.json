@@ -72,10 +72,10 @@
     "onboarding": "bun scripts/onboarding.ts",
     "prepare": "husky && bun scripts/harness-env.ts --placeholders",
     "pw:install": "playwright install --with-deps chromium",
-    "repo:check": "bun run format:check && bun run lint:check && bun run types:check && bun run vars:check && bun run vars:schema:check && bun run skills:check && bun run instructions:check && bun run skills:registry:check && bun run docs:check && bun run agents:compat:check && bun run agents:schema:check && bun run kata:manifest:check && bun run vars:env:check && bun run git:policy verify",
+    "repo:check": "bun run format:check && bun run lint:check && bun run types:check && bun run vars:check && bun run vars:schema:check && bun run skills:check && bun run instructions:check && bun run skills:registry:check && bun run docs:check && bun run shared:check && bun run agents:compat:check && bun run agents:schema:check && bun run kata:manifest:check && bun run vars:env:check && bun run git:policy verify",
     "repo:fix": "bun run format:fix && bun run lint:fix && bun run types:check && bun run vars:check && bun run vars:schema && bun run skills:check && bun run skills:registry:check && bun run agents:compat && bun run vars:env:check",
     "setup:doctor": "bun cli/doctor.ts",
-    "setup": "bun cli/doctor.ts --preflight && bun cli/install.ts",
+    "setup": "bun cli/preflight.ts --for setup --gate && bun cli/install.ts",
     "skills:check": "bun scripts/lint-skills.ts && bun scripts/lint-instructions.ts",
     "skills:evals": "bun scripts/run-skill-evals.ts",
     "skills:registry:check": "bun scripts/build-skill-registry.ts --check",
@@ -108,7 +108,9 @@
     "env:set": "bun --no-env-file scripts/env-set.ts",
     "instructions:audit": "bun scripts/instructions-audit.ts",
     "instructions:check": "bun scripts/lint-instructions.ts",
-    "browser:profiles": "bun scripts/browser-profiles.ts"
+    "browser:profiles": "bun scripts/browser-profiles.ts",
+    "shared:check": "bun scripts/shared-check.ts",
+    "sync": "bun cli/update-boilerplate.ts"
   },
   "dependencies": {
     "@clack/prompts": "1.4.0",
