@@ -77,34 +77,38 @@
       <p class="eyebrow">business-domain-context · generated</p>
       <h1>Business domain map</h1>
       <p class="muted">
-        What Bunkai is for, how it intends to earn, and what every domain term means. Reverse-engineered from
-        <code>upex-bunkai-tms</code> at <code>main</code> commit <code>e88512e</code>. Every path below is relative to that
-        repository; <code>db:&lt;table&gt;</code> is a table in <code>supabase/migrations/</code>; <code>route:&lt;path&gt;</code>
+        What Bunkai is for, how it earns, and what every domain term means. Reverse-engineered from
+        <code>upex-bunkai-tms</code> at <code>origin/staging</code> commit <code>98ee1b4</code> (sections updated 2026-10-13);
+        sections still dated 2026-10-02 were built at <code>main</code> commit <code>e88512e</code>. Every path below is relative
+        to that repository; <code>db:&lt;table&gt;</code> is a table in <code>supabase/migrations/</code>; <code>route:&lt;path&gt;</code>
         is a page or API route of the app.
       </p>
 
-      <section id="overview" data-sources="app/layout.tsx,.context/business/business-model.md,.context/PRD/executive-summary.md,supabase/migrations/,app/(app)/,app/api/v1/" data-updated="2026-10-02">
+      <section id="overview" data-sources="app/layout.tsx,app/(auth)/login/page.tsx,.context/business/business-model.md,.context/business/domain-glossary.md,.context/PRD/executive-summary.md,supabase/migrations/,app/(app)/,app/api/v1/,components/layout/AppSidebar.tsx,app/(app)/projects/[projectSlug]/project-sub-nav.tsx" data-updated="2026-10-13">
         <h2>Overview</h2>
         <p>
-          <strong>Confidence: Medium.</strong> The product purpose is stated consistently in code metadata and the in-repo
-          product docs, and the schema matches the authoring half of that purpose. The docs describe a much larger product than
-          the code at <code>e88512e</code> implements (tests, runs, bugs, dashboards are not in the schema), so everything beyond
-          authoring is intent, not behaviour.
+          <strong>Confidence: Medium.</strong> What the product does is now verified in code at <code>origin/staging</code>
+          <code>98ee1b4</code> (89 migrations, the <code>/api/v1</code> handlers and the shipped screens): the gap the previous
+          version recorded between docs and code (tests, runs, bugs, dashboards missing) is closed. The problem framing and the
+          personas still come from marketing-toned in-repo docs, which keeps the synthesis at Medium.
         </p>
         <h3>Problem statement</h3>
         <p>
-          Bunkai is a Test Management System (TMS). Its own metadata calls it an "Open-core Test Management System. ATCs (Atomic
-          Test Components), modular tests, full traceability" (<code>app/layout.tsx</code>). The product docs frame the problem
-          as existing TMSs (Xray, Zephyr Scale, TestRail, qTest) acting as document vaults: duplicated steps across test cases,
-          missing traceability from user story to test to bug, and pass-rate reports that do not say what is validated
+          Bunkai is a Test Management System (TMS). Its metadata reads "Open-core Test Management System. ATCs (Acceptance Test
+          Cases), modular tests, full traceability" (<code>app/layout.tsx</code>). The product docs frame the problem as existing
+          TMSs (Xray, Zephyr Scale, TestRail, qTest) acting as document vaults: duplicated steps across test cases, missing
+          traceability from user story to test to bug, and pass-rate reports that do not say what is validated
           (<code>.context/business/business-model.md</code>, <code>.context/PRD/executive-summary.md</code>; marketing-toned
           prose, so confidence is downgraded).
         </p>
         <p>
-          The answer the code already enforces is structural: an ATC cannot be saved without a user story and at least one
-          acceptance criterion (<code>app/(app)/projects/[projectSlug]/atcs/[atcId]/actions.ts</code>, FK
-          <code>atcs.user_story_id</code> in <code>supabase/migrations/0004_atcs.sql</code>). Traceability is a property of the
-          data model, not an optional field.
+          The answer the code enforces is structural. An <a href="#term-atc">ATC</a> cannot be created or updated without a
+          <a href="#term-user-story">user story</a> and at least one of that story's
+          <a href="#term-acceptance-criterion">acceptance criteria</a> (the create and update database functions reject an empty or
+          foreign criteria list, <code>supabase/migrations/0021_atc_create_update.sql</code>). <a href="#term-test">Tests</a> chain
+          ATCs by reference, a <a href="#term-run">Run</a> freezes a copy of what it executed, and a <a href="#term-bug">bug</a>
+          keeps links to the run step and ATC it came from. That chain (criterion, ATC, Test, Run, Bug) is what the
+          <a href="#term-traceability-chain">traceability</a> and <a href="#term-coverage">coverage</a> reports read.
         </p>
         <h3>Target users</h3>
         <ul>
@@ -114,93 +118,64 @@
           </li>
           <li>
             Programmatic operators (CLI, CI, AI agents) that authenticate with a
-            <a href="#term-personal-access-token">Personal Access Token</a> (<code>supabase/migrations/0008_access_tokens.sql</code>,
+            <a href="#term-personal-access-token">Personal Access Token</a> and may declare themselves as an <code>agent</code> or
+            <code>ci</code> executor when they start a Run (<code>supabase/migrations/0031_runs.sql</code>,
             <code>lib/api/middleware/bearer.ts</code>).
           </li>
           <li>
-            Named personas in the docs (senior QA engineer, QA lead, developer, autonomous AI test agent) are intent only
+            Workspace owners who buy the paid tier (<a href="#term-billing-plan">Billing Plan</a>) and own data export and deletion.
+          </li>
+          <li>
+            Named personas in the docs (senior QA engineer, QA lead, developer, autonomous AI test agent) remain intent only
             (<code>.context/PRD/executive-summary.md</code>).
           </li>
         </ul>
-        <h3>Value proposition (delivered at e88512e)</h3>
+        <h3>Value proposition (delivered at 98ee1b4)</h3>
         <ul>
-          <li>Multi-tenant workspaces with role-based membership and email invite links (<code>route:/workspaces/[id]/members</code>).</li>
-          <li>A project tree of modules, user stories and acceptance criteria browsed in an Explorer sidebar (<code>components/layout/Sidebar.tsx</code>).</li>
-          <li>An ATC library table and an ATC editor with steps, assertions, tags, layer and mandatory anchoring (<code>components/atcs/</code>).</li>
-          <li>A versioned REST API with OpenAPI docs and token auth for non-browser callers (<code>app/api/v1/</code>, <code>route:/api/docs</code>).</li>
+          <li>Multi-tenant workspaces with roles, invite links, self-service leave, owner deletion with a 30-day restore window, and a full data export (<code>route:/settings/workspaces</code>, <code>route:/settings/data-export</code>).</li>
+          <li>An authoring tree: projects, modules (create, rename, move, archive), user stories with a Ready-to-test gate, ordered acceptance criteria, and a one-way Jira story import (<code>components/layout/Sidebar.tsx</code>, <code>app/(app)/projects/[projectSlug]/import-from-jira-dialog.tsx</code>).</li>
+          <li>An ATC library: create, edit, duplicate, search, export, classify by technique and priority, with mandatory anchoring (<code>components/atcs/</code>).</li>
+          <li>Tests as ordered chains of ATC references with suite tags, grouped into Test Plans; Milestones as dated targets (<code>components/tests/</code>, <code>components/test-plans/</code>, <code>components/milestones/</code>).</li>
+          <li>Execution: Runs of a Test against a project environment by a human, an agent or CI, with per-step verdicts, notes and evidence, live updates and an automatic close of abandoned runs (<code>components/runs/RunnerView.tsx</code>, <code>supabase/migrations/0075_run_inactivity_sweep.sql</code>).</li>
+          <li>Native bug tracking: severity, assignee, a forward-only status lifecycle, filed straight from a failed step (<code>components/bugs/</code>).</li>
+          <li>Quality reports: coverage per criterion and module, a story traceability chain, recovery cycles, a defect heatmap, a run report, Home widgets and a command palette (<code>route:/projects/[projectSlug]/metrics</code>, <code>route:/projects/[projectSlug]/traceability</code>).</li>
+          <li>A notification inbox and a daily email digest with per-user preferences (<code>components/notifications/</code>, <code>route:/settings/notifications</code>).</li>
+          <li>A versioned REST API with OpenAPI docs, scoped tokens and idempotency keys for non-browser callers (<code>app/api/v1/</code>, <code>route:/api/docs</code>).</li>
+          <li>Self-service upgrade from Community to Cloud through Stripe Checkout (<code>route:/settings/billing/upgrade</code>).</li>
         </ul>
         <p>
-          Not delivered at this commit, though promised by the docs: tests as chains of ATCs, execution runs, native bug
-          management, coverage dashboards, Jira sync (see <a href="#discovery-gaps">discovery gaps</a>).
+          Main navigation: Home, Activity, Projects, ATC Library, Test Runs, Bug Reports, Metrics, Settings
+          (<code>components/layout/AppSidebar.tsx</code>); inside a project: All ATCs, Test Runs, Bug Reports, Metrics, Traceability,
+          Milestones, Test Plans (<code>app/(app)/projects/[projectSlug]/project-sub-nav.tsx</code>). The global entries ATC Library,
+          Test Runs, Bug Reports and Metrics have no link of their own (<code>href: null</code>); they are reached inside a project.
+        </p>
+        <p>
+          Still not delivered, though the product glossary or docs describe them: chat channels, messages, mentions and rich links;
+          a run "Execution Mode" (manual / automated) and a per-Test "Automation Status"; CI results upload; subscriptions,
+          invoices and renewals; writing bugs back to Jira; closing a Test Plan; attaching Test Plans to a Milestone (see
+          <a href="#discovery-gaps">discovery gaps</a>).
         </p>
       </section>
 
-      <section id="business-model" data-sources=".context/business/business-model.md,.context/PRD/executive-summary.md,supabase/migrations/0001_tenancy.sql,supabase/migrations/0008_access_tokens.sql,package.json,app/api/v1/,app/(auth)/login/" data-updated="2026-10-02">
+      <section id="business-model" data-sources=".context/business/business-model.md,.context/PRD/executive-summary.md,supabase/migrations/0001_tenancy.sql,supabase/migrations/0077_billing_upgrade_checkout.sql,lib/billing/plan-tiers.ts,lib/billing/checkout.ts,package.json,app/api/v1/,app/(auth)/login/,lib/jira/client.ts,lib/mail/resend-client.ts" data-updated="2026-10-13">
         <h2>Business model</h2>
         <p>
-          Business Model Canvas. Blocks whose only evidence is the in-repo business doc are marked Low: the doc states plans,
-          the code does not yet confirm them.
+          Business Model Canvas. Blocks backed by code are High or Medium; blocks whose only evidence is the in-repo business doc are
+          marked Low.
         </p>
         <div class="table-wrap">
           <table>
-            <thead>
-              <tr><th>Block</th><th>Finding</th><th>Found in</th><th>Confidence</th></tr>
-            </thead>
+            <thead><tr><th>Block</th><th>Finding</th><th>Found in</th><th>Confidence</th></tr></thead>
             <tbody>
-              <tr>
-                <td>Customer Segments</td>
-                <td>QA teams organised in workspaces (roles viewer / member / admin / owner); programmatic consumers via tokens. Docs add indie QA teams, mid-market engineering orgs, regulated-industry enterprises, QA training audiences.</td>
-                <td><code>supabase/migrations/0001_tenancy.sql</code>, <code>supabase/migrations/0008_access_tokens.sql</code>, <code>.context/business/business-model.md</code></td>
-                <td>Medium</td>
-              </tr>
-              <tr>
-                <td>Value Propositions</td>
-                <td>Enforced traceability (an ATC is bound to a user story and at least one acceptance criterion); reusable atomic test components with steps and assertions; API-first operation for scripts and agents.</td>
-                <td><code>app/(app)/projects/[projectSlug]/atcs/[atcId]/actions.ts</code>, <code>supabase/migrations/0004_atcs.sql</code>, <code>app/api/v1/</code></td>
-                <td>High</td>
-              </tr>
-              <tr>
-                <td>Channels</td>
-                <td>Web app (Vercel) and REST API with OpenAPI. Docs add GitHub open-source distribution, content, conferences, a training course.</td>
-                <td><code>app/</code>, <code>app/api/openapi/route.ts</code>, <code>.context/business/business-model.md</code></td>
-                <td>Medium</td>
-              </tr>
-              <tr>
-                <td>Customer Relationships</td>
-                <td>Self-service: passwordless sign-in, self-created first workspace, admin-issued invite links.</td>
-                <td><code>app/(auth)/login/magic-link-form.tsx</code>, <code>supabase/migrations/0006_bootstrap_workspace.sql</code>, <code>supabase/migrations/0010_workspace_invites.sql</code></td>
-                <td>High</td>
-              </tr>
-              <tr>
-                <td>Revenue Streams</td>
-                <td>Open core: free self-hosted Community, per-seat Cloud, licensed Enterprise (prices TBD in the doc). The schema carries a <code>workspaces.plan</code> tier (<code>community</code> / <code>cloud</code> / <code>enterprise</code>) but no billing, payment provider or plan gating exists in code.</td>
-                <td><code>.context/business/business-model.md</code>, <code>supabase/migrations/0001_tenancy.sql</code>, <code>package.json</code></td>
-                <td>Low</td>
-              </tr>
-              <tr>
-                <td>Key Resources</td>
-                <td>The codebase and its schema; the QA methodology it operationalises (KATA, IQL, referenced on the login page); the brand.</td>
-                <td><code>supabase/migrations/</code>, <code>app/(auth)/login/page.tsx</code>, <code>.context/business/business-model.md</code></td>
-                <td>Medium</td>
-              </tr>
-              <tr>
-                <td>Key Activities</td>
-                <td>Authoring and maintaining an ATC library anchored to user stories; managing workspace membership; issuing API tokens.</td>
-                <td><code>components/atcs/</code>, <code>app/api/v1/workspaces/</code>, <code>app/api/v1/tokens/</code></td>
-                <td>High</td>
-              </tr>
-              <tr>
-                <td>Key Partners</td>
-                <td>Supabase (database, auth, email for magic links), Vercel (hosting). Jira appears only as an external reference on a user story (<code>external_id</code>, <code>external_url</code>); no Jira client in code.</td>
-                <td><code>package.json</code>, <code>lib/supabase/</code>, <code>supabase/migrations/0003_authoring.sql</code></td>
-                <td>Medium</td>
-              </tr>
-              <tr>
-                <td>Cost Structure</td>
-                <td>Hosting and managed database (Vercel, Supabase); docs add monitoring, domains, legal. No cost signal in code beyond the hosted services used.</td>
-                <td><code>package.json</code>, <code>.context/business/business-model.md</code></td>
-                <td>Low</td>
-              </tr>
+              <tr><td>Customer Segments</td><td>QA teams organised in workspaces (roles viewer / member / admin / owner); programmatic consumers via tokens (CLI, CI, AI agents). The code sizes three tiers: Community (5 seats, 3 projects), Cloud (25 seats, 50 projects), Enterprise (unlimited). Docs add indie QA teams, mid-market engineering orgs, regulated-industry enterprises, QA training audiences.</td><td><code>supabase/migrations/0001_tenancy.sql</code>, <code>lib/billing/plan-tiers.ts</code>, <code>.context/business/business-model.md</code></td><td>Medium</td></tr>
+              <tr><td>Value Propositions</td><td>Enforced traceability from criterion to ATC to Test to Run to Bug; reusable ATCs chained by reference ("one edit, many tests"); immutable run evidence; coverage that separates "uncovered" from "not run"; API-first operation for scripts and agents.</td><td><code>supabase/migrations/0021_atc_create_update.sql</code>, <code>supabase/migrations/0031_runs.sql</code>, <code>supabase/migrations/0090_project_coverage_skipped_blocked_not_run.sql</code>, <code>app/api/v1/</code></td><td>High</td></tr>
+              <tr><td>Channels</td><td>Web app (Vercel); REST API with OpenAPI docs; transactional email (daily digest, deletion notice) through Resend; sign-in emails through Supabase Auth. Docs add GitHub open-source distribution, content, conferences, a training course.</td><td><code>app/</code>, <code>app/api/openapi/route.ts</code>, <code>lib/mail/resend-client.ts</code>, <code>.context/business/business-model.md</code></td><td>Medium</td></tr>
+              <tr><td>Customer Relationships</td><td>Self-service end to end: email-first sign-up with password and email code, magic link, GitHub or Google OAuth; self-created first workspace; admin-issued invite links; self-service upgrade, data export and deletion with restore.</td><td><code>app/(auth)/login/email-first-form.tsx</code>, <code>app/(auth)/login/oauth-buttons.tsx</code>, <code>supabase/migrations/0006_bootstrap_workspace.sql</code>, <code>supabase/migrations/0084_workspace_deletion.sql</code></td><td>High</td></tr>
+              <tr><td>Revenue Streams</td><td>Per-seat Cloud subscription at 24.00 USD per seat, bought through Stripe Checkout; a paid checkout sets <code>workspaces.plan = cloud</code> and <code>purchased_seats</code>. Community is free; Enterprise is "Custom" price with no self-serve path. No renewal, cancellation, downgrade or invoice handling exists. The open-core self-hosted distribution is doc-only.</td><td><code>lib/billing/plan-tiers.ts</code>, <code>lib/billing/checkout.ts</code>, <code>supabase/migrations/0077_billing_upgrade_checkout.sql</code>, <code>package.json</code> (<code>stripe</code>)</td><td>Medium</td></tr>
+              <tr><td>Key Resources</td><td>The codebase and its schema; the QA methodology it operationalises (KATA, IQL, named on the login page); the brand.</td><td><code>supabase/migrations/</code>, <code>app/(auth)/login/page.tsx</code>, <code>.context/business/business-model.md</code></td><td>Medium</td></tr>
+              <tr><td>Key Activities</td><td>Authoring the ATC library anchored to stories; composing Tests and Test Plans; executing Runs; filing and triaging bugs; reading coverage and quality reports; managing membership, tokens and billing.</td><td><code>components/atcs/</code>, <code>components/tests/</code>, <code>components/runs/</code>, <code>components/bugs/</code>, <code>components/coverage/</code>, <code>app/api/v1/</code></td><td>High</td></tr>
+              <tr><td>Key Partners</td><td>Supabase (Postgres, Auth, Realtime, Storage, pg_cron), Vercel (hosting, cron), Stripe (checkout), Resend (email), Jira Cloud (one-way story import with platform credentials), GitHub and Google (OAuth sign-in).</td><td><code>package.json</code>, <code>lib/supabase/</code>, <code>lib/billing/stripe.ts</code>, <code>lib/mail/resend-client.ts</code>, <code>lib/jira/client.ts</code>, <code>app/auth/oauth/[provider]/route.ts</code></td><td>High</td></tr>
+              <tr><td>Cost Structure</td><td>Hosting and managed services (Vercel, Supabase), payment processing (Stripe), email (Resend); docs add monitoring, domains, legal. No cost figure in code.</td><td><code>package.json</code>, <code>vercel.json</code>, <code>.context/business/business-model.md</code></td><td>Low</td></tr>
             </tbody>
           </table>
         </div>
@@ -209,187 +184,192 @@
           <table>
             <thead><tr><th>Business aspect</th><th>Testing implication</th></tr></thead>
             <tbody>
-              <tr><td>Traceability is the core promise</td><td>Anchoring rules (story + at least one criterion) are the highest-value acceptance checks; a save that bypasses them breaks the product's reason to exist.</td></tr>
-              <tr><td>Multi-tenant workspaces</td><td>Cross-tenant data leakage is the top business risk: negative tests per role and per workspace.</td></tr>
-              <tr><td>API-first for agents and CI</td><td>Token scopes, expiry and revocation are business features, not plumbing: test them as such.</td></tr>
-              <tr><td>Self-service onboarding</td><td>Magic link, first-workspace creation and invite acceptance are the activation funnel: smoke scope.</td></tr>
-              <tr><td>Plan tiers exist only as data</td><td>No plan-gated behaviour to test yet; revisit when billing lands.</td></tr>
+              <tr><td>Traceability is the core promise</td><td>Anchoring rules (story + at least one of its criteria) and the chain to Test, Run and Bug are the highest-value acceptance checks; a write that bypasses them breaks the product's reason to exist.</td></tr>
+              <tr><td>Multi-tenant workspaces</td><td>Cross-tenant leakage is the top business risk: negative tests per role and per workspace, including soft-deleted workspaces, which must read as non-existent.</td></tr>
+              <tr><td>API-first for agents and CI</td><td>Token scopes, expiry, revocation and the executor mode a token may declare are business features: test them as such.</td></tr>
+              <tr><td>Self-service onboarding</td><td>Email-first sign-up, OAuth, magic link, first-workspace creation and invite acceptance are the activation funnel: smoke scope.</td></tr>
+              <tr><td>Coverage drives decisions</td><td>"Uncovered" and "not run" must never merge; a skipped or blocked latest result counts as not run.</td></tr>
+              <tr><td>Paid tier and limits</td><td>Only the project limit blocks; seat and retention limits are displayed but not enforced. Checkout must change the plan only on a confirmed Stripe payment.</td></tr>
+              <tr><td>Irreversible data actions</td><td>Workspace deletion becomes permanent after 30 days; restore, export expiry and owner-only gates are high-consequence checks.</td></tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <section id="term-workspace" data-sources="supabase/migrations/0001_tenancy.sql,supabase/migrations/0006_bootstrap_workspace.sql,lib/types.ts,app/(app)/onboarding/onboarding-form.tsx,components/layout/WorkspaceSwitcher.tsx,db:workspaces" data-updated="2026-10-02">
+      <section id="term-workspace" data-sources="supabase/migrations/0001_tenancy.sql,supabase/migrations/0006_bootstrap_workspace.sql,supabase/migrations/0077_billing_upgrade_checkout.sql,supabase/migrations/0084_workspace_deletion.sql,supabase/migrations/0089_workspace_helpers_deleted_guard.sql,lib/types.ts,app/(app)/onboarding/onboarding-form.tsx,components/layout/WorkspaceSwitcher.tsx,components/settings/WorkspacesList.tsx,db:workspaces" data-updated="2026-10-13">
         <h2>Workspace</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>Workspace</td><td><code>Workspace</code>, <code>workspace_id</code></td><td>"Workspace" (Create workspace, workspace switcher)</td><td><code>workspaces</code></td><td><code>supabase/migrations/0001_tenancy.sql</code>, <code>lib/types.ts</code></td></tr></tbody>
+            <tbody><tr><td>Workspace</td><td><code>Workspace</code>, <code>workspace_id</code>, <code>bunkai_bootstrap_workspace</code></td><td>"Workspace" (Create workspace, workspace switcher, Settings &gt; Workspaces)</td><td><code>workspaces</code></td><td><code>supabase/migrations/0001_tenancy.sql</code>, <code>lib/types.ts</code>, <code>components/settings/WorkspacesList.tsx</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> the tenant. A team's private space; every project, module, story and ATC belongs to exactly one workspace, and a person sees only the workspaces they are an active member of. It has a URL slug, a name, an owner and a plan tier.</p>
-        <p><strong>UI labels:</strong> onboarding form with name (placeholder "Acme QA") and slug (placeholder "acme-qa"), button "Create workspace", toast "Workspace created"; switcher toast "Workspace switched." The active workspace is remembered in a cookie separate from the session (<code>lib/api/workspace-cookie.ts</code>).</p>
-        <p><strong>Related terms:</strong> <a href="#term-workspace-member">Workspace member</a>, <a href="#term-workspace-invite">Workspace invite</a>, <a href="#term-project">Project</a>.</p>
+        <p><strong>Business meaning:</strong> the tenant and the billing unit. A team's private space; every project, Test, run, bug and notification belongs to exactly one workspace, and a person sees only the live workspaces they are an active member of. It has a globally unique URL slug, a name, one or more owners, a <a href="#term-billing-plan">Billing Plan</a> tier and, once paid, a purchased seat count. A workspace scheduled for deletion is treated by every access check as if it did not exist.</p>
+        <p><strong>UI labels:</strong> onboarding form with name (placeholder "Acme QA") and slug (placeholder "acme-qa"), button "Create workspace", toast "Workspace created"; switcher toast "Workspace switched."; Settings &gt; Workspaces list with "Leave" and "Delete" actions and toast "&lt;name&gt; was deleted." The active workspace is remembered in a cookie separate from the session (<code>lib/api/workspace-cookie.ts</code>).</p>
+        <p><strong>Related terms:</strong> <a href="#term-workspace-member">Workspace member</a>, <a href="#term-workspace-invite">Workspace invite</a>, <a href="#term-project">Project</a>, <a href="#term-billing-plan">Billing Plan</a>, <a href="#term-workspace-export">Workspace export</a>, <a href="#term-workspace-deletion">Workspace deletion</a>.</p>
         <p><strong>Abbreviations:</strong> ws (code helpers, e.g. <code>bunkai_is_workspace_member(ws_id)</code>).</p>
-        <p><strong>Structure:</strong> pending; the <code>business-data-context</code> map is still a placeholder (see <a href="#discovery-gaps">discovery gaps</a>).</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>entity-workspace</code> and <code>state-workspace</code>.</p>
       </section>
 
-      <section id="term-workspace-member" data-sources="supabase/migrations/0001_tenancy.sql,supabase/migrations/0005_rls_helpers.sql,lib/types.ts,app/(app)/workspaces/[id]/members/members-client.tsx,db:workspace_members" data-updated="2026-10-02">
+      <section id="term-workspace-member" data-sources="supabase/migrations/0001_tenancy.sql,supabase/migrations/0005_rls_helpers.sql,supabase/migrations/0044_leave_workspace.sql,lib/types.ts,app/(app)/workspaces/[id]/members/members-client.tsx,components/settings/LeaveWorkspaceModal.tsx,db:workspace_members" data-updated="2026-10-13">
         <h2>Workspace member</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>Workspace member</td><td><code>WorkspaceMember</code>, <code>MemberRole</code>, <code>MemberStatus</code></td><td>"Members", "Role"</td><td><code>workspace_members</code></td><td><code>supabase/migrations/0001_tenancy.sql</code>, <code>lib/types.ts</code></td></tr></tbody>
+            <tbody><tr><td>Workspace member (seat)</td><td><code>WorkspaceMember</code>, <code>MemberRole</code>, <code>MemberStatus</code>, <code>bunkai_leave_workspace</code></td><td>"Members", "Role", "Leave workspace"</td><td><code>workspace_members</code></td><td><code>supabase/migrations/0001_tenancy.sql</code>, <code>supabase/migrations/0044_leave_workspace.sql</code>, <code>lib/types.ts</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> a person's seat in a workspace, carrying their role (what they may do) and status (whether the seat is live). Only an active membership grants visibility; write access needs at least the member role, and member management needs admin or owner.</p>
-        <p><strong>UI labels:</strong> members page with "Email" and "Role" fields, empty state "No members yet."</p>
-        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>, <a href="#term-workspace-invite">Workspace invite</a>. Values: <a href="#enumerations">member role, member status</a>.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder).</p>
+        <p><strong>Business meaning:</strong> a person's seat in a workspace, carrying their role (what they may do) and status (whether the seat is live). Only an active membership grants visibility; write access needs at least the member role; member management needs admin or owner. A workspace may have several owners. A member can leave on their own, except from their only workspace or as the last owner; leaving revokes their tokens bound to that workspace.</p>
+        <p><strong>UI labels:</strong> members page with "Email" and "Role" fields, empty state "No members yet."; Settings &gt; Workspaces "Leave" opening the "Leave workspace" dialog.</p>
+        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>, <a href="#term-workspace-invite">Workspace invite</a>, <a href="#term-billing-plan">Billing Plan</a> (a seat is counted against the tier). Values: <a href="#enumerations">member role, member status</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>entity-workspace</code> and <code>flow-invite-and-membership</code>.</p>
       </section>
 
-      <section id="term-workspace-invite" data-sources="supabase/migrations/0010_workspace_invites.sql,supabase/migrations/0011_split_token_secrets.sql,app/api/v1/workspaces/[id]/invites/route.ts,app/api/v1/invites/accept/route.ts,app/(app)/workspaces/[id]/members/members-client.tsx,app/invites/accept/accept-client.tsx,db:workspace_invites" data-updated="2026-10-02">
+      <section id="term-workspace-invite" data-sources="supabase/migrations/0010_workspace_invites.sql,supabase/migrations/0011_split_token_secrets.sql,supabase/migrations/0022_invite_integrity_user_lookup.sql,app/api/v1/workspaces/[id]/invites/route.ts,app/api/v1/invites/accept/route.ts,app/(app)/workspaces/[id]/members/members-client.tsx,app/invites/accept/accept-client.tsx,db:workspace_invites" data-updated="2026-10-13">
         <h2>Workspace invite</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>Invite (invite link)</td><td><code>workspace_invites</code>, <code>workspace_invite_secrets</code></td><td>"Generate invite link", "Invite revoked.", "Joining workspace…"</td><td><code>workspace_invites</code> (+ secret hash in <code>workspace_invite_secrets</code>)</td><td><code>supabase/migrations/0010_workspace_invites.sql</code>, <code>app/api/v1/workspaces/[id]/invites/route.ts</code></td></tr></tbody>
+            <tbody><tr><td>Invite (invite link)</td><td><code>workspace_invites</code>, <code>workspace_invite_secrets</code></td><td>"Generate invite link", "Invite revoked.", "Joining workspace…"</td><td><code>workspace_invites</code> (+ secret hash in <code>workspace_invite_secrets</code>)</td><td><code>supabase/migrations/0010_workspace_invites.sql</code>, <code>app/api/v1/workspaces/[id]/invites/route.ts</code>, <code>app/api/v1/invites/accept/route.ts</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> an admin's offer for a specific email to join a workspace with a given role (never owner). It is shared as a link, expires after a default window, and can be revoked or rotated (a new link replaces the old). Accepting it requires being signed in.</p>
-        <p><strong>UI labels:</strong> "Generate invite link", placeholder "teammate@company.com", "No invites yet.", toasts "Invite revoked.", "New invite link copied to clipboard."; accept page "Checking session…", "Joining workspace…", "Welcome — you have joined the workspace."</p>
-        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>, <a href="#term-workspace-member">Workspace member</a>.</p>
-        <p><strong>Lifecycle note:</strong> the invite's state is derived from timestamps (<code>accepted_at</code>, <code>revoked_at</code>, <code>expires_at</code>), not a status column; its state machine belongs to the data map.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder).</p>
+        <p><strong>Business meaning:</strong> an admin's offer for one email address to join a workspace with a given role (never owner). Bunkai sends no invite email: the admin copies the link and shares it. The link expires after 7 days and can be revoked or rotated (a new link replaces the old). An email that already belongs to an active member cannot be invited. Accepting requires being signed in with that same email; it adds the membership or promotes a lower role, and is refused when the person already holds an equal or higher role.</p>
+        <p><strong>UI labels:</strong> "Generate invite link", placeholder "teammate@company.com", "No invites yet.", toasts "Invite revoked.", "New invite link copied to clipboard."; accept page "Checking session…", "Joining workspace…", "Welcome — you have joined the workspace."; refusal "This invite was sent to a different email address."</p>
+        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>, <a href="#term-workspace-member">Workspace member</a>, <a href="#term-workspace-deletion">Workspace deletion</a> (revokes pending invites).</p>
+        <p><strong>Abbreviations:</strong> none; say "invite link" or "invite token", never bare "token" (the product glossary reserves it).</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>entity-invite</code> and <code>state-invite</code> (state is derived from timestamps, not a status column).</p>
       </section>
 
-      <section id="term-project" data-sources="supabase/migrations/0002_projects_modules.sql,lib/types.ts,app/(app)/projects/page.tsx,app/(app)/projects/[projectSlug]/page.tsx,db:projects,route:/projects" data-updated="2026-10-02">
+      <section id="term-project" data-sources="supabase/migrations/0002_projects_modules.sql,supabase/migrations/0077_billing_upgrade_checkout.sql,lib/types.ts,app/(app)/projects/page.tsx,app/(app)/projects/new/page.tsx,app/(app)/projects/create-project-form.tsx,app/api/v1/workspaces/[id]/projects/response.ts,app/(app)/projects/[projectSlug]/project-sub-nav.tsx,db:projects,route:/projects" data-updated="2026-10-13">
         <h2>Project</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>Project</td><td><code>Project</code>, <code>projectSlug</code></td><td>"Project" (breadcrumb, "No projects yet")</td><td><code>projects</code></td><td><code>supabase/migrations/0002_projects_modules.sql</code>, <code>app/(app)/projects/[projectSlug]/page.tsx</code></td></tr></tbody>
+            <tbody><tr><td>Project</td><td><code>Project</code>, <code>projectSlug</code></td><td>"Project", "New project", "Create project", "Projects" (sidebar)</td><td><code>projects</code></td><td><code>supabase/migrations/0002_projects_modules.sql</code>, <code>app/(app)/projects/create-project-form.tsx</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> the product or system under test that a workspace manages. It owns the module tree and the ATC library; its slug is unique within the workspace and appears in the URL (<code>/projects/&lt;slug&gt;</code>).</p>
-        <p><strong>UI labels:</strong> breadcrumb "workspace / project / All ATCs"; empty state "No projects yet", "Your workspace is ready" (project creation UI is not built at this commit).</p>
-        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>, <a href="#term-module">Module</a>, <a href="#term-atc">ATC</a>.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder).</p>
+        <p><strong>Business meaning:</strong> the product or system under test that a workspace manages. It owns the module tree, the ATC library, environments, Test Plans, Milestones, runs, bugs and reports; its slug is unique within the workspace and appears in the URL (<code>/projects/&lt;slug&gt;</code>). How many projects a workspace may hold depends on its <a href="#term-billing-plan">Billing Plan</a> (Community 3, Cloud 50, Enterprise unlimited); above the limit creation is refused with "This workspace has reached its Billing Plan's project limit. Upgrade to create more projects." Projects have no delete.</p>
+        <p><strong>UI labels:</strong> "New project" and "Create your first project" on the Projects page; form at <code>/projects/new</code> with name (placeholder "Checkout flow") and description (placeholder "What this project covers."), button "Create project", toast "Project created". Project sections: All ATCs, Test Runs, Bug Reports, Metrics, Traceability, Milestones, Test Plans.</p>
+        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>, <a href="#term-module">Module</a>, <a href="#term-atc">ATC</a>, <a href="#term-environment">Environment</a>, <a href="#term-test-plan">Test Plan</a>, <a href="#term-milestone">Milestone</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>entities</code> (Project row) and <code>flow-author-structure</code>.</p>
       </section>
 
-      <section id="term-module" data-sources="supabase/migrations/0002_projects_modules.sql,lib/types.ts,lib/tree.ts,components/layout/Sidebar.tsx,components/atcs/AtcTable.tsx,db:modules" data-updated="2026-10-02">
+      <section id="term-module" data-sources="supabase/migrations/0002_projects_modules.sql,supabase/migrations/0013_module_description.sql,supabase/migrations/0014_module_soft_delete.sql,supabase/migrations/0015_module_move.sql,supabase/migrations/0023_module_activity_log.sql,lib/types.ts,lib/tree.ts,components/layout/Sidebar.tsx,app/(app)/projects/[projectSlug]/create-module-form.tsx,app/(app)/projects/[projectSlug]/delete-module-dialog.tsx,db:modules" data-updated="2026-10-13">
         <h2>Module</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>Module</td><td><code>Module</code>, <code>ModuleTreeNode</code>, <code>parent_module_id</code>, <code>path</code></td><td>"Module" (ATC table column, editor field), folders in "Explorer"</td><td><code>modules</code></td><td><code>supabase/migrations/0002_projects_modules.sql</code>, <code>lib/tree.ts</code></td></tr></tbody>
+            <tbody><tr><td>Module</td><td><code>Module</code>, <code>ModuleTreeNode</code>, <code>parent_module_id</code>, <code>path</code>, <code>archived_at</code></td><td>"Module", "New module", "New sub-module", folders in "Explorer"</td><td><code>modules</code></td><td><code>supabase/migrations/0002_projects_modules.sql</code>, <code>supabase/migrations/0014_module_soft_delete.sql</code>, <code>lib/tree.ts</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> a functional area of the project (a feature or component), nestable into sub-modules up to six levels deep, identified by a slash path (for example <code>auth/login</code>). It is where user stories and ATCs live, and the unit the docs plan to report quality by.</p>
-        <p><strong>UI labels:</strong> shown as folders in the "Explorer" sidebar; "Module" column in the ATC table; read-only "Module" path in the ATC editor ("editing in &lt;module&gt;").</p>
-        <p><strong>Related terms:</strong> <a href="#term-project">Project</a>, <a href="#term-user-story">User story</a>, <a href="#term-atc">ATC</a>.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder).</p>
+        <p><strong>Business meaning:</strong> a functional area of the project (a feature or component), nestable into sub-modules up to six levels deep, identified by a slash path (for example <code>auth/login</code>), with an optional description of up to 500 characters. It is where user stories and ATCs live and the unit coverage and the defect heatmap aggregate by, which is why the product treats it as a first-class node, not a folder name. Modules can be renamed and moved; "deleting" a module archives it with its whole subtree (sub-modules, stories, criteria, ATCs), while runs and bugs stay readable.</p>
+        <p><strong>UI labels:</strong> "Explorer" sidebar folders; context menu "New sub-module", "New user story", "Rename", "Move", "Delete"; buttons "New module", "Create your first module"; description placeholder "What this module covers."; "Delete module" dialog; toasts "Archived “&lt;name&gt;”", "Moved “&lt;name&gt;”"; "Module" column in the ATC table; "Select a module…" when filing a bug.</p>
+        <p><strong>Related terms:</strong> <a href="#term-project">Project</a>, <a href="#term-user-story">User story</a>, <a href="#term-atc">ATC</a>, <a href="#term-coverage">Coverage</a>, <a href="#term-defect-heatmap">Defect heatmap</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>entity-module</code>.</p>
       </section>
 
-      <section id="term-user-story" data-sources="supabase/migrations/0003_authoring.sql,lib/types.ts,components/atcs/AnchoringPanel.tsx,components/layout/Sidebar.tsx,db:user_stories" data-updated="2026-10-02">
+      <section id="term-user-story" data-sources="supabase/migrations/0003_authoring.sql,supabase/migrations/0014_module_soft_delete.sql,supabase/migrations/0016_user_story_uniqueness.sql,supabase/migrations/0017_acceptance_criteria_ordering.sql,supabase/migrations/0018_ready_to_test_gate_fn.sql,lib/types.ts,components/atcs/AnchoringPanel.tsx,components/layout/Sidebar.tsx,app/(app)/projects/[projectSlug]/user-story-form.tsx,app/(app)/projects/[projectSlug]/acceptance-criteria-panel.tsx,db:user_stories" data-updated="2026-10-13">
         <h2>User story</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>User story</td><td><code>UserStory</code>, <code>user_story_id</code>, <code>external_id</code>, <code>external_url</code></td><td>"Linked User Story", "US-"</td><td><code>user_stories</code></td><td><code>supabase/migrations/0003_authoring.sql</code>, <code>components/atcs/AnchoringPanel.tsx</code></td></tr></tbody>
+            <tbody><tr><td>User story</td><td><code>UserStory</code>, <code>UserStoryStatus</code>, <code>user_story_id</code>, <code>external_id</code>, <code>external_url</code></td><td>"User story", "New user story", "Linked user story", "Draft" / "Ready to test"</td><td><code>user_stories</code></td><td><code>supabase/migrations/0003_authoring.sql</code>, <code>supabase/migrations/0017_acceptance_criteria_ordering.sql</code>, <code>lib/types.ts</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> the requirement an ATC proves. It belongs to a module and may point to the same story in an external tracker (an ID such as a Jira key, and a URL). An ATC cannot exist without one; a story with ATCs attached cannot be deleted.</p>
-        <p><strong>UI labels:</strong> ATC editor panel "Linked User Story" with search placeholder "Search US- or paste a Jira ID…", empty result "No stories match."; save blocked with "Pick a User Story to enable Save" / "Bind to a user story before saving."</p>
-        <p><strong>Related terms:</strong> <a href="#term-module">Module</a>, <a href="#term-acceptance-criterion">Acceptance criterion</a>, <a href="#term-atc">ATC</a>, <a href="#term-anchoring">Anchoring</a>.</p>
+        <p><strong>Business meaning:</strong> the requirement an ATC proves. It belongs to a module and may point to the same story in an external tracker (a Jira key, unique per project among active stories, and a URL); stories can be typed in or <a href="#term-jira-import">imported from Jira</a>. It carries a Ready-to-test gate: "Ready to test" is the explicit signal that its criteria are settled, needs at least one active criterion, and falls back to "Draft" when the last criterion is removed. The gate is a two-state signal, not a workflow, and blocks nothing else. A story with ATCs cannot be hard-deleted; removing it archives it.</p>
+        <p><strong>UI labels:</strong> Explorer menu "New user story", "Edit", "Manage criteria", "Remove", "Copy ID"; form placeholders "Refund a paid order", "BK-42" (Jira key), "Describe the story in Markdown."; note "The Jira link is set and cannot be changed."; gate badge "Draft" / "Ready to test", actions "Mark ready to test" / "Back to draft", toasts "Marked ready to test", "Story moved back to draft — it has no criteria left."; ATC editor panel "Linked user story" with search placeholder "Search US- or paste a Jira ID…".</p>
+        <p><strong>Related terms:</strong> <a href="#term-module">Module</a>, <a href="#term-acceptance-criterion">Acceptance criterion</a>, <a href="#term-atc">ATC</a>, <a href="#term-anchoring">Anchoring</a>, <a href="#term-traceability-chain">Traceability chain</a>, <a href="#term-recovery-cycle">Recovery cycle</a>. Values: <a href="#enumerations">user story status</a>.</p>
         <p><strong>Abbreviations:</strong> US.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder).</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>entity-user-story</code> and <code>state-user-story</code>.</p>
       </section>
 
-      <section id="term-acceptance-criterion" data-sources="supabase/migrations/0003_authoring.sql,lib/types.ts,components/atcs/AnchoringPanel.tsx,app/(app)/projects/[projectSlug]/atcs/[atcId]/actions.ts,db:acceptance_criteria" data-updated="2026-10-02">
+      <section id="term-acceptance-criterion" data-sources="supabase/migrations/0003_authoring.sql,supabase/migrations/0017_acceptance_criteria_ordering.sql,supabase/migrations/0018_ready_to_test_gate_fn.sql,lib/types.ts,components/atcs/AnchoringPanel.tsx,app/(app)/projects/[projectSlug]/acceptance-criteria-panel.tsx,app/(app)/projects/[projectSlug]/atcs/[atcId]/actions.ts,db:acceptance_criteria" data-updated="2026-10-13">
         <h2>Acceptance criterion</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>Acceptance criterion</td><td><code>AcceptanceCriterion</code>, <code>acceptance_criterion_id</code>, <code>acIds</code></td><td>"Acceptance Criteria"</td><td><code>acceptance_criteria</code></td><td><code>supabase/migrations/0003_authoring.sql</code>, <code>components/atcs/AnchoringPanel.tsx</code></td></tr></tbody>
+            <tbody><tr><td>Acceptance criterion</td><td><code>AcceptanceCriterion</code>, <code>acceptance_criterion_id</code>, <code>acIds</code>, <code>position</code></td><td>"Acceptance Criteria", "Add a criterion"</td><td><code>acceptance_criteria</code></td><td><code>supabase/migrations/0003_authoring.sql</code>, <code>supabase/migrations/0017_acceptance_criteria_ordering.sql</code>, <code>app/(app)/projects/[projectSlug]/acceptance-criteria-panel.tsx</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> one ordered, checkable condition of a user story. ATCs bind to the specific criteria they verify, which is what makes per-criterion coverage answerable.</p>
-        <p><strong>UI labels:</strong> "Acceptance Criteria" panel in the ATC editor; save blocked with "Bind at least one Acceptance Criterion to enable Save".</p>
-        <p><strong>Related terms:</strong> <a href="#term-user-story">User story</a>, <a href="#term-anchoring">Anchoring</a>, <a href="#term-atc">ATC</a>.</p>
+        <p><strong>Business meaning:</strong> one ordered, checkable condition of a user story, with a title and optional Markdown detail. ATCs bind to the specific criteria they verify, which makes coverage answerable per criterion: a criterion is <a href="#term-coverage">uncovered</a> when no live ATC is bound to it. Criteria can be added, reordered, edited and removed (archived); removing the last one sends the story back to Draft. Criteria imported from Jira are extracted from the issue description.</p>
+        <p><strong>UI labels:</strong> "Acceptance Criteria" panel in the ATC editor; criteria panel with "Add a criterion", placeholders "Criterion title" / "Full refund within 30 days", "Optional Markdown detail.", empty state "No acceptance criteria yet. Add the first one below.", toasts "Criterion added", "Criterion updated", "Criterion removed"; save blocked with "Bind at least one Acceptance Criterion to enable Save".</p>
+        <p><strong>Related terms:</strong> <a href="#term-user-story">User story</a>, <a href="#term-anchoring">Anchoring</a>, <a href="#term-atc">ATC</a>, <a href="#term-coverage">Coverage</a>.</p>
         <p><strong>Abbreviations:</strong> AC.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder).</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>entity-user-story</code>.</p>
       </section>
 
-      <section id="term-atc" data-sources="supabase/migrations/0004_atcs.sql,supabase/migrations/0007_save_atc.sql,lib/types.ts,components/atcs/AtcEditor.tsx,components/atcs/AtcTable.tsx,app/layout.tsx,app/(app)/projects/[projectSlug]/atcs/[atcId]/actions.ts,db:atcs,route:/projects/[projectSlug]/atcs/[atcId]" data-updated="2026-10-02">
+      <section id="term-atc" data-sources="supabase/migrations/0004_atcs.sql,supabase/migrations/0021_atc_create_update.sql,supabase/migrations/0027_atc_search.sql,supabase/migrations/0028_atc_duplicate.sql,supabase/migrations/0029_atc_usage.sql,supabase/migrations/0035_atc_update_propagation.sql,supabase/migrations/0058_atc_title_min_length.sql,supabase/migrations/0065_atc_tags_cap_guard.sql,supabase/migrations/0087_atc_classification.sql,lib/types.ts,components/atcs/AtcEditor.tsx,components/atcs/NewAtcEditor.tsx,components/atcs/AtcTable.tsx,app/layout.tsx,app/(auth)/login/page.tsx,app/(app)/projects/[projectSlug]/export-atcs-button.tsx,.context/business/domain-glossary.md,db:atcs,route:/projects/[projectSlug]/atcs/[atcId]" data-updated="2026-10-13">
         <h2>ATC</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>ATC (Atomic Test Component)</td><td><code>Atc</code>, <code>AtcLayer</code>, <code>AtcStatus</code>, <code>bunkai_save_atc</code></td><td>"ATC", "All ATCs", "ATCs in project", "Save ATC", "New ATC"</td><td><code>atcs</code></td><td><code>supabase/migrations/0004_atcs.sql</code>, <code>components/atcs/AtcEditor.tsx</code></td></tr></tbody>
+            <tbody><tr><td>ATC (Acceptance Test Case)</td><td><code>Atc</code>, <code>AtcLayer</code>, <code>AtcTechnique</code>, <code>AtcPriority</code>, <code>bunkai_create_atc</code>, <code>bunkai_update_atc</code></td><td>"ATC", "All ATCs", "ATC Library", "New ATC", "ATC created", "ATC saved"</td><td><code>atcs</code></td><td><code>supabase/migrations/0004_atcs.sql</code>, <code>supabase/migrations/0021_atc_create_update.sql</code>, <code>components/atcs/AtcEditor.tsx</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> the product's central unit: one small, reusable verification of a single observable behaviour, written as ordered steps plus assertions, placed in a module, tagged, classified by test layer, and anchored to a user story and its criteria. Every save bumps its version. It also carries its latest result status.</p>
-        <p><strong>UI labels:</strong> editor fields "Title" (required, placeholder "A single observable behaviour — start with a verb"), "Module", "Layer", "Steps" ("markdown · one step per numbered line"), "Assertions" ("YAML list · checked by every executor"), "Tags" (placeholder "regression, smoke, P1…"), panel "Anchoring" (valid / missing); toast "ATC saved". Table columns "ID", "Title", "Layer", "Module", "Status", "Tags".</p>
-        <p><strong>Naming conflict:</strong> the app metadata and product docs expand ATC as "Atomic Test Component" (<code>app/layout.tsx</code>); the schema comment expands it as "Acceptance Test Case" (<code>supabase/migrations/0004_atcs.sql</code>). Use "ATC" in test names; see <a href="#discovery-gaps">discovery gaps</a>.</p>
-        <p><strong>Related terms:</strong> <a href="#term-atc-step">ATC step</a>, <a href="#term-atc-assertion">ATC assertion</a>, <a href="#term-anchoring">Anchoring</a>, <a href="#term-module">Module</a>, <a href="#term-user-story">User story</a>. Values: <a href="#enumerations">ATC layer, ATC status</a>.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder). The status enum has six values, so it needs a state machine in the data map.</p>
+        <p><strong>Business meaning:</strong> the product's central unit of authorship: one small, reusable verification of a single observable behaviour, written as ordered steps plus assertions, placed in a module, tagged (at most 10 tags), classified by test layer and optionally by test-design technique and ATC Priority, and anchored to a user story and its criteria. Every save bumps its version and is refused when someone else saved first. Tests reference ATCs instead of copying them, so one edit updates every Test that chains it ("one edit, many tests"). An ATC can be duplicated, searched and exported; it has no delete and is archived only with its module.</p>
+        <p><strong>Execution status:</strong> the <code>atcs.status</code> column (pass / fail / blocked / skipped / running / unrun) is still shown as a status dot, but no code path writes it, so every ATC reads <code>unrun</code>. Real results live on the <a href="#term-run-step">run step</a>; coverage and traceability read those.</p>
+        <p><strong>UI labels:</strong> editor fields "Title" (required, at least 3 characters, placeholder "A single observable behaviour — start with a verb"), "Module", "Layer", "Technique", "Priority" ("Not specified" when unset), "Steps", "Assertions", "Tags", "Linked user story", panel state "Anchored"; toasts "ATC created", "ATC duplicated", "ATC saved — N Tests updated"; "Used by" (the Tests that chain it); table filters "All techniques", "All priorities"; "ATC library exported"; empty state "No Acceptance Test Case has been written for this project yet."</p>
+        <p><strong>Naming:</strong> ATC = Acceptance Test Case everywhere in current code, metadata, login page and schema (<code>app/layout.tsx</code>, <code>app/(auth)/login/page.tsx</code>, <code>supabase/migrations/0004_atcs.sql</code>). The product glossary bans "Atomic Test Component" (<code>.context/business/domain-glossary.md</code> §0, §4). ATC Priority (Critical / High / Medium / Low) is a different scale from <a href="#term-bug">Bug Severity</a> and from Jira priority.</p>
+        <p><strong>Related terms:</strong> <a href="#term-atc-step">ATC step</a>, <a href="#term-atc-assertion">ATC assertion</a>, <a href="#term-anchoring">Anchoring</a>, <a href="#term-module">Module</a>, <a href="#term-user-story">User story</a>, <a href="#term-test">Test</a>. Values: <a href="#enumerations">ATC layer, ATC status, ATC technique, ATC priority</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>entity-atc</code>.</p>
       </section>
 
-      <section id="term-atc-step" data-sources="supabase/migrations/0004_atcs.sql,lib/atc-parse.ts,components/atcs/StepEditor.tsx,db:atc_steps" data-updated="2026-10-02">
+      <section id="term-atc-step" data-sources="supabase/migrations/0004_atcs.sql,supabase/migrations/0021_atc_create_update.sql,supabase/migrations/0031_runs.sql,lib/atc-parse.ts,components/atcs/StepEditor.tsx,components/atcs/AtcEditor.tsx,db:atc_steps" data-updated="2026-10-13">
         <h2>ATC step</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>Step</td><td><code>AtcStep</code> (<code>content</code>, <code>input_data</code>, <code>expected</code>), <code>parseStepsMarkdown</code></td><td>"Steps"</td><td><code>atc_steps</code></td><td><code>supabase/migrations/0004_atcs.sql</code>, <code>lib/atc-parse.ts</code></td></tr></tbody>
+            <tbody><tr><td>Step</td><td><code>AtcStep</code> (<code>content</code>, <code>input_data</code>, <code>expected</code>), <code>parseStepsMarkdown</code></td><td>"Steps" ("markdown · one step per numbered line")</td><td><code>atc_steps</code></td><td><code>supabase/migrations/0004_atcs.sql</code>, <code>lib/atc-parse.ts</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> one ordered action inside an ATC, optionally with input data and an expected result. Authored as a numbered markdown list and replaced as a whole block on every save.</p>
-        <p><strong>Related terms:</strong> <a href="#term-atc">ATC</a>, <a href="#term-atc-assertion">ATC assertion</a>.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder).</p>
+        <p><strong>Business meaning:</strong> one ordered action inside an ATC, optionally with input data and an expected result. Authored as a numbered markdown list and replaced as a whole block on every save. When a Test is run, each step is copied into the run as a <a href="#term-run-step">run step</a>, which is what the tester marks; later edits to the ATC never change that copy.</p>
+        <p><strong>Related terms:</strong> <a href="#term-atc">ATC</a>, <a href="#term-atc-assertion">ATC assertion</a>, <a href="#term-run-step">Run step</a>. Not the same as a Test's chain step (one ATC position inside a <a href="#term-test">Test</a>).</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>entity-atc</code>.</p>
       </section>
 
-      <section id="term-atc-assertion" data-sources="supabase/migrations/0004_atcs.sql,lib/atc-parse.ts,components/atcs/AtcEditor.tsx,db:atc_assertions" data-updated="2026-10-02">
+      <section id="term-atc-assertion" data-sources="supabase/migrations/0004_atcs.sql,supabase/migrations/0035_atc_update_propagation.sql,supabase/migrations/0031_runs.sql,lib/atc-parse.ts,components/atcs/AtcEditor.tsx,components/runs/RunnerView.tsx,db:atc_assertions" data-updated="2026-10-13">
         <h2>ATC assertion</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>Assertion</td><td><code>AtcAssertion</code>, <code>parseAssertionsYaml</code></td><td>"Assertions"</td><td><code>atc_assertions</code></td><td><code>supabase/migrations/0004_atcs.sql</code>, <code>lib/atc-parse.ts</code></td></tr></tbody>
+            <tbody><tr><td>Assertion</td><td><code>AtcAssertion</code>, <code>parseAssertionsYaml</code></td><td>"Assertions" ("YAML list · checked by every executor")</td><td><code>atc_assertions</code></td><td><code>supabase/migrations/0004_atcs.sql</code>, <code>lib/atc-parse.ts</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> an ordered check that decides whether the ATC passes, meant to be evaluated the same way by any executor (manual, agent, automation). Authored as a YAML list.</p>
-        <p><strong>Related terms:</strong> <a href="#term-atc">ATC</a>, <a href="#term-atc-step">ATC step</a>.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder).</p>
+        <p><strong>Business meaning:</strong> an ordered check that decides whether the ATC passes, meant to be evaluated the same way by any executor (manual, agent, automation). Authored as a YAML list and replaced as a whole on every save. Unlike steps, assertions are not copied into a Run and the runner does not show them: a run records verdicts per step only.</p>
+        <p><strong>Related terms:</strong> <a href="#term-atc">ATC</a>, <a href="#term-atc-step">ATC step</a>, <a href="#term-run">Run</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>entity-atc</code>.</p>
       </section>
 
-      <section id="term-anchoring" data-sources="supabase/migrations/0004_atcs.sql,supabase/migrations/0007_save_atc.sql,components/atcs/AnchoringPanel.tsx,components/atcs/AtcEditor.tsx,app/(app)/projects/[projectSlug]/atcs/[atcId]/actions.ts,db:atc_acceptance_criteria" data-updated="2026-10-02">
+      <section id="term-anchoring" data-sources="supabase/migrations/0004_atcs.sql,supabase/migrations/0021_atc_create_update.sql,supabase/migrations/0035_atc_update_propagation.sql,components/atcs/AnchoringPanel.tsx,components/atcs/AtcEditor.tsx,app/(app)/projects/[projectSlug]/atcs/[atcId]/actions.ts,db:atc_acceptance_criteria" data-updated="2026-10-13">
         <h2>Anchoring</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>Anchoring (ATC to criteria binding)</td><td><code>AtcAcceptanceCriterion</code>, <code>isAnchored</code>, <code>p_ac_ids</code></td><td>"Anchoring" (valid / missing)</td><td><code>atc_acceptance_criteria</code> (many-to-many) + <code>atcs.user_story_id</code></td><td><code>supabase/migrations/0004_atcs.sql</code>, <code>components/atcs/AnchoringPanel.tsx</code></td></tr></tbody>
+            <tbody><tr><td>Anchoring (ATC to criteria binding)</td><td><code>AtcAcceptanceCriterion</code>, <code>isAnchored</code>, <code>p_ac_ids</code>, error <code>ac_outside_user_story</code></td><td>"Anchored" (anchoring panel)</td><td><code>atc_acceptance_criteria</code> (many-to-many) + <code>atcs.user_story_id</code></td><td><code>supabase/migrations/0004_atcs.sql</code>, <code>supabase/migrations/0021_atc_create_update.sql</code>, <code>components/atcs/AnchoringPanel.tsx</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> the traceability rule that defines the product: an ATC is anchored when it names one user story and at least one of that story's acceptance criteria. The editor will not save an unanchored ATC. The "at least one criterion" part is enforced in the application layer, not by a database constraint.</p>
-        <p><strong>Related terms:</strong> <a href="#term-atc">ATC</a>, <a href="#term-user-story">User story</a>, <a href="#term-acceptance-criterion">Acceptance criterion</a>.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder).</p>
+        <p><strong>Business meaning:</strong> the traceability rule that defines the product: an ATC is anchored when it names one user story and at least one active criterion of that story. The editor will not save an unanchored ATC, and the create and update database functions refuse an empty criteria list or any criterion outside the story. The story of an ATC cannot change after creation. Anchoring is what <a href="#term-coverage">coverage</a> and the <a href="#term-traceability-chain">traceability chain</a> read.</p>
+        <p><strong>UI labels:</strong> save hints "Pick a User Story to enable Save", "Bind at least one Acceptance Criterion to enable Save"; server messages "Bind to a user story before saving.", "Bind at least one acceptance criterion."</p>
+        <p><strong>Related terms:</strong> <a href="#term-atc">ATC</a>, <a href="#term-user-story">User story</a>, <a href="#term-acceptance-criterion">Acceptance criterion</a>, <a href="#term-coverage">Coverage</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>entity-atc</code> and <code>entities</code> (key relationships).</p>
       </section>
 
-      <section id="term-personal-access-token" data-sources="supabase/migrations/0008_access_tokens.sql,supabase/migrations/0011_split_token_secrets.sql,lib/api/pat.ts,lib/api/middleware/bearer.ts,app/api/v1/tokens/route.ts,app/api/v1/auth/signup/route.ts,db:access_tokens" data-updated="2026-10-02">
+      <section id="term-personal-access-token" data-sources="supabase/migrations/0008_access_tokens.sql,supabase/migrations/0011_split_token_secrets.sql,supabase/migrations/0033_remediate_bk135_admin_scope.sql,supabase/migrations/0044_leave_workspace.sql,lib/api/pat.ts,lib/api/middleware/bearer.ts,app/api/v1/tokens/route.ts,app/(app)/settings/tokens/page.tsx,components/settings/TokensList.tsx,components/settings/IssueTokenModal.tsx,db:access_tokens" data-updated="2026-10-13">
         <h2>Personal access token</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>Personal access token</td><td><code>access_tokens</code>, <code>mintPat</code>, <code>token_prefix</code>, scopes</td><td>no UI at this commit (API only)</td><td><code>access_tokens</code> (+ hash in <code>access_token_secrets</code>)</td><td><code>supabase/migrations/0008_access_tokens.sql</code>, <code>lib/api/pat.ts</code></td></tr></tbody>
+            <tbody><tr><td>Personal access token</td><td><code>access_tokens</code>, <code>mintPat</code>, <code>token_prefix</code>, scopes</td><td>"Personal access tokens", "New token", "Revoke token"</td><td><code>access_tokens</code> (+ hash in <code>access_token_secrets</code>)</td><td><code>supabase/migrations/0008_access_tokens.sql</code>, <code>lib/api/pat.ts</code>, <code>components/settings/IssueTokenModal.tsx</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> a long-lived credential that lets a CLI, CI job or AI agent call the API as a user, limited by scopes and optionally by one workspace. Shown in full once at creation (<code>bk_pat_&lt;prefix&gt;.&lt;secret&gt;</code>), never retrievable again; revocation is permanent and keeps the row for audit.</p>
-        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>, <a href="#term-magic-link">Magic link</a>. Values: <a href="#enumerations">token scope</a>.</p>
-        <p><strong>Abbreviations:</strong> PAT.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder).</p>
+        <p><strong>Business meaning:</strong> a long-lived credential that lets a CLI, CI job or AI agent call the API as its owner, limited by scopes and optionally bound to one workspace; it never exceeds the owner's own permissions, and the <code>workspace:admin</code> scope can only be granted on a workspace where the owner is admin or owner. Shown in full once at creation (<code>bk_pat_&lt;prefix&gt;.&lt;secret&gt;</code>), never retrievable again. Issued and revoked from Settings in a browser session (or returned by the headless sign-in endpoints); a token cannot mint or revoke tokens. Revocation keeps the row for audit; leaving or deleting a workspace revokes the tokens bound to it.</p>
+        <p><strong>UI labels:</strong> Settings &gt; "Personal access tokens" ("Authenticate the Bunkai CLI and your CI against your account."), "Your tokens", "New token" / "Issue your first token", dialog "New personal access token" with "Token name" (placeholder "ci-deploy", "Lowercase and hyphens. Names the machine that will use it."), "Scopes", "Workspace — optional", "Expiry — optional" ("No expiry"); "Revoke token", toast "Token revoked".</p>
+        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>, <a href="#term-magic-link">Magic link</a>, <a href="#term-run">Run</a> (a token caller may declare the agent or ci executor), <a href="#term-idempotency-key">Idempotency key</a>. Values: <a href="#enumerations">token scope</a>.</p>
+        <p><strong>Abbreviations:</strong> PAT. Never bare "token" (also names magic-link and invite tokens).</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>entity-access-token</code> and <code>state-access-token</code>.</p>
       </section>
 
-      <section id="term-magic-link" data-sources="supabase/migrations/0009_cross_cutting.sql,supabase/migrations/0011_split_token_secrets.sql,app/api/v1/auth/magic-link/route.ts,app/(auth)/login/magic-link-form.tsx,app/auth/callback/route.ts,db:magic_link_tokens" data-updated="2026-10-02">
+      <section id="term-magic-link" data-sources="supabase/migrations/0009_cross_cutting.sql,supabase/migrations/0011_split_token_secrets.sql,supabase/migrations/0034_auth_email_status_rpc.sql,app/api/v1/auth/magic-link/route.ts,app/(auth)/login/magic-link-form.tsx,app/(auth)/login/magic-link-disclosure.tsx,app/(auth)/login/email-first-form.tsx,app/(auth)/login/oauth-buttons.tsx,app/auth/callback/route.ts,db:magic_link_tokens" data-updated="2026-10-13">
         <h2>Magic link</h2>
         <div class="table-wrap">
           <table>
@@ -397,35 +377,37 @@
             <tbody><tr><td>Magic link (passwordless sign-in)</td><td><code>magic_link_tokens</code>, <code>signInWithMagicLink</code></td><td>"Send magic link", "Check your inbox"</td><td><code>magic_link_tokens</code> (+ hashes in <code>magic_link_token_secrets</code>)</td><td><code>app/api/v1/auth/magic-link/route.ts</code>, <code>app/(auth)/login/magic-link-form.tsx</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> the only sign-in method in the web UI: the user enters an email, receives a one-time link, and lands signed in. Each issued link is recorded for replay protection and audit. Email + password sign-in exists only through the API, for headless test users.</p>
-        <p><strong>UI labels:</strong> email placeholder "qa@your-org.dev", button "Send magic link", confirmation "Check your inbox"; an OAuth option is shown as coming ("OAuth ships next sprint").</p>
+        <p><strong>Business meaning:</strong> one of the web sign-in methods: the user enters an email, receives a one-time link, and lands signed in. Each issued link is recorded for replay protection and audit. It now sits behind an email-first login screen that also offers password sign-in, account creation confirmed by an emailed verification code, and GitHub or Google OAuth; the magic link is a secondary option on that screen.</p>
+        <p><strong>UI labels:</strong> email placeholder "qa@your-org.dev", "Continue", "Sign in", "Create account", "Create a password" (placeholder "At least 8 characters"), "Verification code", "Verify and continue", "Request a new code", "Continue with GitHub", "Continue with Google", magic-link option "Send magic link" then "Check your inbox".</p>
         <p><strong>Related terms:</strong> <a href="#term-personal-access-token">Personal access token</a>, <a href="#term-workspace-invite">Workspace invite</a>.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder).</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>flow-sign-in-and-onboarding</code>.</p>
       </section>
 
-      <section id="term-activity-log" data-sources="supabase/migrations/0009_cross_cutting.sql,db:activity_log" data-updated="2026-10-02">
+      <section id="term-activity-log" data-sources="supabase/migrations/0009_cross_cutting.sql,supabase/migrations/0023_module_activity_log.sql,supabase/migrations/0045_activity_stream.sql,supabase/migrations/0047_activity_actor_resolve_scope.sql,supabase/migrations/0055_activity_bug_events.sql,supabase/migrations/0067_run_finish_abort_via.sql,app/api/v1/activity/route.ts,app/(app)/activity/page.tsx,components/activity/ActivityView.tsx,components/home/RecentActivity.tsx,db:activity_log" data-updated="2026-10-13">
         <h2>Activity log</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>Activity log (audit trail)</td><td><code>activity_log</code> (<code>entity_type</code>, <code>action</code>, <code>payload</code>)</td><td>none</td><td><code>activity_log</code></td><td><code>supabase/migrations/0009_cross_cutting.sql</code></td></tr></tbody>
+            <tbody><tr><td>Activity log (activity stream, audit trail)</td><td><code>activity_log</code> (<code>entity_type</code>, <code>action</code>, <code>payload</code>)</td><td>"Activity" (sidebar page), Home "Recent activity"</td><td><code>activity_log</code></td><td><code>supabase/migrations/0045_activity_stream.sql</code>, <code>app/api/v1/activity/route.ts</code>, <code>components/activity/ActivityView.tsx</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> intended record of who did what to which entity in a workspace, readable by its members. Schema only: no application code writes or reads it at this commit.</p>
-        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder).</p>
+        <p><strong>Business meaning:</strong> the workspace's record of who did what to which entity, readable by its members on the Activity page and the Home widget. Written only by the database functions and triggers that make the change, in the same transaction, with dotted <code>entity.verb</code> actions (for example <code>atc.created</code>, <code>module.moved</code>, <code>run.finished</code>, <code>bug.status_changed</code>, <code>export.requested</code>). It is also the event source <a href="#term-notification">notifications</a> are produced from. Its actions are finer-grained than, and not the same vocabulary as, the notification event types.</p>
+        <p><strong>UI labels:</strong> sidebar "Activity", empty state "No activity yet"; Home "Could not load recent activity" on error.</p>
+        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>, <a href="#term-notification">Notification</a>, <a href="#term-run">Run</a>, <a href="#term-bug">Bug</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>entity-activity-log</code>.</p>
       </section>
 
-      <section id="term-idempotency-key" data-sources="supabase/migrations/0009_cross_cutting.sql,lib/api/idempotency.ts,lib/api/error-envelope.ts,db:idempotency_keys" data-updated="2026-10-02">
+      <section id="term-idempotency-key" data-sources="supabase/migrations/0009_cross_cutting.sql,lib/api/idempotency.ts,lib/api/error-envelope.ts,app/api/v1/tests/route.ts,app/api/v1/runs/route.ts,app/api/v1/test-plans/[id]/tests/route.ts,app/api/v1/workspaces/[id]/billing/checkout/route.ts,db:idempotency_keys" data-updated="2026-10-13">
         <h2>Idempotency key</h2>
         <div class="table-wrap">
           <table>
             <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
-            <tbody><tr><td>Idempotency key</td><td><code>idempotency_keys</code>, error codes <code>idempotency_key_required</code> / <code>idempotency_key_invalid</code></td><td>none (API header)</td><td><code>idempotency_keys</code></td><td><code>supabase/migrations/0009_cross_cutting.sql</code>, <code>lib/api/idempotency.ts</code></td></tr></tbody>
+            <tbody><tr><td>Idempotency key</td><td><code>idempotency_keys</code>, header <code>Idempotency-Key</code>, error codes <code>idempotency_key_required</code> / <code>idempotency_key_invalid</code></td><td>none (API header)</td><td><code>idempotency_keys</code></td><td><code>supabase/migrations/0009_cross_cutting.sql</code>, <code>lib/api/idempotency.ts</code></td></tr></tbody>
           </table>
         </div>
-        <p><strong>Business meaning:</strong> a client-chosen key that makes a repeated API create request return the first result instead of creating a duplicate, kept for a limited time per user and endpoint.</p>
-        <p><strong>Structure:</strong> pending (data map placeholder). Which endpoints require it is unverified (<a href="#discovery-gaps">discovery gaps</a>).</p>
+        <p><strong>Business meaning:</strong> a client-chosen key that makes a repeated create request return the first result instead of creating a duplicate, kept per user and endpoint. It is required on four endpoints: create a Test, start a Run, add Tests to a Test Plan, and start a billing checkout. Reusing a key with a different body, or while the first request is still in flight, is refused. Starting a Run has a second, domain-level guard: the same Test and start token within 24 hours returns the existing Run.</p>
+        <p><strong>Related terms:</strong> <a href="#term-test">Test</a>, <a href="#term-run">Run</a>, <a href="#term-test-plan">Test Plan</a>, <a href="#term-billing-checkout">Billing checkout</a>. Values: <a href="#enumerations">idempotency status</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>entities</code> (Idempotency key row).</p>
       </section>
 
       <section id="term-feature-flag" data-sources="supabase/migrations/0009_cross_cutting.sql,db:feature_flags" data-updated="2026-10-02">
@@ -452,17 +434,301 @@
         <p><strong>Structure:</strong> pending (data map placeholder).</p>
       </section>
 
-      <section id="enumerations" data-sources="supabase/migrations/0001_tenancy.sql,supabase/migrations/0004_atcs.sql,supabase/migrations/0008_access_tokens.sql,supabase/migrations/0009_cross_cutting.sql,supabase/migrations/0010_workspace_invites.sql,lib/types.ts,app/qa/qa-config.ts" data-updated="2026-10-02">
-        <h2>Enumerations</h2>
-        <p class="muted">Values are database CHECK constraints (no Postgres enum types); <code>lib/types.ts</code> mirrors them as TypeScript unions.</p>
+      <section id="term-test" data-sources="supabase/migrations/0024_tests.sql,supabase/migrations/0025_test_read.sql,supabase/migrations/0026_tests_reorder.sql,supabase/migrations/0029_atc_usage.sql,supabase/migrations/0030_test_tags.sql,supabase/migrations/0035_atc_update_propagation.sql,components/tests/NewTestBuilder.tsx,components/tests/TestTagEditor.tsx,components/tests/TestDetailTabs.tsx,components/tests/StartRunButton.tsx,app/api/v1/tests/route.ts,.context/business/domain-glossary.md,db:tests,db:test_steps,route:/projects/[projectSlug]/tests/[testId]" data-updated="2026-10-13">
+        <h2>Test</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Test (chain of ATCs)</td><td><code>tests</code>, <code>test_steps</code> (chain step: <code>test_id</code>, <code>atc_id</code>, <code>position</code>), <code>bunkai_create_test</code></td><td>"Test", "New Test", "Steps", "Run History", "Suites:"</td><td><code>tests</code>, <code>test_steps</code></td><td><code>supabase/migrations/0024_tests.sql</code>, <code>supabase/migrations/0030_test_tags.sql</code>, <code>components/tests/NewTestBuilder.tsx</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> the unit of execution: a named, ordered chain of references to ATCs that walks one journey (an end-to-end or integration scenario). It holds references, not copies, so an ATC edit shows up in every Test that chains it; the same ATC may appear at several positions, so a chain position is addressed by its own chain-step id, not by the ATC. A Test belongs to the workspace, not to one project (its project is derived from the ATCs it chains), needs at least one ATC, a title of 1 to 200 characters, and can be reordered (same ATCs, new order) and tagged. Three reserved suite tags, <code>smoke</code>, <code>sanity</code>, <code>regression</code>, are lower-cased; custom tags keep their casing (at most 20, each up to 50 characters). Tests have no delete.</p>
+        <p><strong>UI labels:</strong> "New Test", title placeholder "Name the journey this chain verifies", "Filter ATCs…", "A Test must include at least one ATC.", toast "Test created"; tabs "Steps" and "Run History"; "Chain order changed — unsaved.", toast "Chain reordered"; "Suites:" quick-add, toast "Tags updated."; "Start run" with an "Environment…" picker, toast "Run started"; ATC side "Used by".</p>
+        <p><strong>Related terms:</strong> <a href="#term-atc">ATC</a>, <a href="#term-run">Run</a>, <a href="#term-test-plan">Test Plan</a>, <a href="#term-environment">Environment</a>, <a href="#term-idempotency-key">Idempotency key</a>.</p>
+        <p><strong>Abbreviations:</strong> the product glossary maps the methodology's TC (Test Case) to a Bunkai Test and bans calling a chain "test case" or "test component" (<code>.context/business/domain-glossary.md</code> §1, §4).</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>entity-test</code> and <code>flow-compose-test-and-plan</code>.</p>
+      </section>
 
-        <h3>Workspace plan · <code>workspaces.plan</code> (<code>supabase/migrations/0001_tenancy.sql</code>)</h3>
+      <section id="term-test-plan" data-sources="supabase/migrations/0073_test_plans.sql,supabase/migrations/0074_test_plan_nbsp_whitespace_class.sql,supabase/migrations/0076_test_plan_tests.sql,components/test-plans/TestPlansListView.tsx,components/test-plans/TestPlanDetailView.tsx,components/test-plans/TestPlanForm.tsx,components/test-plans/TestPlanStatusChip.tsx,app/api/v1/test-plans/[id]/tests/route.ts,db:test_plans,db:test_plan_tests,route:/projects/[projectSlug]/plans" data-updated="2026-10-13">
+        <h2>Test Plan</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Test Plan</td><td><code>test_plans</code>, <code>test_plan_tests</code></td><td>"Test Plans", "New plan", "Add tests"</td><td><code>test_plans</code>, <code>test_plan_tests</code></td><td><code>supabase/migrations/0073_test_plans.sql</code>, <code>supabase/migrations/0076_test_plan_tests.sql</code>, <code>components/test-plans/</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> a curated group of Tests inside one project for a goal, cycle or release. It has a name (1 to 100 characters, unique per project ignoring case), a goal or release (up to 100) and a description (up to 500). A Test joins a plan at most once and may belong to several plans; only Tests whose whole chain lies in the plan's project can be added, and removing a Test from a plan only removes the membership. A plan is created Open and is editable only while Open; nothing in the product closes it yet.</p>
+        <p><strong>UI labels:</strong> project section "Test Plans", "New plan", "Create first plan", empty state "No test plans yet"; list columns "Name", "Goal / release", "Status", "Tests", "Created by"; placeholders "e.g. Release 2.4 regression", "Release 2.4", "What this plan covers and when it should run"; "Add tests" picker ("Filter by name or tag", "No tests match."), "This plan has no tests yet", "Remove from this plan"; status chip "Open" / "Closed"; toast "Test plan details updated".</p>
+        <p><strong>Related terms:</strong> <a href="#term-test">Test</a>, <a href="#term-project">Project</a>, <a href="#term-milestone">Milestone</a>. Not the ATP (Acceptance Test Plan, a per-story QA document) and not the <a href="#term-billing-plan">Billing Plan</a>; the product glossary bans bare "plan" (<code>.context/business/domain-glossary.md</code> §4). Values: <a href="#enumerations">test plan status</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>state-test-plan</code> and <code>flow-compose-test-and-plan</code>.</p>
+      </section>
+
+      <section id="term-milestone" data-sources="supabase/migrations/0064_milestones.sql,lib/milestones/countdown.ts,components/milestones/MilestonesListView.tsx,components/milestones/MilestoneDetailView.tsx,components/milestones/CreateMilestoneForm.tsx,db:milestones,route:/projects/[projectSlug]/milestones" data-updated="2026-10-13">
+        <h2>Milestone</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Milestone</td><td><code>milestones</code> (<code>name</code>, <code>target_date</code>, <code>description</code>)</td><td>"Milestones", "New milestone"</td><td><code>milestones</code></td><td><code>supabase/migrations/0064_milestones.sql</code>, <code>components/milestones/</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> a named target date inside a project (for example a release cut). The name is unique per project ignoring case; the target date must be between today and five years ahead when it is set or changed, so a past milestone stays editable. Today it is a planning marker only: nothing links to it, and its date chip states the date fact ("Due today", "N days left", "N days past target") instead of a readiness judgement. The product glossary records "Overdue" as a banned label for this reason.</p>
+        <p><strong>UI labels:</strong> project section "Milestones", "New milestone", empty state "No milestones yet", placeholders "Release 2.4", "Second summer cut", toast "Milestone updated"; detail view "No test plans attached" ("Attaching test plans and tracking readiness against this milestone arrives with a later capability.").</p>
+        <p><strong>Related terms:</strong> <a href="#term-project">Project</a>, <a href="#term-test-plan">Test Plan</a> (intended, not linked).</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>flow-compose-test-and-plan</code>.</p>
+      </section>
+
+      <section id="term-environment" data-sources="supabase/migrations/0031_runs.sql,supabase/migrations/0032_project_environments_crud.sql,supabase/migrations/0063_environment_cross_workspace_404.sql,lib/environments/errors.ts,app/(app)/projects/[projectSlug]/project-explorer.tsx,app/(app)/projects/[projectSlug]/create-environment-form.tsx,app/(app)/projects/[projectSlug]/delete-environment-dialog.tsx,db:project_environments" data-updated="2026-10-13">
+        <h2>Environment</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Project environment</td><td><code>project_environments</code>, <code>environment_id</code></td><td>"Environments" (explorer group), "New environment", "Environment…"</td><td><code>project_environments</code></td><td><code>supabase/migrations/0031_runs.sql</code>, <code>supabase/migrations/0032_project_environments_crud.sql</code>, <code>app/(app)/projects/[projectSlug]/project-explorer.tsx</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> a named place a project is tested (for example Staging or Production). Every Run must say which environment it ran against, so a project without an environment cannot start a Run. Names are 1 to 50 characters and unique per project ignoring case. Environments can be added, renamed and removed from the project explorer; removal is refused while any Run references the environment, to keep run history intact. Staging and Production were seeded only for projects that existed when runs shipped; projects created later start with none.</p>
+        <p><strong>UI labels:</strong> explorer group "Environments", "New environment" (placeholder "Staging"), delete dialog note "Environments referenced by a run cannot be removed…"; "Environment…" picker on "Start run".</p>
+        <p><strong>Related terms:</strong> <a href="#term-project">Project</a>, <a href="#term-run">Run</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>flow-environments</code>.</p>
+      </section>
+
+      <section id="term-run" data-sources="supabase/migrations/0031_runs.sql,supabase/migrations/0036_run_abort.sql,supabase/migrations/0037_run_finish.sql,supabase/migrations/0040_run_module_snapshot.sql,supabase/migrations/0043_run_realtime_replication.sql,supabase/migrations/0067_run_finish_abort_via.sql,supabase/migrations/0075_run_inactivity_sweep.sql,components/runs/RunnerView.tsx,components/runs/ProjectRunsReportView.tsx,components/runs/RunHistoryView.tsx,components/home/ActiveRuns.tsx,app/api/v1/runs/route.ts,db:runs,route:/projects/[projectSlug]/runs/[runId]" data-updated="2026-10-13">
+        <h2>Run</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Run (test run, execution)</td><td><code>runs</code>, <code>executor_mode</code>, <code>start_token</code>, <code>abort_reason</code>, <code>bunkai_create_run</code></td><td>"Test Runs", "Start run", "Finish run", "Abort run", "Run History"</td><td><code>runs</code> (+ <code>run_atcs</code>, <code>run_steps</code>)</td><td><code>supabase/migrations/0031_runs.sql</code>, <code>components/runs/RunnerView.tsx</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> one execution of a Test against a project environment, by a human, an agent or CI. At start it freezes a copy of the Test's chain (every ATC position and every step), so later ATC edits never change the evidence. The executor marks each <a href="#term-run-step">run step</a>, then closes the Run with a verdict they choose (passed or failed), or aborts it with a reason. Only a running Run accepts marks; a closed Run is final. A Run with no step activity for 4 hours is closed automatically as aborted ("Auto-closed by inactivity sweep"). The starter is notified when it finishes or aborts, unless they closed it themselves in the browser. Runs have no delete.</p>
+        <p><strong>UI labels:</strong> project section "Test Runs" (run report with filters, "All modules"); "Start run", toast "Run started"; runner "Finish run", "Abort run" with "Abort reason" (placeholder "Why are you aborting this run?"), toasts "Run finished", "Run aborted"; status labels "Running", "Passed", "Failed", "Aborted"; executor labels "Human", "Agent", "CI" (the Home active-runs panel says "Manual" for human).</p>
+        <p><strong>Related terms:</strong> <a href="#term-test">Test</a>, <a href="#term-environment">Environment</a>, <a href="#term-run-step">Run step</a>, <a href="#term-bug">Bug</a>, <a href="#term-notification">Notification</a>, <a href="#term-coverage">Coverage</a>. Values: <a href="#enumerations">run status, run executor mode</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>entity-run</code>, <code>state-run</code> and <code>flow-execute-run</code>.</p>
+      </section>
+
+      <section id="term-run-step" data-sources="supabase/migrations/0031_runs.sql,supabase/migrations/0037_run_finish.sql,supabase/migrations/0042_run_step_mark.sql,lib/runs/mark-step-view.ts,lib/traceability/chain-view.ts,components/runs/RunnerView.tsx,.context/business/domain-glossary.md,db:run_atcs,db:run_steps" data-updated="2026-10-13">
+        <h2>Run step</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Run step (step result) and run ATC (position result)</td><td><code>run_steps</code> (<code>status</code>, <code>note</code>, <code>evidence_url</code>), <code>run_atcs</code>, <code>bunkai_mark_run_step</code></td><td>"Pass" / "Fail" / "Block", "Step marked", "Unrun"</td><td><code>run_steps</code>, <code>run_atcs</code></td><td><code>supabase/migrations/0031_runs.sql</code>, <code>supabase/migrations/0042_run_step_mark.sql</code>, <code>lib/runs/mark-step-view.ts</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> the frozen copy of one ATC step inside a Run, and the verdict recorded on it: passed, failed or blocked, with an optional note and evidence link. A marked step can be re-marked while the Run is running (last mark wins, no history). Each chain position (run ATC) carries its own verdict derived from its steps; this per-ATC result is what coverage and traceability read as an ATC's real execution status. When the Run is closed, every step still pending becomes skipped. A failed step is where a <a href="#term-bug">bug</a> is filed from.</p>
+        <p><strong>Grain:</strong> the product glossary separates three run vocabularies: the Run (<code>running</code> / <code>passed</code> / <code>failed</code> / <code>aborted</code>), the position and step (<code>pending</code> / <code>passed</code> / <code>failed</code> / <code>blocked</code> / <code>skipped</code>), and the traceability chip that combines both. <code>aborted</code> exists only at the Run grain (<code>.context/business/domain-glossary.md</code> §3).</p>
+        <p><strong>UI labels:</strong> mark buttons "Pass", "Fail", "Block"; note placeholder "What did you observe?", evidence placeholder "https://…"; toast "Step marked"; verdict badges "Unrun" (stored <code>pending</code>), "Passed", "Failed", "Blocked", "Skipped"; "Report bug" on a failed step.</p>
+        <p><strong>Related terms:</strong> <a href="#term-run">Run</a>, <a href="#term-atc-step">ATC step</a>, <a href="#term-bug">Bug</a>, <a href="#term-coverage">Coverage</a>. Values: <a href="#enumerations">run step status</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>state-run-step</code>.</p>
+      </section>
+
+      <section id="term-bug" data-sources="supabase/migrations/0046_bugs.sql,supabase/migrations/0051_bugs_list.sql,supabase/migrations/0054_bug_assignment_status.sql,supabase/migrations/0070_bug_detail_composer.sql,lib/bugs/constants.ts,components/bugs/BugsListView.tsx,components/bugs/BugDetailView.tsx,components/bugs/BugFormDialog.tsx,app/api/v1/bugs/route.ts,.context/business/domain-glossary.md,db:bugs,route:/projects/[projectSlug]/bugs" data-updated="2026-10-13">
+        <h2>Bug</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Bug (defect)</td><td><code>bugs</code> (<code>severity</code>, <code>status</code>, <code>assignee_user_id</code>, <code>run_step_id</code>), <code>bunkai_create_bug</code>, <code>bunkai_transition_bug_status</code></td><td>"Bug Reports", "Report bug", "New bug", "Severity", "Status"</td><td><code>bugs</code></td><td><code>supabase/migrations/0046_bugs.sql</code>, <code>supabase/migrations/0054_bug_assignment_status.sql</code>, <code>components/bugs/</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> a defect tracked natively inside Bunkai, not delegated to Jira. It always belongs to a project and a module, and is either filed from a failed run step (the run, step and ATC are linked automatically as its origin) or filed manually with no origin. It has a title (5 to 200 characters), a severity, an optional description and steps to reproduce, up to 10 evidence links, a reporter and an optional assignee, who must be an active member above viewer. Its status moves one stage forward at a time and never back. Bugs have no delete and stay readable after their module is archived (tagged "Archived").</p>
+        <p><strong>Severity:</strong> stored as <code>P1</code> to <code>P4</code>, rendered as words: P1 Critical, P2 Major, P3 Minor, P4 Trivial (<code>lib/bugs/constants.ts</code>). Not the same scale as ATC Priority.</p>
+        <p><strong>UI labels:</strong> project section "Bug Reports" with List and Heatmap views; "New bug" / "Report bug" dialog ("What went wrong?", "Select a module…", "File bug"), toast "Bug filed"; detail "Origin", "Details", "Evidence", "Steps to reproduce", "Filed manually. This defect was reported directly — no test run or ATC is linked.", "Unassigned"; one forward action per status: "Start progress", "Mark resolved", "Close"; toast "Bug status updated".</p>
+        <p><strong>Related terms:</strong> <a href="#term-run-step">Run step</a>, <a href="#term-module">Module</a>, <a href="#term-atc">ATC</a>, <a href="#term-defect-heatmap">Defect heatmap</a>, <a href="#term-notification">Notification</a>, <a href="#term-traceability-chain">Traceability chain</a>. Values: <a href="#enumerations">bug severity, bug status</a>.</p>
+        <p><strong>Abbreviations:</strong> the product glossary distinguishes Defect (any deviation) from Bug (found during execution); the UI uses "Bug" and the traceability view "Defects".</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>entity-bug</code>, <code>state-bug</code> and <code>flow-file-and-triage-bug</code>.</p>
+      </section>
+
+      <section id="term-coverage" data-sources="supabase/migrations/0048_project_coverage_report.sql,supabase/migrations/0050_project_coverage_report_real_execution_source.sql,supabase/migrations/0090_project_coverage_skipped_blocked_not_run.sql,components/coverage/ProjectCoverageView.tsx,components/home/CoverageSummary.tsx,app/api/v1/projects/[id]/coverage/route.ts,app/api/v1/workspaces/[id]/coverage/route.ts,.context/business/domain-glossary.md,db:atc_acceptance_criteria,db:run_atcs" data-updated="2026-10-13">
+        <h2>Coverage</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Coverage (per criterion and per module)</td><td><code>bunkai_report_project_coverage</code>, states <code>uncovered</code> / <code>not_run</code> / <code>executed</code>; module <code>no_acs</code> / <code>uncovered</code> / <code>not_run</code> / <code>fully_covered</code></td><td>"Coverage by module", "Coverage gaps", "Never run"</td><td>computed (no table)</td><td><code>supabase/migrations/0090_project_coverage_skipped_blocked_not_run.sql</code>, <code>components/coverage/ProjectCoverageView.tsx</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> how much of a project's acceptance criteria is backed by tests that actually ran. Per criterion: <strong>uncovered</strong> when no live ATC of the project is bound to it (an authoring gap); <strong>not run</strong> when a bound ATC's most recent result is anything but passed or failed, including never run, skipped and blocked (an execution gap); otherwise <strong>executed</strong>. A failed ATC still counts as coverage: coverage and health are separate axes. A module rolls up as no criteria, uncovered, not run or fully covered. The two gaps have different owners and must never be merged into one "not covered" state. Shown on the project Metrics page and summarised on Home; also available per workspace.</p>
+        <p><strong>UI labels:</strong> "Coverage by module", "Executed vs. bound-but-never-run vs. unbound acceptance criteria", "Coverage gaps", "No coverage gaps.", "Zero linked ATCs: nothing bound at all", "Never run" (Home says "awaiting execution" for the same state; the product glossary records this drift).</p>
+        <p><strong>Related terms:</strong> <a href="#term-acceptance-criterion">Acceptance criterion</a>, <a href="#term-anchoring">Anchoring</a>, <a href="#term-run-step">Run step</a>, <a href="#term-module">Module</a>, <a href="#term-traceability-chain">Traceability chain</a>. Values: <a href="#enumerations">coverage state, module coverage status</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>flow-reports</code>.</p>
+      </section>
+
+      <section id="term-traceability-chain" data-sources="supabase/migrations/0068_story_traceability_report.sql,supabase/migrations/0069_story_traceability_module.sql,lib/traceability/chain-view.ts,lib/traceability/export-snapshot.ts,components/traceability/TraceabilityChainView.tsx,app/api/v1/projects/[id]/traceability/route.ts,.context/business/domain-glossary.md,route:/projects/[projectSlug]/traceability" data-updated="2026-10-13">
+        <h2>Traceability chain</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Traceability chain (product sense)</td><td>story traceability report (<code>0068</code>, <code>0069</code>), <code>chain-view.ts</code>, derived state <code>in_flight</code></td><td>"Traceability", "Select a user story", "Latest run", "Defects"</td><td>computed (no table)</td><td><code>supabase/migrations/0068_story_traceability_report.sql</code>, <code>lib/traceability/chain-view.ts</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> the evidence chain for one user story, read in one screen: each acceptance criterion, the ATCs bound to it, the Tests that chain those ATCs, their latest Runs and the bugs they produced. Each run row reads in flight (run still running or ATC still pending), aborted, or the ATC's result. It names three distinct absences: "Uncovered" (a criterion with no ATC), "No test written yet", "No run recorded yet". It can be exported as a snapshot. The product glossary separates this chain (criterion, ATC, Test, Run, Defect) from the methodology's traceability (US, ATP, ATR, TC); say which one is meant.</p>
+        <p><strong>UI labels:</strong> project section "Traceability", "Select a user story", "All modules" filter, "Active filters:", columns "Test", "Latest run", "Defects"; gap labels above; chip labels "Pass", "Fail", "Blocked", "Skipped", "Aborted", "Running"; toast "Snapshot exported".</p>
+        <p><strong>Related terms:</strong> <a href="#term-user-story">User story</a>, <a href="#term-acceptance-criterion">Acceptance criterion</a>, <a href="#term-atc">ATC</a>, <a href="#term-test">Test</a>, <a href="#term-run">Run</a>, <a href="#term-bug">Bug</a>, <a href="#term-coverage">Coverage</a>. Values: <a href="#enumerations">traceability run state</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>flow-reports</code>.</p>
+      </section>
+
+      <section id="term-recovery-cycle" data-sources="supabase/migrations/0049_recovery_cycle_report.sql,lib/metrics/recovery-cycle.ts,components/metrics/RecoveryCycleSection.tsx,app/api/v1/projects/[id]/metrics/recovery-cycles/route.ts,route:/projects/[projectSlug]/metrics" data-updated="2026-10-13">
+        <h2>Recovery cycle</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Recovery cycle</td><td>recovery cycle report (<code>0049</code>), <code>median_recovery_seconds</code>, state <code>no_cycle</code> / <code>in_progress</code> / <code>recovered</code></td><td>"Recovery cycle by user story", "Median recovery cycle"</td><td>computed (no table)</td><td><code>supabase/migrations/0049_recovery_cycle_report.sql</code>, <code>components/metrics/RecoveryCycleSection.tsx</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> per user story, the time from its first failing run to the first later run in which it fully passes: how long a broken story stayed broken. It measures repair latency, not defect count, and is computed from run data only. A story with run history reads Recovered, Not yet green (failed, not yet passing again) or No cycle (never failed). Shown on the project Metrics page with the project median. The product glossary asks to never shorten it to "recovery".</p>
+        <p><strong>UI labels:</strong> "Recovery cycle by user story", "Elapsed time from first failing run to first fully-passing run", "Median recovery cycle", state labels "Recovered", "Not yet green", "No cycle · never failed", empty state "No stories with run history yet."</p>
+        <p><strong>Related terms:</strong> <a href="#term-user-story">User story</a>, <a href="#term-run">Run</a>. Values: <a href="#enumerations">recovery cycle state</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>flow-reports</code>.</p>
+      </section>
+
+      <section id="term-defect-heatmap" data-sources="supabase/migrations/0052_defect_heatmap_report.sql,lib/metrics/defect-heatmap.ts,components/bugs/BugsHeatmapView.tsx,components/bugs/BugsListView.tsx,app/api/v1/projects/[id]/bugs/heatmap/route.ts" data-updated="2026-10-13">
+        <h2>Defect heatmap</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Defect heatmap</td><td>defect heatmap report (<code>0052</code>), <code>HeatBucket</code>, <code>TrendDirection</code>, window <code>7d</code> / <code>30d</code> / <code>90d</code></td><td>Heatmap view of "Bug Reports", "Window"</td><td>computed (no table)</td><td><code>supabase/migrations/0052_defect_heatmap_report.sql</code>, <code>lib/metrics/defect-heatmap.ts</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> bugs per active module over a rolling window of 7, 30 or 90 days, with a week-over-week trend. A parent module counts its descendants' bugs, including bugs filed against modules archived since. Each module gets a heat level: Clean (0), Low (up to 2), Elevated (up to 4), Hotspot (more than 4); the trend reads Rising, Falling or Flat. It is the second view of the Bug Reports screen and the reason modules are first-class.</p>
+        <p><strong>UI labels:</strong> "Window", "Trend compares the latest 7 days vs. the prior 7 days", "Includes all nested sub-modules", heat labels "Clean", "Low", "Elevated", "Hotspot", trend "Rising", "Falling", "Flat"; empty state "No active modules in this Project".</p>
+        <p><strong>Related terms:</strong> <a href="#term-bug">Bug</a>, <a href="#term-module">Module</a>. Values: <a href="#enumerations">heatmap window, heat bucket, trend</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>flow-reports</code>.</p>
+      </section>
+
+      <section id="term-notification" data-sources="supabase/migrations/0053_notifications.sql,supabase/migrations/0056_bug_event_notifications.sql,supabase/migrations/0057_bug_notification_deep_link.sql,supabase/migrations/0066_run_event_notifications.sql,components/notifications/NotificationsPanel.tsx,components/notifications/NotificationRow.tsx,app/api/v1/notifications/,db:notifications" data-updated="2026-10-13">
+        <h2>Notification</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Notification (inbox item)</td><td><code>notifications</code> (<code>event_type</code>, <code>entity_type</code>, <code>payload</code>, <code>read_at</code>, <code>source_event_id</code>)</td><td>"Notifications", "Mark all as read"</td><td><code>notifications</code></td><td><code>supabase/migrations/0053_notifications.sql</code>, <code>components/notifications/NotificationsPanel.tsx</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> a message in one member's inbox about a run or bug event that concerns them. Produced automatically from the activity log: the run starter when their Run finishes or aborts (not when they closed it themselves in the browser); the new assignee when a bug is assigned or reassigned; the reporter and assignee when a bug's status changes, never the person who changed it. Each recipient gets at most one per event. The inbox shows the last 90 days, updates live, and keeps an item readable as "This item is no longer available." when its entity is gone or hidden. Items are unread until read one by one or all at once.</p>
+        <p><strong>UI labels:</strong> "Notifications" panel, "Mark all as read", empty state "No notifications yet", fallback "This item is no longer available."</p>
+        <p><strong>Related terms:</strong> <a href="#term-activity-log">Activity log</a>, <a href="#term-notification-preference">Notification preference</a>, <a href="#term-email-digest">Email digest</a>, <a href="#term-run">Run</a>, <a href="#term-bug">Bug</a>. Values: <a href="#enumerations">notification event type</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>entity-notification</code> and <code>flow-notifications</code>.</p>
+      </section>
+
+      <section id="term-notification-preference" data-sources="supabase/migrations/0062_notification_preferences.sql,components/settings/NotificationPreferencesGrid.tsx,app/(app)/settings/notifications/page.tsx,app/api/v1/notification-preferences/,db:notification_preferences" data-updated="2026-10-13">
+        <h2>Notification preference</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Notification preference (event type x channel)</td><td><code>notification_preferences</code> (<code>event_type</code>, <code>channel</code>, <code>enabled</code>)</td><td>Settings &gt; "Notifications", "Event type", "In-app" / "Email"</td><td><code>notification_preferences</code></td><td><code>supabase/migrations/0062_notification_preferences.sql</code>, <code>components/settings/NotificationPreferencesGrid.tsx</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> a person's on/off switch per event family (Run lifecycle, Bug lifecycle, Mentions) and channel (In-app, Email). It is personal and applies to every workspace; a missing switch means on. Mentions is shown but locked off (no mention feature exists). Only the Email switch has an effect today (it filters the <a href="#term-email-digest">email digest</a>); the In-app switch is stored but inbox notifications are produced regardless.</p>
+        <p><strong>UI labels:</strong> "Run lifecycle" ("A run finishes, fails, or is aborted."), "Bug lifecycle" ("Assignments and status changes."), "Mentions" ("Someone mentions you in a comment or discussion."), columns "In-app" and "Email", toast "Saved".</p>
+        <p><strong>Related terms:</strong> <a href="#term-notification">Notification</a>, <a href="#term-email-digest">Email digest</a>. Values: <a href="#enumerations">notification preference event type, channel</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>entity-notification</code>.</p>
+      </section>
+
+      <section id="term-email-digest" data-sources="supabase/migrations/0078_notification_digest_log.sql,app/api/v1/admin/send-digest/route.ts,lib/notifications/send-digest-run.ts,lib/notifications/digest-template.ts,lib/mail/resend-client.ts,vercel.json,db:notification_digest_log" data-updated="2026-10-13">
+        <h2>Email digest</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Email digest (daily)</td><td><code>send-digest</code> route, <code>notification_digest_log</code>, <code>bunkai_notification_digest_candidates</code></td><td>email (no screen)</td><td><code>notification_digest_log</code></td><td><code>supabase/migrations/0078_notification_digest_log.sql</code>, <code>lib/notifications/send-digest-run.ts</code>, <code>vercel.json</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> one email per person per day (08:00 UTC) summarising their unread notifications of the last 90 days in live workspaces, skipping event families whose Email preference is off. Sent through Resend; a day is claimed before sending so a second trigger never sends twice, and a failed day is not retried (the notifications stay unread for the next one).</p>
+        <p><strong>Related terms:</strong> <a href="#term-notification">Notification</a>, <a href="#term-notification-preference">Notification preference</a>. Values: <a href="#enumerations">digest status</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>flow-notifications</code>.</p>
+      </section>
+
+      <section id="term-jira-import" data-sources="supabase/migrations/0019_import_jobs.sql,supabase/migrations/0020_import_jobs_one_active.sql,lib/jira/import-runner.ts,lib/jira/client.ts,lib/jira/extract-acceptance-criteria.ts,app/api/v1/imports/route.ts,app/(app)/projects/[projectSlug]/import-from-jira-dialog.tsx,lib/types.ts,db:import_jobs" data-updated="2026-10-13">
+        <h2>Jira import</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Import job (Jira story import)</td><td><code>ImportJob</code>, <code>ImportJobStatus</code>, <code>jql</code></td><td>"Import from Jira", "JQL"</td><td><code>import_jobs</code></td><td><code>supabase/migrations/0019_import_jobs.sql</code>, <code>lib/jira/import-runner.ts</code>, <code>app/(app)/projects/[projectSlug]/import-from-jira-dialog.tsx</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> a one-way, asynchronous import of the Jira issues matched by a JQL query into a project as user stories with acceptance criteria (extracted from the issue description). Stories are matched on their Jira key, so a re-import updates instead of duplicating; the module comes from the Jira component name or an auto-created "Inbox" module. One import runs at a time per project; the job records created, updated and skipped counts and per-issue errors. Bunkai never writes back to Jira, and it uses one platform-level Atlassian account, not a per-workspace connection.</p>
+        <p><strong>UI labels:</strong> "Import from Jira" dialog, "JQL" (placeholder "project = ACME AND issuetype = Story"), "Working… polling for progress.", "Close (keeps running)", toasts "Import completed" / "Import failed".</p>
+        <p><strong>Related terms:</strong> <a href="#term-user-story">User story</a>, <a href="#term-acceptance-criterion">Acceptance criterion</a>, <a href="#term-module">Module</a>. Values: <a href="#enumerations">import job status</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>flow-jira-import</code>, <code>state-async-job</code> and <code>integration-jira</code>.</p>
+      </section>
+
+      <section id="term-workspace-export" data-sources="supabase/migrations/0083_workspace_data_export.sql,lib/workspace-export/,components/data-export/DataExportView.tsx,app/(app)/settings/data-export/page.tsx,app/api/v1/workspaces/[id]/data-export/route.ts,db:workspace_exports" data-updated="2026-10-13">
+        <h2>Workspace export</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Workspace data export</td><td><code>workspace_exports</code>, <code>EXPORT_DOWNLOAD_WINDOW_HOURS</code>, bucket <code>workspace-exports</code></td><td>Settings &gt; "Data export", "Request export", "Download archive"</td><td><code>workspace_exports</code></td><td><code>supabase/migrations/0083_workspace_data_export.sql</code>, <code>lib/workspace-export/constants.ts</code>, <code>components/data-export/DataExportView.tsx</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> the owner's way to take all of a workspace's data out: projects, modules, stories, criteria, ATCs, Tests, Runs, bugs, activity and memberships in one archive. Owner only, from a browser session; one export at a time per workspace. It is prepared in the background, downloadable for 168 hours (7 days) and then expires. Requesting and downloading are both recorded in the activity log. The delete-workspace dialog points owners here first.</p>
+        <p><strong>UI labels:</strong> Settings &gt; "Data export" ("Request and download a complete export of this workspace's data."), "What's in an export", "Export status", "Request export", "Request a new export", "Download archive", "No export has been requested yet for this workspace.", "The export failed to prepare.", "The last export has expired and is no longer downloadable."</p>
+        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>, <a href="#term-workspace-deletion">Workspace deletion</a>, <a href="#term-activity-log">Activity log</a>. Values: <a href="#enumerations">workspace export status</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>flow-workspace-export</code> and <code>state-async-job</code>.</p>
+      </section>
+
+      <section id="term-workspace-deletion" data-sources="supabase/migrations/0084_workspace_deletion.sql,supabase/migrations/0084a_workspace_deletion_recursion_fix.sql,supabase/migrations/0089_workspace_helpers_deleted_guard.sql,lib/workspace-deletion/email.ts,components/settings/DeleteWorkspaceModal.tsx,app/workspaces/[id]/restore/restore-client.tsx,app/api/v1/workspaces/[id]/route.ts,app/api/v1/workspaces/[id]/restore/route.ts,db:workspace_deletions,db:workspaces" data-updated="2026-10-13">
+        <h2>Workspace deletion</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Workspace deletion (with restore window)</td><td><code>workspaces.deleted_at</code>, <code>workspace_deletions</code> (tombstone), <code>bunkai_request_workspace_deletion</code>, <code>bunkai_purge_deleted_workspaces</code></td><td>"Delete workspace", "Restore workspace"</td><td><code>workspaces</code>, <code>workspace_deletions</code></td><td><code>supabase/migrations/0084_workspace_deletion.sql</code>, <code>components/settings/DeleteWorkspaceModal.tsx</code>, <code>app/workspaces/[id]/restore/restore-client.tsx</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> an owner's request to erase a workspace. Owner only, from a browser session; other members cannot veto. From that moment the workspace is invisible to everyone, its tokens and pending invites are revoked, and the owner and every active member get an email with a restore link. For 30 days the owner can restore it (data intact, revoked tokens and invites stay revoked); after that a daily job deletes it permanently. A tombstone record (name, slug, requester, member count, row counts) survives the purge for audit.</p>
+        <p><strong>UI labels:</strong> Settings &gt; Workspaces "Delete" opening "Delete workspace" (with "Go to Data export"), toast "&lt;name&gt; was deleted."; restore page "Restore workspace", "Restoring…", toast "Workspace restored."</p>
+        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>, <a href="#term-workspace-export">Workspace export</a>, <a href="#term-personal-access-token">Personal access token</a>, <a href="#term-workspace-invite">Workspace invite</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>flow-workspace-deletion</code> and <code>state-workspace</code>.</p>
+      </section>
+
+      <section id="term-billing-plan" data-sources="supabase/migrations/0001_tenancy.sql,supabase/migrations/0072_workspace_billing_overview.sql,supabase/migrations/0077_billing_upgrade_checkout.sql,lib/billing/plan-tiers.ts,components/billing/BillingOverviewView.tsx,app/(app)/settings/billing/page.tsx,app/api/v1/workspaces/[id]/projects/response.ts,.context/business/domain-glossary.md,db:workspaces" data-updated="2026-10-13">
+        <h2>Billing Plan</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Billing Plan (tier) and seat</td><td><code>WorkspacePlan</code>, <code>workspaces.plan</code>, <code>workspaces.purchased_seats</code>, <code>PLAN_TIERS</code></td><td>Settings &gt; "Billing", "Current plan", "Seats", "Usage"; tier names "Community", "Cloud", "Enterprise"</td><td><code>workspaces</code></td><td><code>supabase/migrations/0001_tenancy.sql</code>, <code>supabase/migrations/0077_billing_upgrade_checkout.sql</code>, <code>lib/billing/plan-tiers.ts</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> the subscription tier of a workspace, which sets its limits and price. Community: free, 5 seats, 3 projects, 30-day retention. Cloud: 24.00 USD per seat, 25 seats, 50 projects, 90-day retention. Enterprise: custom price, no limits. A seat is one active member counted against the tier. Only the project limit is enforced (project creation is refused above it); seats and retention are shown as usage meters and never block. Admins and owners see the billing overview; only the owner can upgrade (see <a href="#term-billing-checkout">Billing checkout</a>). There is no downgrade, renewal date or invoice.</p>
+        <p><strong>UI labels:</strong> Settings &gt; "Billing" ("Plan, seats, and usage for this workspace."), "Current plan", "Seats", "Usage", "Run history" (retention meter), "Upgrade plan", "Unable to load billing info"; Community shows "No active subscription".</p>
+        <p><strong>Naming:</strong> the stored values are <code>community</code> / <code>cloud</code> / <code>enterprise</code>; the product glossary bans "Free / Team / Enterprise" and bare "plan" (collides with <a href="#term-test-plan">Test Plan</a>) (<code>.context/business/domain-glossary.md</code> §3, §4).</p>
+        <p><strong>Related terms:</strong> <a href="#term-workspace">Workspace</a>, <a href="#term-workspace-member">Workspace member</a>, <a href="#term-project">Project</a>, <a href="#term-billing-checkout">Billing checkout</a>. Values: <a href="#enumerations">workspace plan</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>entity-workspace</code> and <code>flow-billing-upgrade</code>.</p>
+      </section>
+
+      <section id="term-billing-checkout" data-sources="supabase/migrations/0077_billing_upgrade_checkout.sql,lib/billing/checkout.ts,lib/billing/stripe.ts,lib/billing/seat-quantity.ts,components/billing/UpgradeView.tsx,app/(app)/settings/billing/upgrade/page.tsx,app/api/v1/workspaces/[id]/billing/checkout/route.ts,app/api/v1/billing/webhook/route.ts,db:billing_checkout_sessions,db:stripe_webhook_events" data-updated="2026-10-13">
+        <h2>Billing checkout</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Upgrade checkout (Stripe Checkout session)</td><td><code>billing_checkout_sessions</code> (<code>target_plan</code>, <code>seat_quantity</code>, <code>status</code>), <code>stripe_webhook_events</code></td><td>"Upgrade your plan", "Upgrade to Cloud"</td><td><code>billing_checkout_sessions</code>, <code>stripe_webhook_events</code></td><td><code>supabase/migrations/0077_billing_upgrade_checkout.sql</code>, <code>lib/billing/checkout.ts</code>, <code>components/billing/UpgradeView.tsx</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> the owner's purchase of the Cloud tier for a chosen number of seats. Bunkai records the attempt, sends the owner to Stripe's hosted payment page, and changes the workspace to Cloud with the purchased seats only when Stripe confirms the payment. Only one checkout can be open per workspace; returning from Stripe's cancel page cancels it, and Stripe expiry or a failed delayed payment closes it without a plan change. Repeated Stripe events are ignored.</p>
+        <p><strong>UI labels:</strong> "Upgrade your plan", owner-only seat step, "Upgrade to Cloud", return states "Payment confirmed — activating your plan" ("This usually takes a few seconds."), "The request failed. Your plan is unchanged."</p>
+        <p><strong>Related terms:</strong> <a href="#term-billing-plan">Billing Plan</a>, <a href="#term-workspace">Workspace</a>, <a href="#term-idempotency-key">Idempotency key</a>. Values: <a href="#enumerations">checkout session status</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> sections <code>flow-billing-upgrade</code>, <code>state-checkout-session</code> and <code>integration-stripe</code>.</p>
+      </section>
+
+      <section id="term-command-palette" data-sources="supabase/migrations/0071_workspace_search.sql,supabase/migrations/0082_bk635_search_rpc_actor_bind_and_grant_revoke.sql,components/layout/CommandPalette.tsx,app/api/v1/search/route.ts,.context/business/domain-glossary.md" data-updated="2026-10-13">
+        <h2>Command palette</h2>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Business name</th><th>Code identifier</th><th>UI label</th><th>Table / collection</th><th>Found in</th></tr></thead>
+            <tbody><tr><td>Command palette (workspace search)</td><td><code>CommandPalette</code>, <code>SearchEntityType</code>, workspace search RPC (<code>0071</code>)</td><td>"Command palette", "Search…" (Cmd/Ctrl+K)</td><td>computed (no table)</td><td><code>components/layout/CommandPalette.tsx</code>, <code>supabase/migrations/0071_workspace_search.sql</code></td></tr></tbody>
+          </table>
+        </div>
+        <p><strong>Business meaning:</strong> the keyboard overlay (Cmd/Ctrl+K) that searches the active workspace and jumps to a result. It returns ATCs, Tests, Projects, Modules, Bugs and Runs in that fixed group order, only what the caller can see. It is an overlay, not a screen. The product glossary asks to say "command palette", not "search bar" (the ATC library's in-page filter).</p>
+        <p><strong>UI labels:</strong> "Command palette", "Search…", groups "ATCs", "Tests", "Projects", "Modules", "Bugs", "Runs", error "Search failed. Try again.", "Esc".</p>
+        <p><strong>Related terms:</strong> <a href="#term-atc">ATC</a>, <a href="#term-test">Test</a>, <a href="#term-project">Project</a>, <a href="#term-module">Module</a>, <a href="#term-bug">Bug</a>, <a href="#term-run">Run</a>.</p>
+        <p><strong>Structure:</strong> <code>business-data-context</code> section <code>flow-reports</code>.</p>
+      </section>
+
+      <section id="enumerations" data-sources="supabase/migrations/0001_tenancy.sql,supabase/migrations/0004_atcs.sql,supabase/migrations/0008_access_tokens.sql,supabase/migrations/0009_cross_cutting.sql,supabase/migrations/0010_workspace_invites.sql,supabase/migrations/0017_acceptance_criteria_ordering.sql,supabase/migrations/0019_import_jobs.sql,supabase/migrations/0030_test_tags.sql,supabase/migrations/0031_runs.sql,supabase/migrations/0046_bugs.sql,supabase/migrations/0049_recovery_cycle_report.sql,supabase/migrations/0052_defect_heatmap_report.sql,supabase/migrations/0056_bug_event_notifications.sql,supabase/migrations/0062_notification_preferences.sql,supabase/migrations/0066_run_event_notifications.sql,supabase/migrations/0069_story_traceability_module.sql,supabase/migrations/0073_test_plans.sql,supabase/migrations/0077_billing_upgrade_checkout.sql,supabase/migrations/0078_notification_digest_log.sql,supabase/migrations/0083_workspace_data_export.sql,supabase/migrations/0087_atc_classification.sql,supabase/migrations/0090_project_coverage_skipped_blocked_not_run.sql,lib/types.ts,lib/api/pat.ts,lib/billing/plan-tiers.ts,lib/bugs/constants.ts,lib/metrics/defect-heatmap.ts,lib/runs/mark-step-view.ts,app/qa/qa-config.ts" data-updated="2026-10-13">
+        <h2>Enumerations</h2>
+        <p class="muted">Stored values are database CHECK constraints (no Postgres enum types); <code>lib/types.ts</code> mirrors several as TypeScript unions. The last group lists computed values that no table stores: reports return them.</p>
+
+        <h3>Workspace plan · <code>workspaces.plan</code> (<code>supabase/migrations/0001_tenancy.sql</code>, <code>lib/billing/plan-tiers.ts</code>)</h3>
         <table>
           <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
           <tbody>
-            <tr><td><code>community</code></td><td>Free tier (default)</td><td>Set on every bootstrapped workspace</td></tr>
-            <tr><td><code>cloud</code></td><td>Hosted paid tier (per docs)</td><td>No code path sets or reads it</td></tr>
-            <tr><td><code>enterprise</code></td><td>Licensed tier (per docs)</td><td>No code path sets or reads it</td></tr>
+            <tr><td><code>community</code></td><td>Free tier (default): 5 seats, 3 projects, 30-day retention</td><td>Set on every bootstrapped workspace; displayed "Community"</td></tr>
+            <tr><td><code>cloud</code></td><td>Paid per seat (24.00 USD): 25 seats, 50 projects, 90-day retention</td><td>Set by a paid Stripe checkout; displayed "Cloud"</td></tr>
+            <tr><td><code>enterprise</code></td><td>Custom price, no limits</td><td>No self-serve path sets it; displayed "Enterprise"</td></tr>
           </tbody>
         </table>
 
@@ -470,10 +736,10 @@
         <table>
           <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
           <tbody>
-            <tr><td><code>viewer</code></td><td>Read-only member</td><td>Sees workspace data, cannot write</td></tr>
-            <tr><td><code>member</code></td><td>Contributor (default)</td><td>Can author projects, modules, stories, ATCs</td></tr>
-            <tr><td><code>admin</code></td><td>Manager</td><td>Manages members and invites</td></tr>
-            <tr><td><code>owner</code></td><td>Workspace creator</td><td>Only role allowed to change or delete the workspace; cannot be granted through an invite</td></tr>
+            <tr><td><code>viewer</code></td><td>Read-only member</td><td>Sees workspace data and reports, cannot write; cannot be a bug assignee</td></tr>
+            <tr><td><code>member</code></td><td>Contributor (default)</td><td>Authors projects, modules, stories, ATCs, Tests; runs Tests; files bugs; imports from Jira</td></tr>
+            <tr><td><code>admin</code></td><td>Manager</td><td>Manages members and invites; sees billing</td></tr>
+            <tr><td><code>owner</code></td><td>Workspace owner (several allowed)</td><td>Only role that upgrades, exports, deletes or restores the workspace; cannot be granted through an invite; the last owner cannot leave</td></tr>
           </tbody>
         </table>
 
@@ -481,8 +747,8 @@
         <table>
           <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
           <tbody>
-            <tr><td><code>active</code></td><td>Live seat (default)</td><td>Required for any visibility</td></tr>
-            <tr><td><code>invited</code></td><td>Pending seat</td><td>Declared; the invite flow uses <code>workspace_invites</code> instead</td></tr>
+            <tr><td><code>active</code></td><td>Live seat (default)</td><td>Required for any visibility; the only value code writes</td></tr>
+            <tr><td><code>invited</code></td><td>Pending seat</td><td>Declared; invite acceptance would activate such a row, but no code creates it</td></tr>
             <tr><td><code>suspended</code></td><td>Blocked seat</td><td>Declared; no code path sets it</td></tr>
           </tbody>
         </table>
@@ -494,6 +760,15 @@
             <tr><td><code>viewer</code></td><td>Invitee joins read-only</td><td>Invite creation</td></tr>
             <tr><td><code>member</code></td><td>Invitee joins as contributor (default)</td><td>Invite creation</td></tr>
             <tr><td><code>admin</code></td><td>Invitee joins as manager</td><td>Invite creation</td></tr>
+          </tbody>
+        </table>
+
+        <h3>User story status · <code>user_stories.status</code> (<code>supabase/migrations/0017_acceptance_criteria_ordering.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>draft</code></td><td>Criteria not yet settled (default)</td><td>Badge "Draft"; automatic fallback when the last criterion is removed</td></tr>
+            <tr><td><code>ready_to_test</code></td><td>Criteria settled; ready to author ATCs against</td><td>Badge "Ready to test"; needs at least one active criterion</td></tr>
           </tbody>
         </table>
 
@@ -511,7 +786,7 @@
         <table>
           <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
           <tbody>
-            <tr><td><code>unrun</code></td><td>Never executed (default)</td><td>Status chip and dot in table and editor</td></tr>
+            <tr><td><code>unrun</code></td><td>Never executed (default)</td><td>Status dot in table, editor and sidebar filter</td></tr>
             <tr><td><code>running</code></td><td>Execution in progress</td><td>Same</td></tr>
             <tr><td><code>pass</code></td><td>Last result passed</td><td>Same</td></tr>
             <tr><td><code>fail</code></td><td>Last result failed</td><td>Same</td></tr>
@@ -519,16 +794,182 @@
             <tr><td><code>skipped</code></td><td>Deliberately not executed</td><td>Same</td></tr>
           </tbody>
         </table>
-        <p class="muted">No code path changes <code>atcs.status</code> at this commit (no execution feature); the values are displayed only.</p>
+        <p>No code path writes <code>atcs.status</code>, including Runs: every ATC reads <code>unrun</code>. The real per-ATC result is the run step status below.</p>
 
-        <h3>Token scope · <code>access_tokens.scopes</code> (<code>supabase/migrations/0008_access_tokens.sql</code>, <code>app/qa/qa-config.ts</code>)</h3>
+        <h3>ATC technique · <code>atcs.technique</code> (<code>supabase/migrations/0087_atc_classification.sql</code>)</h3>
         <table>
           <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
           <tbody>
-            <tr><td><code>atc:read</code></td><td>Read ATCs and the authoring tree</td><td>PAT creation; all four are granted by default on headless signup</td></tr>
-            <tr><td><code>atc:write</code></td><td>Create, update, delete ATCs</td><td>PAT creation</td></tr>
-            <tr><td><code>run:execute</code></td><td>Start runs and post results</td><td>PAT creation; no run feature exists yet</td></tr>
-            <tr><td><code>workspace:admin</code></td><td>Manage members, invites, workspace metadata</td><td>PAT creation</td></tr>
+            <tr><td><code>Equivalence Partitioning</code></td><td>Test-design technique that produced the ATC (EP)</td><td>"Technique" field and "All techniques" filter; null = "Not specified"</td></tr>
+            <tr><td><code>Boundary Value Analysis</code></td><td>Same (BVA)</td><td>Same</td></tr>
+            <tr><td><code>State Transition</code></td><td>Same</td><td>Same</td></tr>
+            <tr><td><code>Decision Table</code></td><td>Same</td><td>Same</td></tr>
+            <tr><td><code>Pairwise</code></td><td>Same</td><td>Same</td></tr>
+          </tbody>
+        </table>
+
+        <h3>ATC priority · <code>atcs.priority</code> (<code>supabase/migrations/0087_atc_classification.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>Critical</code></td><td>Must run even when nothing else can</td><td>"Priority" field and "All priorities" filter; null = "Not specified"; not Bug Severity</td></tr>
+            <tr><td><code>High</code></td><td>High importance</td><td>Same</td></tr>
+            <tr><td><code>Medium</code></td><td>Medium importance</td><td>Same</td></tr>
+            <tr><td><code>Low</code></td><td>Low importance</td><td>Same</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Reserved suite tag · <code>tests.tags</code> (<code>supabase/migrations/0030_test_tags.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>smoke</code></td><td>Runs first as a go / no-go gate</td><td>"Suites:" quick-add; lower-cased on write; custom tags coexist</td></tr>
+            <tr><td><code>sanity</code></td><td>Narrow post-change check</td><td>Same</td></tr>
+            <tr><td><code>regression</code></td><td>Part of the regression suite</td><td>Same</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Run status · <code>runs.status</code> (<code>supabase/migrations/0031_runs.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>running</code></td><td>In progress; the only state that accepts marks</td><td>"Running"; Home active runs</td></tr>
+            <tr><td><code>passed</code></td><td>Closed with the executor's passed verdict</td><td>"Passed"; terminal</td></tr>
+            <tr><td><code>failed</code></td><td>Closed with the executor's failed verdict</td><td>"Failed"; terminal</td></tr>
+            <tr><td><code>aborted</code></td><td>Stopped with a reason, by a person or the inactivity sweep</td><td>"Aborted"; terminal; requires <code>abort_reason</code></td></tr>
+          </tbody>
+        </table>
+
+        <h3>Run executor mode · <code>runs.executor_mode</code> (<code>supabase/migrations/0031_runs.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>human</code></td><td>A person executed it</td><td>Always for a browser start; "Human" in run lists, "Manual" on Home</td></tr>
+            <tr><td><code>agent</code></td><td>An AI agent executed it</td><td>Declared by a token caller; "Agent"</td></tr>
+            <tr><td><code>ci</code></td><td>A CI pipeline executed it</td><td>Declared by a token caller; "CI"</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Run step status · <code>run_atcs.status</code>, <code>run_steps.status</code> (<code>supabase/migrations/0031_runs.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>pending</code></td><td>Not marked yet (default)</td><td>Rendered "Unrun"; never accepted as a mark</td></tr>
+            <tr><td><code>passed</code></td><td>Step or position passed</td><td>Mark "Pass"; counts as executed coverage</td></tr>
+            <tr><td><code>failed</code></td><td>Step or position failed</td><td>Mark "Fail"; counts as executed coverage; a bug can be filed</td></tr>
+            <tr><td><code>blocked</code></td><td>Could not be exercised</td><td>Mark "Block"; reads as not run in coverage</td></tr>
+            <tr><td><code>skipped</code></td><td>Never exercised: the Run closed first</td><td>Set by finish, abort or sweep only; reads as not run</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Bug severity · <code>bugs.severity</code> (<code>supabase/migrations/0046_bugs.sql</code>, <code>lib/bugs/constants.ts</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>P1</code></td><td>Critical</td><td>Rendered "Critical"; Home open bugs by severity</td></tr>
+            <tr><td><code>P2</code></td><td>Major</td><td>Rendered "Major"</td></tr>
+            <tr><td><code>P3</code></td><td>Minor</td><td>Rendered "Minor"</td></tr>
+            <tr><td><code>P4</code></td><td>Trivial</td><td>Rendered "Trivial"</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Bug status · <code>bugs.status</code> (<code>supabase/migrations/0046_bugs.sql</code>, <code>supabase/migrations/0054_bug_assignment_status.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>open</code></td><td>Filed, not being worked (default)</td><td>"Open"; next action "Start progress"</td></tr>
+            <tr><td><code>in_progress</code></td><td>Being fixed</td><td>"In progress"; next action "Mark resolved"</td></tr>
+            <tr><td><code>resolved</code></td><td>Fixed, awaiting confirmation</td><td>"Resolved"; next action "Close"</td></tr>
+            <tr><td><code>closed</code></td><td>Done</td><td>"Closed"; terminal. One step forward at a time, never back</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Test plan status · <code>test_plans.status</code> (<code>supabase/migrations/0073_test_plans.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>open</code></td><td>Editable plan (default)</td><td>Chip "Open"</td></tr>
+            <tr><td><code>closed</code></td><td>Read-only, finished plan</td><td>Chip "Closed"; no path in the product sets it</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Import job status · <code>import_jobs.status</code> (<code>supabase/migrations/0019_import_jobs.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>queued</code></td><td>Requested, not started (default)</td><td>"Import from Jira" polling; one queued or running per project</td></tr>
+            <tr><td><code>running</code></td><td>Paging Jira</td><td>Same</td></tr>
+            <tr><td><code>completed</code></td><td>Finished; counts and per-issue errors recorded</td><td>Toast "Import completed"</td></tr>
+            <tr><td><code>failed</code></td><td>Stopped by a Jira auth error or unexpected failure</td><td>Toast "Import failed"</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Workspace export status · <code>workspace_exports.status</code> (<code>supabase/migrations/0083_workspace_data_export.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>queued</code></td><td>Requested (default)</td><td>"Export status"; one queued or running per workspace</td></tr>
+            <tr><td><code>running</code></td><td>Being prepared</td><td>Same</td></tr>
+            <tr><td><code>completed</code></td><td>Archive ready for 168 hours</td><td>"Download archive"</td></tr>
+            <tr><td><code>failed</code></td><td>Could not be prepared</td><td>"The export failed to prepare."</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Checkout session status · <code>billing_checkout_sessions.status</code> (<code>supabase/migrations/0077_billing_upgrade_checkout.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>open</code></td><td>Owner is on Stripe's payment page</td><td>At most one per workspace</td></tr>
+            <tr><td><code>completed</code></td><td>Paid; workspace moved to Cloud</td><td>Stripe webhook</td></tr>
+            <tr><td><code>expired</code></td><td>Stripe session expired or delayed payment failed</td><td>Stripe webhook; no plan change</td></tr>
+            <tr><td><code>canceled</code></td><td>Owner returned from Stripe's cancel page</td><td>No plan change</td></tr>
+          </tbody>
+        </table>
+        <p>Its <code>target_plan</code> accepts only <code>cloud</code>.</p>
+
+        <h3>Notification event type · <code>notifications.event_type</code> (<code>supabase/migrations/0056_bug_event_notifications.sql</code>, <code>supabase/migrations/0066_run_event_notifications.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>run.finished</code></td><td>Your Run closed with a verdict</td><td>To the starter; family run_lifecycle</td></tr>
+            <tr><td><code>run.aborted</code></td><td>Your Run was aborted (by a person or the sweep)</td><td>Same</td></tr>
+            <tr><td><code>bug.assigned</code></td><td>A bug was assigned to you</td><td>To the new assignee; family bug_lifecycle</td></tr>
+            <tr><td><code>bug.reassigned</code></td><td>A bug moved to you from someone else</td><td>Same</td></tr>
+            <tr><td><code>bug.status_changed</code></td><td>A bug you reported or own changed status</td><td>To reporter and assignee, never the changer</td></tr>
+          </tbody>
+        </table>
+        <p>No CHECK constraint: these are the values the two notification triggers produce.</p>
+
+        <h3>Notification preference event type and channel · <code>notification_preferences</code> (<code>supabase/migrations/0062_notification_preferences.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>run_lifecycle</code></td><td>Run finished or aborted</td><td>Row "Run lifecycle"</td></tr>
+            <tr><td><code>bug_lifecycle</code></td><td>Bug assignment and status</td><td>Row "Bug lifecycle"</td></tr>
+            <tr><td><code>mentions</code></td><td>Mentions (no feature yet)</td><td>Row "Mentions", locked off</td></tr>
+            <tr><td><code>in_app</code> (channel)</td><td>Inbox</td><td>Column "In-app"; stored, not applied</td></tr>
+            <tr><td><code>email</code> (channel)</td><td>Daily email digest</td><td>Column "Email"; filters the digest</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Digest status · <code>notification_digest_log.status</code> (<code>supabase/migrations/0078_notification_digest_log.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>pending</code></td><td>Day claimed, email being sent (default)</td><td>Blocks a second send that day</td></tr>
+            <tr><td><code>sent</code></td><td>Email delivered to Resend</td><td>Digest run</td></tr>
+            <tr><td><code>failed</code></td><td>Send failed; not retried</td><td>Digest run</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Token scope · <code>access_tokens.scopes</code> (<code>supabase/migrations/0008_access_tokens.sql</code>, <code>lib/api/pat.ts</code>, <code>app/qa/qa-config.ts</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>atc:read</code></td><td>Read ATCs and the authoring tree</td><td>PAT creation; default on headless sign-in</td></tr>
+            <tr><td><code>atc:write</code></td><td>Create and update authoring content</td><td>PAT creation; default on headless sign-in</td></tr>
+            <tr><td><code>run:execute</code></td><td>Start Runs, mark steps, finish or abort</td><td>PAT creation; default on headless sign-in</td></tr>
+            <tr><td><code>workspace:admin</code></td><td>Manage members, invites, workspace metadata, billing checkout</td><td>Only for a token bound to a workspace where the owner is admin or owner; never via headless sign-in</td></tr>
           </tbody>
         </table>
 
@@ -550,20 +991,72 @@
             <tr><td><code>workspace</code></td><td>Applies to one workspace</td><td>Schema only</td></tr>
           </tbody>
         </table>
+
+        <h3>Computed: coverage state (<code>supabase/migrations/0090_project_coverage_skipped_blocked_not_run.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>uncovered</code></td><td>Criterion with no live ATC of the project bound</td><td>Per criterion; authoring gap</td></tr>
+            <tr><td><code>not_run</code></td><td>A bound ATC's latest result is not passed or failed (none, pending, skipped, blocked)</td><td>Per criterion; execution gap; "Never run"</td></tr>
+            <tr><td><code>executed</code></td><td>Every bound ATC's latest result is passed or failed</td><td>Per criterion</td></tr>
+            <tr><td><code>no_acs</code></td><td>Module with no criteria</td><td>Per module</td></tr>
+            <tr><td><code>uncovered</code> / <code>not_run</code></td><td>Module with at least one criterion in that state (uncovered wins)</td><td>Per module</td></tr>
+            <tr><td><code>fully_covered</code></td><td>Every criterion of the module executed</td><td>Per module</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Computed: traceability run state (<code>supabase/migrations/0069_story_traceability_module.sql</code>, <code>lib/traceability/chain-view.ts</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>in_flight</code></td><td>Run still running or ATC still pending</td><td>Chip "Running"</td></tr>
+            <tr><td><code>aborted</code></td><td>The Run was aborted</td><td>Chip "Aborted"</td></tr>
+            <tr><td><code>passed</code> / <code>failed</code> / <code>blocked</code> / <code>skipped</code></td><td>The ATC's result in that Run</td><td>Chips "Pass", "Fail", "Blocked", "Skipped"</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Computed: recovery cycle state (<code>supabase/migrations/0049_recovery_cycle_report.sql</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>no_cycle</code></td><td>The story never failed</td><td>"No cycle · never failed"</td></tr>
+            <tr><td><code>in_progress</code></td><td>Failed, no fully passing run since</td><td>"Not yet green"</td></tr>
+            <tr><td><code>recovered</code></td><td>Failed, then fully passed later</td><td>"Recovered"; feeds the median</td></tr>
+          </tbody>
+        </table>
+
+        <h3>Computed: defect heatmap window, heat bucket, trend (<code>supabase/migrations/0052_defect_heatmap_report.sql</code>, <code>lib/metrics/defect-heatmap.ts</code>)</h3>
+        <table>
+          <thead><tr><th>Value</th><th>Business meaning</th><th>Usage context</th></tr></thead>
+          <tbody>
+            <tr><td><code>7d</code> / <code>30d</code> / <code>90d</code></td><td>Rolling window of bugs counted</td><td>"Window" selector</td></tr>
+            <tr><td><code>clean</code></td><td>0 bugs in the window</td><td>"Clean"</td></tr>
+            <tr><td><code>low</code></td><td>1 to 2 bugs</td><td>"Low"</td></tr>
+            <tr><td><code>elevated</code></td><td>3 to 4 bugs</td><td>"Elevated"</td></tr>
+            <tr><td><code>hotspot</code></td><td>More than 4 bugs</td><td>"Hotspot"</td></tr>
+            <tr><td><code>rising</code> / <code>falling</code> / <code>flat</code></td><td>Last 7 days vs the prior 7</td><td>"Rising", "Falling", "Flat"</td></tr>
+          </tbody>
+        </table>
       </section>
 
-      <section id="discovery-gaps" data-sources="supabase/migrations/,app/,.context/business/business-model.md,.context/PRD/executive-summary.md,.context/PBI/epic-tree.md" data-updated="2026-10-02">
+      <section id="discovery-gaps" data-sources="supabase/migrations/,app/,lib/,components/,.context/business/business-model.md,.context/business/domain-glossary.md,.context/PRD/executive-summary.md,lib/billing/plan-tiers.ts" data-updated="2026-10-13">
         <h2>Discovery gaps</h2>
-        <p>The following items could not be verified from code and require human confirmation:</p>
+        <p>The following items could not be verified from code, or code and docs disagree, and require human confirmation:</p>
         <ul>
-          <li><strong>Tests, Runs, Bugs are not in the schema.</strong> The docs and the backlog (epics for tests as chains of ATCs, manual execution runs, bugs and defect heatmap, coverage and traceability) describe them, and the UI shows a "New Test" button, but no table or route exists at <code>e88512e</code>. No <code>term-</code> section was written for them. Source: Jira project <code>BK</code> and the target's later branches.</li>
-          <li><strong>ATC expansion conflict.</strong> "Atomic Test Component" (<code>app/layout.tsx</code>, product docs) vs "Acceptance Test Case" (<code>supabase/migrations/0004_atcs.sql</code> header). Which one the team uses in tickets is unconfirmed.</li>
-          <li><strong>No creation UI for authoring entities.</strong> No page, action or API route inserts projects, modules, user stories, acceptance criteria or ATCs; the "New ATC" and "New Test" buttons have no handler, and <code>bunkai_save_atc</code> only updates an existing ATC. How data enters the system (seed scripts, direct SQL) is unknown.</li>
-          <li><strong>Revenue Streams and Cost Structure</strong> rest on the business doc only (Low confidence); no billing, pricing or plan gating in code.</li>
-          <li><strong>Unused schema.</strong> <code>activity_log</code>, <code>feature_flags</code> and <code>user_view_state</code> have no reader or writer in app code; which endpoints require an idempotency key is unverified.</li>
-          <li><strong>Member status values</strong> <code>invited</code> and <code>suspended</code> are declared but never set by code; their business meaning is inferred from the names.</li>
+          <li><strong>Docs ahead of code.</strong> The product glossary (<code>.context/business/domain-glossary.md</code>, last code-synced at <code>4924f48</code>) defines terms with no table, route or screen at <code>98ee1b4</code>: Channel, Message, Mention, Rich Link, Execution Mode (<code>manual</code> / <code>automated</code>), Automation Status (<code>manual-only</code> / <code>candidate</code> / <code>automated</code>), CI Results File, Subscription, Invoice, and a one-way bug sync to Jira. No <code>term-</code> section was written for them. Whether they are still planned is a product question.</li>
+          <li><strong>Glossary vs code on environments.</strong> The product glossary says Staging and Production are seeded per project; the code seeded them only once, for projects that existed when runs shipped (<code>supabase/migrations/0031_runs.sql</code>), and new projects start with none, so they cannot run a Test until someone adds an environment. Intended behaviour unconfirmed.</li>
+          <li><strong>Dead execution status on ATCs.</strong> <code>atcs.status</code> is displayed (status dot, sidebar filter "fail / blocked / unrun") but never written, so it always reads <code>unrun</code> even after Runs. Whether it should mirror the latest run result is unconfirmed.</li>
+          <li><strong>Assertions are not part of a Run.</strong> Runs snapshot ATC steps only; assertions are neither copied nor shown in the runner, although the editor describes them as "checked by every executor". How an executor is meant to apply them is unconfirmed.</li>
+          <li><strong>Limits shown but not enforced.</strong> Seat and retention limits appear as usage meters; invites and acceptance do not check seats and nothing deletes old runs. Only the project limit blocks. Whether enforcement is planned is a product question.</li>
+          <li><strong>Billing lifecycle.</strong> Only the Cloud upgrade exists. No downgrade, cancellation, renewal, failed-renewal or invoice handling; Enterprise has no path that sets it. Revenue figures beyond the per-seat price are not in code.</li>
+          <li><strong>Unreachable values.</strong> Test plan <code>closed</code>, member status <code>invited</code> and <code>suspended</code>, and the <code>mentions</code> preference have no path that sets or uses them; their meaning is inferred from names and docs.</li>
+          <li><strong>In-app preference has no effect.</strong> The "In-app" switch is stored but notification producers ignore it; only "Email" filters the digest.</li>
+          <li><strong>Milestone to Test Plan link.</strong> The milestone screen says attaching plans "arrives with a later capability"; nothing links them yet.</li>
+          <li><strong>Label drift (unruled).</strong> Executor <code>human</code> renders "Human" in run lists and "Manual" on Home; a bound-but-never-run criterion renders "Never run" on Metrics and "awaiting execution" on Home; run verdicts render "Passed" / "Pass". Recorded as unruled in the product glossary §5. The global sidebar entries ATC Library, Test Runs, Bug Reports and Metrics have no link of their own.</li>
+          <li><strong>Unused schema.</strong> <code>feature_flags</code> and <code>user_view_state</code> still have no reader or writer in app code.</li>
+          <li><strong>Structure pointers on unchanged sections.</strong> <code>term-feature-flag</code> and <code>term-view-state</code> were left byte-identical and still read "pending (data map placeholder)"; the <code>business-data-context</code> map now exists and holds both in its <code>entities</code> section.</li>
+          <li><strong>Revenue Streams and Cost Structure</strong> beyond the Cloud price rest on the business doc only (Low confidence).</li>
           <li><strong>No i18n bundle.</strong> UI labels come from component JSX; the QA guide page (<code>app/qa/</code>) is in Spanish while the app UI is in English. Confirm the product's official UI language.</li>
-          <li><strong>Structure pointers.</strong> Every term's attributes, relationships and lifecycle (ATC status, invite lifecycle, token lifecycle) belong to the <code>business-data-context</code> map, which is still a placeholder. Generate it with <code>project-context</code> mode <code>data</code>, then point each term at its section.</li>
           <li><strong>Diagrams.</strong> No figure drawn: this map is tables by design (figures are optional here); a relationship overview can be added later after the <code>diagrams</code> capability check.</li>
         </ul>
       </section>

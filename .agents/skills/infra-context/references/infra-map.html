@@ -96,27 +96,31 @@
       <h1>Infra map</h1>
       <p class="muted">
         How Bunkai TMS is built and the non-functional budgets it holds, reverse-engineered from the product code of
-        <code>upex-bunkai-tms</code> at <code>main</code> commit <code>e88512e</code> (read-only snapshot). Paths are relative to
-        that repo. Phase 2 sections (architecture, external services, NFRs) are below; the Phase 3 sections (backend, frontend,
-        environments, CI/CD) are added by <code>project-discovery</code> Phase 3. Design-time intent from the target
-        <code>.context/SRS/</code> is quoted only where labelled as intent: it is not evidence of implementation.
+        <code>upex-bunkai-tms</code> at <code>staging</code> commit <code>98ee1b4</code> (read-only snapshot). Paths are relative to
+        that repo. At that point the production branch <code>main</code> still sits at <code>e88512e</code>, an ancestor of
+        <code>staging</code>: this map describes what staging runs, and the <code>environments</code> section says what that means
+        for production. Phase 2 sections (architecture, external services, background jobs, NFRs) come first, then the Phase 3
+        sections (backend, frontend, environments, CI/CD). Design-time intent from the target <code>.context/SRS/</code> is quoted
+        only where labelled as intent: it is not evidence of implementation.
       </p>
 
       <section
         id="overview"
-        data-sources="package.json,next.config.ts,middleware.ts,app/,lib/,supabase/migrations/,lib/urls.ts"
-        data-updated="2026-10-02"
+        data-sources="package.json,next.config.ts,vercel.json,middleware.ts,app/,lib/,supabase/migrations/,lib/urls.ts,.agents/project.yaml"
+        data-updated="2026-10-13"
       >
         <h2>Overview</h2>
         <p>
           Bunkai is a single Next.js App Router application that serves both the web UI and a versioned REST API
-          (<code>app/api/v1/**</code>) from one deployable, backed entirely by Supabase (Postgres with Row Level Security, plus
-          Supabase Auth). There is no separate backend service, no ORM, no queue and no cache tier: server components, one Server
-          Action and the route handlers talk to Supabase directly through <code>@supabase/ssr</code> /
-          <code>@supabase/supabase-js</code>. Multi-row writes go through Postgres functions (<code>bunkai_*</code> RPCs). The
-          pattern is a feature-light modular monolith: <code>app/</code> owns routing and pages, <code>lib/api/</code> the API
-          cross-cutting concerns (auth, error envelope, logging, idempotency), <code>lib/supabase/</code> the data clients, and
-          <code>supabase/migrations/</code> the schema, policies and functions.
+          (<code>app/api/v1/**</code>, 107 handlers) from one Vercel deployable, backed by one Supabase project (Postgres with Row
+          Level Security, Auth, Realtime, Storage and <code>pg_cron</code>). There is still no separate backend service, no ORM,
+          no queue and no cache tier. Business rules live in Postgres functions (<code>bunkai_*</code> RPCs) and RLS; route
+          handlers parse, authenticate, call one RPC or an RLS-checked query, and map errors. Work that outlives a request runs in
+          Next.js <code>after()</code> callbacks (Jira import, workspace export, deletion emails), in two <code>pg_cron</code> jobs
+          inside the database, and in one Vercel Cron call. Three SaaS integrations sit behind optional env keys: Stripe
+          (billing upgrade), Resend (outbound email) and Jira Cloud (story import). The pattern is a modular monolith organised by
+          domain under <code>lib/</code> (runs, bugs, billing, notifications, coverage, workspace export and deletion, and more),
+          with <code>app/</code> owning routing and pages.
         </p>
         <div class="table-wrap">
           <table>
@@ -124,34 +128,38 @@
               <tr><th>Layer</th><th>Technology</th><th>Found in</th></tr>
             </thead>
             <tbody>
-              <tr><td>UI</td><td>Next.js 15 App Router, React 19, Tailwind 3, Radix / shadcn-style primitives, TanStack Table, Monaco, cmdk, sonner</td><td><code>package.json</code>, <code>app/</code>, <code>components/</code></td></tr>
-              <tr><td>API</td><td>Next.js Route Handlers wrapped by <code>withApiHandler</code>, zod 4 validation, OpenAPI generated from zod (<code>@asteasolutions/zod-to-openapi</code>), Scalar docs UI</td><td><code>app/api/v1/**</code>, <code>lib/api/handler.ts</code>, <code>lib/openapi/registry.ts</code>, <code>app/api/docs/page.tsx</code></td></tr>
-              <tr><td>Auth</td><td>Supabase Auth (cookie session via <code>@supabase/ssr</code>, magic-link OTP, email + password) plus Bunkai Personal Access Tokens <code>bk_pat_*</code></td><td><code>middleware.ts</code>, <code>lib/api/auth.ts</code>, <code>lib/api/middleware/bearer.ts</code>, <code>lib/api/pat.ts</code></td></tr>
-              <tr><td>Data</td><td>Supabase Postgres, RLS on every table, SECURITY DEFINER helper functions, plpgsql RPCs</td><td><code>supabase/migrations/</code></td></tr>
-              <tr><td>Hosting</td><td>Vercel (environment derived from <code>VERCEL_ENV</code>); no <code>vercel.json</code> in the repo</td><td><code>lib/urls.ts</code></td></tr>
-              <tr><td>Runtime tooling</td><td>Bun scripts, TypeScript strict</td><td><code>package.json</code>, <code>tsconfig.json</code></td></tr>
+              <tr><td>UI</td><td>Next.js 15 App Router, React 19, Tailwind 3, Radix / shadcn-style primitives, TanStack Table, Monaco, cmdk, sonner, dnd-kit, react-markdown with rehype-sanitize</td><td><code>package.json</code>, <code>app/</code>, <code>components/</code></td></tr>
+              <tr><td>API</td><td>Next.js Route Handlers wrapped by <code>withApiHandler</code> with a declared auth posture per handler, zod 4 validation, OpenAPI generated from zod (<code>@asteasolutions/zod-to-openapi</code>), Scalar docs UI</td><td><code>app/api/v1/**</code>, <code>lib/api/handler.ts</code>, <code>lib/openapi/registry.ts</code>, <code>app/api/docs/page.tsx</code></td></tr>
+              <tr><td>Auth</td><td>Supabase Auth (cookie session via <code>@supabase/ssr</code>; email + password with an emailed code, magic link, GitHub and Google OAuth) plus Bunkai Personal Access Tokens <code>bk_pat_*</code> with enforced scopes</td><td><code>middleware.ts</code>, <code>app/auth/</code>, <code>lib/api/principal.ts</code>, <code>lib/api/pat.ts</code></td></tr>
+              <tr><td>Data</td><td>Supabase Postgres, RLS on every table, SECURITY DEFINER helpers, plpgsql RPCs, 14 triggers, <code>pg_cron</code>; Realtime publication on 3 tables; private Storage bucket <code>workspace-exports</code></td><td><code>supabase/migrations/</code> (89 SQL files)</td></tr>
+              <tr><td>Background work</td><td><code>after()</code> callbacks, 2 <code>pg_cron</code> jobs, 1 Vercel Cron entry</td><td><code>app/api/v1/imports/route.ts</code>, <code>supabase/migrations/0075_run_inactivity_sweep.sql</code>, <code>supabase/migrations/0084_workspace_deletion.sql</code>, <code>vercel.json</code></td></tr>
+              <tr><td>Integrations</td><td><code>stripe</code> 22, <code>resend</code> 6, Jira REST over <code>fetch</code></td><td><code>lib/billing/stripe.ts</code>, <code>lib/mail/resend-client.ts</code>, <code>lib/jira/client.ts</code></td></tr>
+              <tr><td>Hosting</td><td>Vercel; environment derived from <code>VERCEL_ENV</code>; <code>vercel.json</code> holds only the cron entry</td><td><code>lib/urls.ts</code>, <code>vercel.json</code></td></tr>
+              <tr><td>Runtime tooling</td><td>Bun (scripts and <code>bun test</code>), TypeScript strict</td><td><code>package.json</code>, <code>tsconfig.json</code></td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          Deployment shape: one Vercel project per environment URL (<code>lib/urls.ts</code> maps <code>VERCEL_ENV=production</code>
-          to production, <code>preview</code> to staging, anything else to local) talking to a hosted Supabase project. The same
-          facts in short form live in <code>.context/project-config.md</code> §Tech Stack of this QA repo.
+          Deployment shape: one Vercel project serving production from <code>main</code> and staging from <code>staging</code>
+          (<code>lib/urls.ts</code> maps <code>VERCEL_ENV=production</code> to production, <code>preview</code> to staging, anything
+          else to local), and one Supabase project behind all three environments (the product's own
+          <code>.agents/project.yaml</code> declares single-project tenancy for the MVP). The same facts in short form live in
+          <code>.context/project-config.md</code> §Tech Stack of this QA repo.
         </p>
       </section>
 
       <section
         id="architecture"
-        data-sources="middleware.ts,app/(app)/,app/(auth)/login/,app/auth/callback/route.ts,app/api/v1/,lib/api/,lib/supabase/,supabase/migrations/,components/providers/auth-context.tsx"
-        data-updated="2026-10-02"
+        data-sources="middleware.ts,app/(app)/,app/(auth)/login/,app/auth/,app/api/v1/,lib/api/,lib/supabase/,lib/billing/,lib/mail/,lib/jira/,lib/runs/realtime-run-channel.ts,lib/notifications/realtime-notifications-channel.ts,supabase/migrations/,vercel.json,.context/ADR/"
+        data-updated="2026-10-13"
       >
         <h2>Architecture</h2>
 
         <figure data-diagram="architecture" data-for="architecture">
           <div class="svg-wrap">
-            <svg viewBox="0 0 1000 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="infra-architecture-title infra-architecture-desc">
+            <svg viewBox="0 0 1000 640" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="infra-architecture-title infra-architecture-desc">
               <title id="infra-architecture-title">Bunkai TMS containers and request paths</title>
-              <desc id="infra-architecture-desc">Browsers and CLI or agent callers reach one Next.js app on Vercel, whose middleware, UI and API route handlers talk to Supabase Auth and to Postgres guarded by Row Level Security.</desc>
+              <desc id="infra-architecture-desc">Browsers, API clients and Vercel Cron call one Next.js app on Vercel, which talks to Supabase Auth, Postgres, Realtime and Storage, starts Stripe checkouts, receives Stripe webhooks and sends work to Resend and Jira Cloud; Realtime pushes run and inbox changes back to the browser.</desc>
               <defs>
                 <pattern id="infra-dots" width="22" height="22" patternUnits="userSpaceOnUse">
                   <circle cx="1" cy="1" r="0.9" fill="rgba(45,49,66,0.10)" />
@@ -165,118 +173,146 @@
               <rect width="100%" height="100%" fill="url(#infra-dots)" opacity="0.55" />
 
               <!-- Zones -->
-              <rect x="220" y="88" width="400" height="320" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8" />
-              <rect x="364" y="92" width="112" height="12" rx="2" fill="#f5f5f5" />
-              <text x="420" y="101" fill="rgba(45,49,66,0.40)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">VERCEL · NEXT.JS APP</text>
+              <rect x="240" y="88" width="320" height="352" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8" />
+              <rect x="344" y="92" width="112" height="12" rx="2" fill="#f5f5f5" />
+              <text x="400" y="101" fill="rgba(45,49,66,0.40)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">VERCEL · NEXT.JS APP</text>
 
-              <rect x="700" y="88" width="240" height="320" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8" />
-              <rect x="790" y="92" width="60" height="12" rx="2" fill="#f5f5f5" />
-              <text x="820" y="101" fill="rgba(45,49,66,0.40)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">SUPABASE</text>
+              <rect x="680" y="88" width="280" height="352" rx="8" fill="rgba(45,49,66,0.02)" stroke="rgba(45,49,66,0.10)" stroke-width="0.8" />
+              <rect x="772" y="92" width="96" height="12" rx="2" fill="#f5f5f5" />
+              <text x="820" y="101" fill="rgba(45,49,66,0.40)" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.14em">SUPABASE PROJECT</text>
 
               <!-- Arrows (before boxes) -->
-              <line x1="168" y1="152" x2="240" y2="152" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#infra-arrow-link)" />
-              <line x1="384" y1="152" x2="440" y2="152" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#infra-arrow)" />
-              <path d="M 312,120 V 80 Q 312,72 320,72 H 872 Q 880,72 880,80 V 120" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#infra-arrow)" />
-              <path d="M 312,184 V 332 Q 312,340 320,340 H 440" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#infra-arrow)" />
-              <line x1="168" y1="364" x2="440" y2="364" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#infra-arrow-link)" />
-              <path d="M 600,172 H 652 Q 660,172 660,180 V 332 Q 660,340 668,340 H 720" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#infra-arrow)" />
-              <line x1="600" y1="364" x2="720" y2="364" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#infra-arrow-accent)" />
-              <path d="M 560,320 V 260 Q 560,252 568,252 H 652 a 8,8 0 0,1 16,0 H 752 Q 760,252 760,244 V 184" fill="none" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#infra-arrow)" />
+              <line x1="168" y1="136" x2="280" y2="136" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#infra-arrow-link)" />
+              <line x1="168" y1="264" x2="280" y2="264" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#infra-arrow-link)" />
+              <line x1="168" y1="392" x2="280" y2="392" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#infra-arrow-link)" />
+              <line x1="520" y1="136" x2="700" y2="136" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#infra-arrow)" />
+              <line x1="520" y1="264" x2="700" y2="264" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#infra-arrow-accent)" />
+              <line x1="520" y1="392" x2="700" y2="392" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#infra-arrow)" />
+              <path d="M 940,384 H 968 Q 976,384 976,376 V 64 Q 976,56 968,56 H 112 Q 104,56 104,64 V 104" fill="none" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#infra-arrow)" />
+              <line x1="316" y1="424" x2="316" y2="488" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#infra-arrow-link)" />
+              <line x1="400" y1="488" x2="400" y2="424" stroke="#2e5aa8" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#infra-arrow-link)" />
+              <line x1="484" y1="424" x2="484" y2="488" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#infra-arrow-link)" />
 
               <!-- Arrow labels -->
-              <rect x="180" y="132" width="48" height="12" rx="2" fill="#f5f5f5" />
-              <text x="204" y="141" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">HTTPS</text>
-              <rect x="560" y="52" width="56" height="12" rx="2" fill="#f5f5f5" />
-              <text x="588" y="61" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">GETUSER</text>
-              <rect x="322" y="252" width="44" height="12" rx="2" fill="#f5f5f5" />
-              <text x="344" y="261" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">COOKIE</text>
-              <rect x="180" y="344" width="68" height="12" rx="2" fill="#f5f5f5" />
-              <text x="214" y="353" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">BEARER PAT</text>
-              <rect x="668" y="196" width="48" height="12" rx="2" fill="#f5f5f5" />
-              <text x="692" y="205" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">RLS RPC</text>
-              <rect x="636" y="372" width="52" height="12" rx="2" fill="#f5f5f5" />
-              <text x="662" y="381" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">QUERIES</text>
-              <rect x="576" y="232" width="68" height="12" rx="2" fill="#f5f5f5" />
-              <text x="610" y="241" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AUTH CALLS</text>
+              <rect x="184" y="116" width="80" height="12" rx="2" fill="#f5f5f5" />
+              <text x="224" y="125" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">HTTPS COOKIE</text>
+              <rect x="190" y="244" width="68" height="12" rx="2" fill="#f5f5f5" />
+              <text x="224" y="253" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">BEARER PAT</text>
+              <rect x="186" y="372" width="76" height="12" rx="2" fill="#f5f5f5" />
+              <text x="224" y="381" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CRON_SECRET</text>
+              <rect x="582" y="116" width="56" height="12" rx="2" fill="#f5f5f5" />
+              <text x="610" y="125" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">GETUSER</text>
+              <rect x="578" y="244" width="64" height="12" rx="2" fill="#f5f5f5" />
+              <text x="610" y="253" fill="#eb6c36" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">RLS · RPC</text>
+              <rect x="574" y="372" width="72" height="12" rx="2" fill="#f5f5f5" />
+              <text x="610" y="381" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EXPORT ZIP</text>
+              <rect x="494" y="34" width="92" height="12" rx="2" fill="#f5f5f5" />
+              <text x="540" y="43" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">REALTIME PUSH</text>
+              <rect x="248" y="450" width="60" height="12" rx="2" fill="#f5f5f5" />
+              <text x="278" y="459" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">CHECKOUT</text>
+              <rect x="408" y="450" width="56" height="12" rx="2" fill="#f5f5f5" />
+              <text x="436" y="459" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">WEBHOOK</text>
+              <rect x="492" y="450" width="84" height="12" rx="2" fill="#f5f5f5" />
+              <text x="534" y="459" fill="#2e5aa8" font-size="8" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">MAIL · IMPORT</text>
 
               <!-- Node: Browser -->
-              <rect x="40" y="120" width="128" height="64" rx="6" fill="#f5f5f5" />
-              <rect x="40" y="120" width="128" height="64" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1" />
-              <rect x="48" y="128" width="32" height="12" rx="2" fill="transparent" stroke="rgba(122,131,153,0.40)" stroke-width="0.8" />
-              <text x="64" y="137" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">USER</text>
-              <text x="104" y="158" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Browser</text>
-              <text x="104" y="174" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">magic-link session</text>
+              <rect x="40" y="104" width="128" height="64" rx="6" fill="#f5f5f5" />
+              <rect x="40" y="104" width="128" height="64" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1" />
+              <rect x="48" y="112" width="32" height="12" rx="2" fill="transparent" stroke="rgba(122,131,153,0.40)" stroke-width="0.8" />
+              <text x="64" y="121" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">USER</text>
+              <text x="104" y="142" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Browser</text>
+              <text x="104" y="158" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">sb-* session cookie</text>
 
-              <!-- Node: CLI / agent / test -->
-              <rect x="40" y="320" width="128" height="64" rx="6" fill="#f5f5f5" />
-              <rect x="40" y="320" width="128" height="64" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1" />
-              <rect x="48" y="328" width="28" height="12" rx="2" fill="transparent" stroke="rgba(122,131,153,0.40)" stroke-width="0.8" />
-              <text x="62" y="337" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
-              <text x="104" y="358" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">API client</text>
-              <text x="104" y="374" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">CLI · agent · test</text>
+              <!-- Node: API client -->
+              <rect x="40" y="232" width="128" height="64" rx="6" fill="#f5f5f5" />
+              <rect x="40" y="232" width="128" height="64" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1" />
+              <rect x="48" y="240" width="28" height="12" rx="2" fill="transparent" stroke="rgba(122,131,153,0.40)" stroke-width="0.8" />
+              <text x="62" y="249" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EXT</text>
+              <text x="104" y="270" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">API client</text>
+              <text x="104" y="286" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">CLI · agent · test</text>
 
-              <!-- Node: Middleware -->
-              <rect x="240" y="120" width="144" height="64" rx="6" fill="#f5f5f5" />
-              <rect x="240" y="120" width="144" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1" />
-              <rect x="248" y="128" width="32" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8" />
-              <text x="264" y="137" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">EDGE</text>
-              <text x="312" y="158" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Middleware</text>
-              <text x="312" y="174" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">middleware.ts</text>
+              <!-- Node: Vercel Cron -->
+              <rect x="40" y="360" width="128" height="64" rx="6" fill="#f5f5f5" />
+              <rect x="40" y="360" width="128" height="64" rx="6" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1" />
+              <rect x="48" y="368" width="32" height="12" rx="2" fill="transparent" stroke="rgba(122,131,153,0.40)" stroke-width="0.8" />
+              <text x="64" y="377" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SYS</text>
+              <text x="104" y="398" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Vercel Cron</text>
+              <text x="104" y="414" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">08:00 UTC · prod only</text>
 
-              <!-- Node: App UI -->
-              <rect x="440" y="120" width="160" height="64" rx="6" fill="#f5f5f5" />
-              <rect x="440" y="120" width="160" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1" />
-              <rect x="448" y="128" width="28" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8" />
-              <text x="462" y="137" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">RSC</text>
-              <text x="520" y="158" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">App UI</text>
-              <text x="520" y="174" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">app/(app) · actions.ts</text>
-
-              <!-- Node: API route handlers (focal) -->
-              <rect x="440" y="320" width="160" height="64" rx="6" fill="#f5f5f5" />
-              <rect x="440" y="320" width="160" height="64" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1" />
-              <rect x="448" y="328" width="28" height="12" rx="2" fill="transparent" stroke="rgba(235,108,54,0.50)" stroke-width="0.8" />
-              <text x="462" y="337" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">API</text>
-              <text x="520" y="358" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Route handlers</text>
-              <text x="520" y="374" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">app/api/v1/**</text>
+              <!-- Node: Next.js app (focal) -->
+              <rect x="280" y="104" width="240" height="320" rx="6" fill="#f5f5f5" />
+              <rect x="280" y="104" width="240" height="320" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1" />
+              <rect x="288" y="112" width="28" height="12" rx="2" fill="transparent" stroke="rgba(235,108,54,0.50)" stroke-width="0.8" />
+              <text x="302" y="121" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">APP</text>
+              <text x="400" y="232" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Next.js app</text>
+              <text x="400" y="252" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">middleware.ts · RSC pages</text>
+              <text x="400" y="268" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">/api/v1 · 107 handlers</text>
+              <text x="400" y="284" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">after() workers</text>
 
               <!-- Node: Supabase Auth -->
-              <rect x="720" y="120" width="200" height="64" rx="6" fill="#f5f5f5" />
-              <rect x="720" y="120" width="200" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1" />
-              <rect x="728" y="128" width="32" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.22)" stroke-width="0.8" />
-              <text x="744" y="137" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AUTH</text>
-              <text x="820" y="158" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Supabase Auth</text>
-              <text x="820" y="174" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">JWT cookie · OTP email</text>
+              <rect x="700" y="104" width="240" height="64" rx="6" fill="#f5f5f5" />
+              <rect x="700" y="104" width="240" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1" />
+              <rect x="708" y="112" width="32" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.22)" stroke-width="0.8" />
+              <text x="724" y="121" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">AUTH</text>
+              <text x="820" y="142" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Supabase Auth</text>
+              <text x="820" y="158" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">password · OTP · OAuth</text>
 
-              <!-- Node: Postgres + RLS (focal store) -->
-              <rect x="720" y="320" width="200" height="64" rx="6" fill="#f5f5f5" />
-              <rect x="720" y="320" width="200" height="64" rx="6" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1" />
-              <rect x="728" y="328" width="24" height="12" rx="2" fill="transparent" stroke="rgba(235,108,54,0.50)" stroke-width="0.8" />
-              <text x="740" y="337" fill="#eb6c36" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DB</text>
-              <text x="820" y="358" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Postgres + RLS</text>
-              <text x="820" y="374" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">migrations · bunkai_* RPC</text>
+              <!-- Node: Postgres -->
+              <rect x="700" y="232" width="240" height="64" rx="6" fill="#f5f5f5" />
+              <rect x="700" y="232" width="240" height="64" rx="6" fill="#ffffff" stroke="#2d3142" stroke-width="1" />
+              <rect x="708" y="240" width="24" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.40)" stroke-width="0.8" />
+              <text x="720" y="249" fill="#2d3142" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">DB</text>
+              <text x="820" y="270" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Postgres + RLS</text>
+              <text x="820" y="286" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">bunkai_* RPC · pg_cron x2</text>
+
+              <!-- Node: Realtime + Storage -->
+              <rect x="700" y="360" width="240" height="64" rx="6" fill="#f5f5f5" />
+              <rect x="700" y="360" width="240" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1" />
+              <rect x="708" y="368" width="28" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.22)" stroke-width="0.8" />
+              <text x="722" y="377" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SVC</text>
+              <text x="820" y="398" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Realtime · Storage</text>
+              <text x="820" y="414" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">run + inbox · exports</text>
+
+              <!-- Node: Stripe -->
+              <rect x="240" y="488" width="176" height="64" rx="6" fill="#f5f5f5" />
+              <rect x="240" y="488" width="176" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1" />
+              <rect x="248" y="496" width="28" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.22)" stroke-width="0.8" />
+              <text x="262" y="505" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SAAS</text>
+              <text x="328" y="526" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Stripe</text>
+              <text x="328" y="542" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">Checkout · webhook</text>
+
+              <!-- Node: Resend + Jira -->
+              <rect x="448" y="488" width="208" height="64" rx="6" fill="#f5f5f5" />
+              <rect x="448" y="488" width="208" height="64" rx="6" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1" />
+              <rect x="456" y="496" width="28" height="12" rx="2" fill="transparent" stroke="rgba(45,49,66,0.22)" stroke-width="0.8" />
+              <text x="470" y="505" fill="#7a8399" font-size="7" font-family="'Geist Mono', monospace" text-anchor="middle" letter-spacing="0.08em">SAAS</text>
+              <text x="552" y="526" fill="#2d3142" font-size="12" font-weight="600" font-family="'Geist', sans-serif" text-anchor="middle">Resend · Jira Cloud</text>
+              <text x="552" y="542" fill="#4f5d75" font-size="9" font-family="'Geist Mono', monospace" text-anchor="middle">digest mail · story import</text>
 
               <!-- Legend strip -->
-              <line x1="40" y1="424" x2="960" y2="424" stroke="rgba(45,49,66,0.10)" stroke-width="0.8" />
-              <text x="40" y="440" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
-              <rect x="40" y="452" width="14" height="10" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1" />
-              <text x="60" y="460" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Focal (API, data)</text>
-              <rect x="180" y="452" width="14" height="10" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1" />
-              <text x="200" y="460" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">App component</text>
-              <rect x="316" y="452" width="14" height="10" rx="2" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1" />
-              <text x="336" y="460" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Managed service</text>
-              <rect x="456" y="452" width="14" height="10" rx="2" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1" />
-              <text x="476" y="460" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Caller</text>
-              <line x1="548" y1="458" x2="576" y2="458" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#infra-arrow-link)" />
-              <text x="584" y="460" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">External request</text>
-              <line x1="692" y1="458" x2="720" y2="458" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#infra-arrow-accent)" />
-              <text x="728" y="460" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Primary data path</text>
-              <line x1="840" y1="458" x2="868" y2="458" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#infra-arrow)" />
-              <text x="876" y="460" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Internal call</text>
+              <line x1="40" y1="584" x2="960" y2="584" stroke="rgba(45,49,66,0.10)" stroke-width="0.8" />
+              <text x="40" y="600" fill="#4f5d75" font-size="8" font-family="'Geist Mono', monospace" letter-spacing="0.18em">LEGEND</text>
+              <rect x="40" y="612" width="14" height="10" rx="2" fill="rgba(235,108,54,0.08)" stroke="#eb6c36" stroke-width="1" />
+              <text x="60" y="620" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Focal (the app)</text>
+              <rect x="164" y="612" width="14" height="10" rx="2" fill="#ffffff" stroke="#2d3142" stroke-width="1" />
+              <text x="184" y="620" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Data store</text>
+              <rect x="272" y="612" width="14" height="10" rx="2" fill="rgba(45,49,66,0.03)" stroke="rgba(45,49,66,0.30)" stroke-width="1" />
+              <text x="292" y="620" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Managed service</text>
+              <rect x="400" y="612" width="14" height="10" rx="2" fill="rgba(79,93,117,0.10)" stroke="#7a8399" stroke-width="1" />
+              <text x="420" y="620" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Caller</text>
+              <line x1="484" y1="618" x2="512" y2="618" stroke="#2e5aa8" stroke-width="1.2" marker-end="url(#infra-arrow-link)" />
+              <text x="520" y="620" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">External request</text>
+              <line x1="620" y1="618" x2="648" y2="618" stroke="#eb6c36" stroke-width="1.4" marker-end="url(#infra-arrow-accent)" />
+              <text x="656" y="620" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Primary data path</text>
+              <line x1="756" y1="618" x2="784" y2="618" stroke="#4f5d75" stroke-width="1.2" marker-end="url(#infra-arrow)" />
+              <text x="792" y="620" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Internal call</text>
+              <line x1="868" y1="618" x2="896" y2="618" stroke="#4f5d75" stroke-width="1.2" stroke-dasharray="5,4" marker-end="url(#infra-arrow)" />
+              <text x="904" y="620" fill="#4f5d75" font-size="8.5" font-family="'Geist', sans-serif">Async</text>
             </svg>
           </div>
           <figcaption>
-            Container view: two kinds of caller, one Next.js app on Vercel, two Supabase services. Every fact is restated in the
-            text below.
+            Container view: three kinds of caller, one Next.js app on Vercel, one Supabase project, three SaaS integrations.
+            Every fact is restated in the text below.
           </figcaption>
         </figure>
 
@@ -287,93 +323,96 @@
               <tr><th>Directory</th><th>Responsibility</th><th>Found in</th></tr>
             </thead>
             <tbody>
-              <tr><td><code>middleware.ts</code></td><td>Runs on every non-static request (matcher excludes <code>_next/static</code>, <code>_next/image</code>, <code>favicon.ico</code> and dotted paths). Refreshes the Supabase session cookie via <code>auth.getUser()</code>; redirects anonymous users from <code>/projects*</code> and <code>/onboarding*</code> to <code>/login?next=…</code>. It does not gate <code>/api/*</code>.</td><td><code>middleware.ts</code></td></tr>
-              <tr><td><code>app/(app)/</code></td><td>Authenticated pages as React Server Components: projects, project view, ATC editor, onboarding, workspace members. Pages read Supabase directly with the user's cookie session (RLS applies) and redirect to <code>/login</code> themselves when no user.</td><td><code>app/(app)/projects/page.tsx</code>, <code>app/(app)/workspaces/[id]/members/page.tsx</code></td></tr>
-              <tr><td><code>app/(app)/…/atcs/[atcId]/actions.ts</code></td><td>The only Server Action: <code>saveAtcAction</code> parses steps / assertions and calls the <code>bunkai_save_atc</code> RPC, then <code>revalidatePath</code>.</td><td><code>app/(app)/projects/[projectSlug]/atcs/[atcId]/actions.ts</code></td></tr>
-              <tr><td><code>app/(auth)/login/</code>, <code>app/auth/callback/</code></td><td>Magic-link request form and the OTP code exchange (<code>exchangeCodeForSession</code>) with an open-redirect guard on <code>next</code>.</td><td><code>app/(auth)/login/magic-link-form.tsx</code>, <code>app/auth/callback/route.ts</code></td></tr>
-              <tr><td><code>app/api/v1/**</code></td><td>REST API: <code>auth/{signup,signin,magic-link}</code>, <code>health</code>, <code>me</code>, <code>me/active-workspace</code>, <code>tokens</code>, <code>workspaces</code>, <code>workspaces/{id}/invites</code>, <code>invites/accept</code>, plus the <code>/api/v1</code> discovery banner. Each route has a sibling <code>route.openapi.ts</code>.</td><td><code>app/api/v1/</code></td></tr>
-              <tr><td><code>app/api/openapi</code>, <code>app/api/docs</code></td><td>Serves the generated <code>public/openapi.json</code>; Scalar docs UI over it.</td><td><code>app/api/openapi/route.ts</code>, <code>app/api/docs/page.tsx</code></td></tr>
-              <tr><td><code>app/qa/</code>, <code>app/design-tokens/</code>, <code>app/invites/accept/</code></td><td>Public QA guide page (carries <code>data-testid</code> attributes), design-token showcase, invite acceptance client.</td><td><code>app/qa/</code>, <code>app/design-tokens/page.tsx</code>, <code>app/invites/accept/</code></td></tr>
-              <tr><td><code>components/</code></td><td>Client components: ATC editor / table / anchoring panel, layout shell (sidebar, topbar, workspace switcher, command palette), UI primitives, auth context provider.</td><td><code>components/</code></td></tr>
-              <tr><td><code>lib/api/</code></td><td>API cross-cutting: dual-mode auth, PAT mint and verify, error envelope, handler wrapper, request id, JSON logging, idempotency helper, invite tokens, active-workspace cookie.</td><td><code>lib/api/</code></td></tr>
-              <tr><td><code>lib/supabase/</code></td><td>Three clients: browser (anon key, per-tab singleton), server (anon key + request cookies), admin (service-role key, server-only, bypasses RLS); typed RPC wrappers; <code>withWorkspace</code> read helper.</td><td><code>lib/supabase/</code></td></tr>
-              <tr><td><code>supabase/migrations/</code></td><td>Ordered SQL migrations: tables, RLS policies, helper functions, RPCs, triggers. The schema source of truth.</td><td><code>supabase/migrations/</code></td></tr>
+              <tr><td><code>middleware.ts</code></td><td>Runs on every non-static request (matcher excludes <code>_next/static</code>, <code>_next/image</code>, <code>favicon.ico</code> and dotted paths). Refreshes the Supabase session cookie via <code>auth.getUser()</code>; redirects anonymous users from <code>/home</code>, <code>/projects</code>, <code>/onboarding</code>, <code>/settings</code> and <code>/activity</code> (and their subpaths) to <code>/login?next=…</code>. It never blocks <code>/api/*</code>.</td><td><code>middleware.ts</code>, <code>middleware.test.ts</code></td></tr>
+              <tr><td><code>app/(app)/</code></td><td>Authenticated pages as React Server Components (38 <code>page.tsx</code> under <code>app/</code> in total): home, activity, projects and their ATCs, tests, plans, runs, bugs, milestones, metrics, traceability; settings (account, billing, upgrade, data export, notifications, tokens, workspaces); workspace members.</td><td><code>app/(app)/</code></td></tr>
+              <tr><td><code>app/(app)/…/atcs/[atcId]/actions.ts</code></td><td>Still the only Server Action: <code>saveAtcAction</code>, then <code>revalidatePath</code>.</td><td><code>app/(app)/projects/[projectSlug]/atcs/[atcId]/actions.ts</code></td></tr>
+              <tr><td><code>app/(auth)/login/</code>, <code>app/auth/</code></td><td>Email-first login form (check email, password sign-in or sign-up, emailed-code confirmation, resend), magic-link disclosure, GitHub and Google OAuth buttons; <code>/auth/callback</code> (code exchange for OAuth and PKCE magic links, OAuth state check, and a stateless <code>token_hash</code> rail not yet switched on, see <code>environments</code>) and <code>/auth/oauth/{provider}</code>.</td><td><code>app/(auth)/login/</code>, <code>app/auth/callback/route.ts</code>, <code>app/auth/oauth/[provider]/route.ts</code></td></tr>
+              <tr><td><code>app/api/v1/**</code></td><td>REST API, 80 route files, 107 handlers by the posture snapshot (business groups, auth family, health, admin digest, billing webhook). Each route has a sibling <code>route.openapi.ts</code>. Endpoint groups belong to <code>business-api-context</code>.</td><td><code>app/api/v1/</code>, <code>lib/api/route-capability-coverage.snapshot.json</code></td></tr>
+              <tr><td><code>app/api/openapi</code>, <code>app/api/docs</code></td><td>Serves the generated <code>public/openapi.json</code> (102 operations); Scalar docs UI over it.</td><td><code>app/api/openapi/route.ts</code>, <code>app/api/docs/page.tsx</code></td></tr>
+              <tr><td><code>app/qa/</code>, <code>app/about/</code>, <code>app/design-tokens/</code>, <code>app/invites/accept/</code>, <code>app/workspaces/[id]/restore/</code></td><td>Public QA guide, about page, design-token showcase, invite acceptance, workspace restore landing (link from the deletion email).</td><td><code>app/</code></td></tr>
+              <tr><td><code>components/</code></td><td>Client components grouped by feature (activity, atcs, billing, bugs, coverage, data-export, home, layout, markdown, metrics, milestones, notifications, runs, settings, test-plans, tests, traceability) plus <code>ui/</code> primitives and the auth provider.</td><td><code>components/</code></td></tr>
+              <tr><td><code>lib/api/</code></td><td>Gateway (<code>withApiHandler</code>, posture and capability checks), principal resolution (cookie or PAT), PAT mint and verify, 60-second user JWT minting, error envelope, request id, JSON logging, idempotency, posture scan.</td><td><code>lib/api/</code></td></tr>
+              <tr><td><code>lib/supabase/</code></td><td>Three clients: browser (anon key), server (anon key + request cookies), admin (service-role key, server-only, bypasses RLS); typed RPC wrappers; <code>withWorkspace</code> read helper.</td><td><code>lib/supabase/</code></td></tr>
+              <tr><td><code>lib/billing/</code>, <code>lib/mail/</code>, <code>lib/jira/</code></td><td>Integration adapters: lazy Stripe client and checkout, Resend sender, Jira search client with 429 backoff and the import runner.</td><td><code>lib/billing/stripe.ts</code>, <code>lib/mail/resend-client.ts</code>, <code>lib/jira/client.ts</code></td></tr>
+              <tr><td><code>lib/workspace-export/</code>, <code>lib/workspace-deletion/</code>, <code>lib/notifications/</code></td><td>Background work bodies: export runner and zip builder (<code>fflate</code>), deletion emails, digest run, Realtime channel helpers.</td><td><code>lib/</code></td></tr>
+              <tr><td><code>supabase/migrations/</code></td><td>89 ordered SQL files (<code>0001</code> to <code>0090</code>, no <code>0079</code> / <code>0080</code>, plus <code>0084a</code>): tables, RLS, helpers, RPCs, triggers, cron jobs, Realtime publication, Storage bucket, QA inspector roles. The schema source of truth.</td><td><code>supabase/migrations/</code>, <code>supabase/migrations/README.md</code></td></tr>
             </tbody>
           </table>
         </div>
 
         <h3>Containers and data flow</h3>
         <ul>
-          <li><strong>Browser → Middleware → App UI</strong>: page requests pass the middleware (session refresh against Supabase Auth via <code>getUser</code>), then server components query Postgres with the user's JWT, so RLS decides what rows come back.</li>
-          <li><strong>App UI → Postgres</strong>: reads through the server client; the ATC save is the Server Action calling the <code>bunkai_save_atc</code> RPC (SECURITY INVOKER, one transaction, RLS evaluated as the caller).</li>
-          <li><strong>Browser → Middleware → Route handlers</strong>: client components call <code>/api/v1/*</code> with <code>fetch</code> and the session cookie (onboarding, workspace switcher, members, invite accept, magic-link form).</li>
-          <li><strong>CLI / agent / test → Route handlers</strong>: <code>Authorization: Bearer bk_pat_*</code>. The middleware still runs on these requests but only refreshes cookies.</li>
-          <li><strong>Route handlers → Postgres</strong>: either the user-scoped server client (RLS applies) or the service-role admin client (RLS bypassed; used for PAT lookup, PAT minting, idempotency rows, invite secrets, invite acceptance, and the Bearer branch of <code>GET /workspaces</code> and <code>GET /me</code>).</li>
-          <li><strong>Route handlers → Supabase Auth</strong>: <code>signInWithOtp</code>, <code>signInWithPassword</code>, <code>auth.admin.createUser</code>, <code>auth.admin.getUserById</code>.</li>
+          <li>Browser → app: page requests pass the middleware (session refresh via <code>getUser</code>), then server components query Postgres with the user's JWT, so RLS decides what rows come back. Client components call <code>/api/v1/*</code> with <code>fetch</code> and the session cookie.</li>
+          <li>API client → app: <code>Authorization: Bearer bk_pat_*</code>. The gateway verifies the PAT, checks the route's scope, then mints a 60-second user JWT so Postgres sees the token owner exactly as for a browser call.</li>
+          <li>Vercel Cron → app: <code>GET /api/v1/admin/send-digest</code> daily at 08:00 UTC with <code>Authorization: Bearer {CRON_SECRET}</code>; registered from the production deployment only.</li>
+          <li>App → Supabase Auth: <code>getUser</code> on every matched request and again in the gateway for cookie calls; sign-up, password sign-in, OTP verify, OTP resend, magic link, OAuth authorize URL, admin user lookups.</li>
+          <li>App → Postgres: PostgREST over HTTPS through <code>@supabase/supabase-js</code>, either user-scoped (RLS applies) or service-role (RLS bypassed: PAT lookup, secret tables, invite acceptance, idempotency rows, webhook, digest, background workers).</li>
+          <li>App → Storage: the export worker uploads the zip to the private bucket <code>workspace-exports</code>; downloads stream back through the API.</li>
+          <li>Realtime → browser: row changes on <code>run_atcs</code>, <code>run_steps</code> and <code>notifications</code> are pushed to subscribed browsers (RLS-filtered) through <code>lib/runs/realtime-run-channel.ts</code> and <code>lib/notifications/realtime-notifications-channel.ts</code>.</li>
+          <li>App ↔ Stripe: the app creates Checkout Sessions; Stripe calls back <code>POST /api/v1/billing/webhook</code> (signature-verified).</li>
+          <li>App → Resend and Jira Cloud: the digest and deletion emails go out through Resend; the import worker pages Jira's <code>/rest/api/3/search/jql</code>.</li>
+          <li>Inside Postgres: <code>pg_cron</code> runs the abandoned-run sweep and the deleted-workspace purge (<code>background-jobs</code>). The database makes no outbound calls (<code>pg_net</code> / <code>http</code> not installed, per <code>business-data-context</code> <code>integration-supabase</code>).</li>
         </ul>
 
         <h3>Auth flow</h3>
-        <p>Three entry paths, all ending in a Supabase user id:</p>
+        <p>Four ways in, all ending in a Supabase user id (request detail in <code>backend</code>):</p>
         <ol>
-          <li><strong>Magic link (UI)</strong>: the login form posts the email to <code>POST /api/v1/auth/magic-link</code> → <code>signInWithOtp</code> with <code>emailRedirectTo = {app url}/auth/callback?next=…</code> → Supabase Auth emails the link → <code>GET /auth/callback?code=…</code> exchanges the code for a session and sets the <code>sb-*</code> auth cookies → redirect to <code>next</code> (default <code>/projects</code>). A best-effort audit row goes to <code>magic_link_tokens</code> + <code>magic_link_token_secrets</code>.</li>
-          <li><strong>Headless sign-up / sign-in (API)</strong>: <code>POST /api/v1/auth/signup</code> creates the user with <code>email_confirm: true</code> through the admin API (no confirmation email), signs in with the password to set session cookies on the response, and mints a PAT; <code>POST /api/v1/auth/signin</code> does the same for an existing user. Both return the Supabase session tokens and the PAT once.</li>
-          <li><strong>PAT on later calls</strong>: <code>requireBearerToken</code> parses <code>bk_pat_{12-char prefix}.{rest}</code>, looks up <code>access_tokens</code> by prefix, compares SHA-256 against <code>access_token_secrets</code>, rejects revoked or expired tokens with a uniform 401, and fire-and-forgets <code>last_used_at</code>.</li>
+          <li>Password (UI or headless): <code>POST /api/v1/auth/check-email</code> routes the form; <code>POST /api/v1/auth/signup</code> answers 202 <code>pending_confirmation</code> and Supabase emails a code; <code>POST /api/v1/auth/confirm</code> verifies the 6 to 8 digit code; <code>POST /api/v1/auth/signin</code> signs in. Confirm and sign-in set the <code>sb-*</code> cookies and return the session plus a PAT shown once.</li>
+          <li>Magic link: <code>POST /api/v1/auth/magic-link</code> (existing accounts only) → email → <code>GET /auth/callback</code>, which sets the session and redirects to <code>next</code>.</li>
+          <li>OAuth: <code>GET /auth/oauth/{github|google}</code> sets a state cookie and redirects to the provider through Supabase; the callback rejects a state mismatch before exchanging the code.</li>
+          <li>PAT on later calls: <code>bk_pat_{12-char prefix}.{secret}</code>, prefix lookup with the service-role client, SHA-256 compare, uniform 401 on any failure, scope check (403), 60-second user JWT for RLS.</li>
         </ol>
         <p>
-          <strong>Which endpoints accept which credential</strong> (from the handlers at <code>e88512e</code>): only <code>GET /api/v1/workspaces</code> and
-          <code>GET /api/v1/me</code> call the dual-mode <code>requireAuth</code> and accept a PAT. Every other authenticated handler
-          (<code>POST /workspaces</code>, <code>GET|PATCH /workspaces/{id}</code>, invites, <code>invites/accept</code>, <code>tokens</code>,
-          <code>me/active-workspace</code>) reads the cookie session only, so a PAT alone gets a 401 there. Scopes
-          (<code>atc:read</code>, <code>atc:write</code>, <code>run:execute</code>, <code>workspace:admin</code>) are stored on the token, but no handler calls
-          <code>requireScope</code> / <code>requireScopeOrCookie</code>: scopes are not enforced yet.
+          Every handler declares one of four postures (<code>public</code>, <code>authenticated</code>, <code>cookie-only</code>,
+          <code>required</code> with capabilities); a route without one does not compile, and <code>lib/api/route-posture-scan.ts</code>
+          diffs every handler against the committed snapshot. Tier counts and refusal semantics are in
+          <code>business-api-context</code> (<code>auth-model</code>).
         </p>
 
         <h3>Database at architecture level</h3>
         <p>
-          One store: Supabase Postgres, reached through PostgREST via <code>@supabase/supabase-js</code> (no ORM, no direct SQL
-          connection from the app). Subsystems by migration: tenancy (workspaces, members), projects and modules, authoring (user
-          stories, acceptance criteria), ATCs (header, steps, assertions, AC anchoring, full-text <code>tsv</code> maintained by a
-          trigger), access tokens, cross-cutting (idempotency keys, activity log, feature flags, view state, magic-link audit),
-          workspace invites, and secret side-tables split out so QA inspection roles cannot read hashes. Tables, columns and
-          lifecycles belong to <code>business-data-context</code> (<code>bun run context:map business-data-context</code>); the vocabulary is in
-          <code>business-domain-context</code> (<code>term-*</code> sections). Generated types live in <code>lib/types/supabase.ts</code>.
+          One store: Supabase Postgres, reached through PostgREST (no ORM, no direct connection from the app). Subsystems by
+          migration: tenancy and invites, projects and modules, authoring (stories, criteria, ATCs), test design (tests, test
+          plans, milestones, tags), execution (runs, run snapshot, environments), bugs, activity and notifications, reports
+          (coverage, traceability, defect heat map, recovery cycle), billing (plans, checkout sessions, Stripe events), imports,
+          workspace export and deletion, access tokens and secret side-tables, QA inspector roles. Tables and lifecycles belong to
+          <code>business-data-context</code>; generated types live in <code>lib/types/supabase.ts</code>.
         </p>
 
         <h3>Security architecture</h3>
         <ul>
-          <li><strong>AuthN</strong>: Supabase Auth JWT in <code>sb-*</code> cookies for browsers; PATs (SHA-256 of the secret stored, only the 12-char prefix in clear) for API callers.</li>
-          <li><strong>AuthZ</strong>: Row Level Security on every table; membership checks centralised in SECURITY DEFINER helpers (<code>bunkai_is_workspace_member</code>, <code>bunkai_can_write_workspace</code>, <code>bunkai_is_workspace_admin</code>, <code>bunkai_is_workspace_owner</code>, <code>search_path = ''</code>). Roles: <code>viewer</code> &lt; <code>member</code> &lt; <code>admin</code> &lt; <code>owner</code>. Workspace bootstrap is the SECURITY DEFINER RPC <code>bunkai_bootstrap_workspace</code>, executable by <code>authenticated</code>.</li>
-          <li><strong>Service-role bypass</strong>: the admin client skips RLS; handlers that use it check authorization in code (e.g. invite accept checks status, expiry and invitee email; the Bearer branch of <code>GET /workspaces</code> joins on membership).</li>
-          <li><strong>Secrets at rest</strong>: PAT, magic-link and invite secrets hashed in <code>*_secrets</code> tables revoked from <code>anon</code>, <code>authenticated</code>, <code>qa_inspector_ro</code>, <code>qa_inspector_rw</code>.</li>
-          <li><strong>Idempotency</strong>: <code>lib/api/idempotency.ts</code> implements <code>Idempotency-Key</code> replay over the <code>idempotency_keys</code> table, but no route calls it at <code>e88512e</code>.</li>
+          <li>AuthN: Supabase Auth JWT in <code>sb-*</code> cookies for browsers; PATs (SHA-256 stored, 12-char prefix in clear) for API callers; <code>CRON_SECRET</code> for the cron; Stripe signature for the webhook.</li>
+          <li>AuthZ: scopes enforced in the gateway (<code>requireCapability</code>), roles and tenancy enforced in Postgres (RLS and SECURITY DEFINER helpers; roles <code>viewer</code> &lt; <code>member</code> &lt; <code>admin</code> &lt; <code>owner</code>).</li>
+          <li>Service-role bypass: the admin client skips RLS; handlers and workers that use it check authorization in code.</li>
+          <li>Secrets at rest: PAT, magic-link and invite secrets hashed in <code>*_secrets</code> tables revoked from client and QA roles.</li>
         </ul>
 
         <h3>Performance hooks</h3>
         <p>
-          No cache layer and no rate limiter in the app. <code>revalidatePath</code> after the ATC save; <code>force-static</code> + <code>Cache-Control</code>
-          on the OpenAPI spec; a GIN-indexed <code>tsvector</code> on ATCs. Supabase's own OTP rate limit surfaces as 429 on the magic-link
-          route. Details in <code>nfr-performance</code>.
+          No cache layer and no app-level rate limiter. Keyset pagination on the long lists, Home indexes, a GIN-indexed ATC search
+          vector, <code>revalidatePath</code> after the ATC save, <code>Cache-Control</code> on the OpenAPI spec. Supabase Auth's own
+          limits surface as 429 on the auth family. Details in <code>nfr-performance</code>.
         </p>
 
         <h3>ADRs</h3>
         <ul>
-          <li><code>.context/ADR/ADR-0009-auth-in-tests-headless-signup-pat.md</code> (Proposed): tests get identity through the headless signup / signin endpoints, cookie session vs PAT chosen per endpoint, magic link only in its own tests.</li>
-          <li><code>.context/ADR/ADR-0010-test-isolation-user-workspace-under-rls.md</code> (Proposed): mutating tests isolate data by owning a fresh user + workspace, relying on RLS tenancy.</li>
+          <li>QA repo: <code>.context/ADR/ADR-0009-auth-in-tests-headless-signup-pat.md</code> and <code>ADR-0010-test-isolation-user-workspace-under-rls.md</code> (both Proposed). ADR-0009 predates the sign-up change: sign-up no longer mints a PAT, it needs the emailed code (see <code>discovery-gaps</code>).</li>
+          <li>Product repo <code>.context/ADR/</code> (the team's own decisions, cited not copied): ADR-0001 unified API authentication, ADR-0005 PAT issuance role gate, ADR-0006 consumption-side scope enforcement, ADR-0007 password auth and email OTP, ADR-0008 OAuth CSRF state, ADR-0010 Realtime transport, ADR-0012 RPC authorization invariant, ADR-0014 Stripe checkout, ADR-0015 workspace deletion (revised), ADR-0017 system cron principal.</li>
         </ul>
 
         <h3>QA relevance</h3>
         <ul>
-          <li>Test RLS as a first-class surface: cross-workspace reads and writes per role, through both the UI path (cookie) and the API path (cookie and PAT).</li>
-          <li>The cookie-only vs PAT-capable split decides how API tests authenticate; a PAT-only API client cannot reach most endpoints today.</li>
-          <li>Magic-link login needs a reachable inbox and is subject to Supabase's OTP rate limit: keep it out of per-test setup.</li>
-          <li>Selectors: <code>data-testid</code> exists only on the login form and the <code>/qa</code> page; the authenticated app has none (see <code>discovery-gaps</code>).</li>
+          <li>Test RLS as a first-class surface: cross-workspace reads and writes per role, through the cookie path and the PAT path.</li>
+          <li>Asynchronous outcomes (import, export, deletion email, digest, Realtime updates) are asserted on the job row, the mailbox or the subscribed page, never on the HTTP answer.</li>
+          <li>Stripe, Resend and Jira need sandbox credentials per environment, or the related flows answer with their degraded mode (503, failed job, failed digest row).</li>
+          <li>Selectors: <code>data-testid</code> now covers most of the authenticated app (see <code>frontend</code>).</li>
         </ul>
       </section>
 
       <section
         id="external-services"
-        data-sources="package.json,lib/env.ts,lib/supabase/,middleware.ts,lib/urls.ts,app/api/v1/auth/magic-link/route.ts,app/api/v1/workspaces/[id]/invites/route.ts,app/api/docs/page.tsx,app/layout.tsx,components/atcs/StepEditor.tsx,.env.example"
-        data-updated="2026-10-02"
+        data-sources="package.json,lib/env.ts,.env.example,lib/supabase/,lib/billing/stripe.ts,lib/billing/checkout.ts,app/api/v1/billing/webhook/route.ts,lib/mail/resend-client.ts,lib/workspace-deletion/email.ts,lib/jira/client.ts,app/auth/oauth/[provider]/route.ts,app/api/v1/admin/send-digest/route.ts,vercel.json,lib/urls.ts,app/api/docs/page.tsx,app/layout.tsx,components/atcs/StepEditor.tsx"
+        data-updated="2026-10-13"
       >
         <h2>External services</h2>
         <div class="table-wrap">
@@ -382,35 +421,87 @@
               <tr><th>Service</th><th>Purpose</th><th>Env key (name only)</th><th>Integration point</th><th>Found in</th></tr>
             </thead>
             <tbody>
-              <tr><td>Supabase Postgres (PostgREST)</td><td>All product data, RLS, RPCs</td><td><code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code></td><td>browser / server / admin clients</td><td><code>lib/supabase/client.ts</code>, <code>lib/supabase/server.ts</code>, <code>lib/supabase/admin.ts</code></td></tr>
-              <tr><td>Supabase Auth (GoTrue)</td><td>Sessions, magic-link OTP, password sign-in, admin user creation</td><td>same as above; <code>SUPABASE_JWT_SECRET</code> declared optional and unused by code</td><td><code>auth.getUser</code>, <code>signInWithOtp</code>, <code>signInWithPassword</code>, <code>exchangeCodeForSession</code>, <code>auth.admin.*</code></td><td><code>middleware.ts</code>, <code>app/api/v1/auth/</code>, <code>app/auth/callback/route.ts</code>, <code>components/providers/auth-context.tsx</code></td></tr>
-              <tr><td>Email delivery (via Supabase Auth)</td><td>Magic-link emails only; the app sends no email itself</td><td>none in the app (SMTP lives in the Supabase project settings)</td><td><code>signInWithOtp</code></td><td><code>app/api/v1/auth/magic-link/route.ts</code></td></tr>
-              <tr><td>Vercel</td><td>Hosting; environment detection</td><td><code>VERCEL_ENV</code> (system), <code>NEXT_PUBLIC_APP_URL</code> (validated, default localhost)</td><td><code>getEnvironment()</code>, <code>webUrl()</code></td><td><code>lib/urls.ts</code>, <code>lib/env.ts</code></td></tr>
+              <tr><td>Supabase Postgres (PostgREST)</td><td>All product data, RLS, RPCs, triggers</td><td><code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code></td><td>browser / server / admin clients</td><td><code>lib/supabase/</code></td></tr>
+              <tr><td>Supabase Auth (GoTrue)</td><td>Sessions, password sign-up with emailed code, magic link, OAuth, admin lookups</td><td>same as above; <code>SUPABASE_JWT_SECRET</code> signs the 60-second user JWT on the PAT path</td><td><code>getUser</code>, <code>signUp</code>, <code>signInWithPassword</code>, <code>verifyOtp</code>, <code>signInWithOtp</code>, <code>signInWithOAuth</code>, <code>exchangeCodeForSession</code></td><td><code>middleware.ts</code>, <code>app/api/v1/auth/</code>, <code>app/auth/</code>, <code>lib/api/user-jwt.ts</code></td></tr>
+              <tr><td>Auth email (via Supabase Auth)</td><td>Sign-up codes, resend, magic links</td><td>none in the app (SMTP and templates live in the Supabase dashboard)</td><td>Supabase Auth</td><td><code>app/api/v1/auth/</code>, <code>.context/release/pending-production-v2.md</code></td></tr>
+              <tr><td>GitHub, Google (OAuth through Supabase)</td><td>Social sign-in</td><td>none in the app (providers configured in Supabase)</td><td><code>GET /auth/oauth/{provider}</code></td><td><code>app/auth/oauth/[provider]/route.ts</code>, <code>lib/auth/oauth-state.ts</code></td></tr>
+              <tr><td>Supabase Realtime</td><td>Live run progress and live inbox</td><td>public Supabase keys</td><td>browser channels on <code>run_atcs</code>, <code>run_steps</code>, <code>notifications</code></td><td><code>lib/runs/realtime-run-channel.ts</code>, <code>lib/notifications/realtime-notifications-channel.ts</code>, <code>supabase/migrations/0043_run_realtime_replication.sql</code></td></tr>
+              <tr><td>Supabase Storage</td><td>Workspace export archives (private bucket <code>workspace-exports</code>)</td><td><code>SUPABASE_SERVICE_ROLE_KEY</code></td><td>export runner upload, download route</td><td><code>lib/workspace-export/export-runner.ts</code>, <code>supabase/migrations/0083_workspace_data_export.sql</code></td></tr>
+              <tr><td>Stripe</td><td>Cloud plan upgrade: Checkout Session out, checkout events in</td><td><code>STRIPE_SECRET_KEY</code>, <code>STRIPE_WEBHOOK_SECRET</code>, <code>STRIPE_CLOUD_PRICE_ID</code> (all optional at boot); success and cancel URLs from <code>NEXT_PUBLIC_APP_URL</code></td><td><code>getStripeClient()</code>, <code>POST /api/v1/billing/webhook</code></td><td><code>lib/billing/stripe.ts</code>, <code>lib/billing/checkout.ts</code>, <code>app/api/v1/billing/webhook/route.ts</code></td></tr>
+              <tr><td>Resend</td><td>Daily notification digest; workspace deletion receipt with restore link</td><td><code>RESEND_API_KEY</code> (optional), <code>RESEND_DIGEST_FROM_EMAIL</code> (defaults to Resend's sandbox sender)</td><td><code>sendDigestEmail()</code></td><td><code>lib/mail/resend-client.ts</code>, <code>app/api/v1/admin/send-digest/route.ts</code>, <code>app/api/v1/workspaces/[id]/route.ts</code></td></tr>
+              <tr><td>Jira Cloud</td><td>Import stories and acceptance criteria by JQL</td><td><code>ATLASSIAN_URL</code>, <code>ATLASSIAN_EMAIL</code>, <code>ATLASSIAN_API_TOKEN</code> (optional; one platform-level account)</td><td><code>/rest/api/3/search/jql</code>, 100 issues per page</td><td><code>lib/jira/client.ts</code>, <code>lib/jira/import-runner.ts</code></td></tr>
+              <tr><td>Vercel</td><td>Hosting, environment detection, <code>after()</code>, Cron</td><td><code>VERCEL_ENV</code> (system), <code>CRON_SECRET</code> (required at boot)</td><td><code>getEnvironment()</code>, <code>vercel.json</code> <code>crons</code></td><td><code>lib/urls.ts</code>, <code>vercel.json</code>, <code>lib/env.ts</code></td></tr>
               <tr><td>Google Fonts (build time)</td><td>Inter, JetBrains Mono, Noto Serif JP via <code>next/font/google</code></td><td>none</td><td>root layout</td><td><code>app/layout.tsx</code></td></tr>
-              <tr><td>Monaco editor assets</td><td>ATC step editor</td><td>none</td><td><code>@monaco-editor/react</code> with no <code>loader.config</code> override, so it uses the library's default CDN loader (inferred, not observed at runtime)</td><td><code>components/atcs/StepEditor.tsx</code></td></tr>
+              <tr><td>Monaco editor assets</td><td>ATC step editor</td><td>none</td><td><code>@monaco-editor/react</code> default loader (inferred, not observed at runtime)</td><td><code>components/atcs/StepEditor.tsx</code></td></tr>
               <tr><td>Scalar API reference</td><td>Human API docs over <code>/api/openapi</code></td><td>none</td><td>client component</td><td><code>app/api/docs/page.tsx</code></td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          <strong>Supabase Auth email</strong>: magic-link tests depend on an inbox the test can read and on Supabase's OTP rate limit.
-          Upstream failures map to <code>rate_limited</code> (429) or <code>upstream_error</code> (the upstream status, else 502).
+          Degraded modes are designed in, not crashes: a missing Stripe key answers 503 <code>payment_processor_unavailable</code>
+          with a generic message (the missing variable goes to the server log only); a missing Resend key marks the digest row
+          failed and the deletion still happens without its email; a missing or rejected Jira credential fails the import job
+          with <code>jira_unauthorized</code>. The one hard requirement added since the last map is <code>CRON_SECRET</code>: it is
+          required by <code>lib/env.ts</code>, so any server module that imports the env schema throws at boot without it.
         </p>
         <p>
-          <strong>Workspace invites send no email</strong>: <code>POST /api/v1/workspaces/{id}/invites</code> returns the token and
-          <code>accept_url</code> once in the response and logs the accept URL to stdout. Tests take the invite link from the response.
+          Stripe webhook: an unknown checkout session answers 5xx so Stripe redelivers; event ids are deduplicated in the database.
+          Jira: HTTP 429 is retried with a 1, 2, 4, 8, 16 second backoff (or <code>Retry-After</code>), then the job fails.
+          Workspace invites still send no email: the token and <code>accept_url</code> come back once in the response.
         </p>
         <p>
-          <strong>Key-name drift</strong>: the target <code>.env.example</code> declares a different Supabase key set from the one
-          <code>lib/env.ts</code> validates (recorded in <code>.context/project-config.md</code> Discovery Gaps). Not in package.json or code:
-          Sentry, PostHog, Cloudflare R2, GitHub OAuth (named in the SRS as intent only).
+          Key-name drift: <code>.env.example</code> names <code>RESEND_API_KEY</code> and the Atlassian keys, but not
+          <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code>, <code>CRON_SECRET</code>, the three
+          Stripe keys or <code>RESEND_DIGEST_FROM_EMAIL</code>. Not in <code>package.json</code> or code: Sentry, PostHog, Cloudflare
+          R2.
+        </p>
+      </section>
+
+      <section
+        id="background-jobs"
+        data-sources="vercel.json,app/api/v1/admin/send-digest/route.ts,lib/notifications/send-digest-run.ts,app/api/v1/imports/route.ts,lib/jira/import-runner.ts,app/api/v1/workspaces/[id]/data-export/route.ts,lib/workspace-export/export-runner.ts,app/api/v1/workspaces/[id]/route.ts,lib/workspace-deletion/email.ts,supabase/migrations/0075_run_inactivity_sweep.sql,supabase/migrations/0084_workspace_deletion.sql,supabase/migrations/0043_run_realtime_replication.sql,supabase/migrations/0053_notifications.sql,app/api/v1/billing/webhook/route.ts"
+        data-updated="2026-10-13"
+      >
+        <h2>Background jobs and asynchronous work</h2>
+        <p>
+          Nothing runs on a queue or a worker host. Work that outlives a request runs in three places, each with its own trigger,
+          environment reach and failure mode. What each job means to the business is in <code>business-data-context</code>
+          (<code>automatic-processes</code>); this section holds where it runs and how a tester reaches it.
+        </p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Job</th><th>Runs in</th><th>Trigger / schedule</th><th>Reaches which environments</th><th>On failure</th><th>Found in</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Abandoned-run sweep <code>bunkai-sweep-abandoned-runs</code></td><td>Postgres <code>pg_cron</code></td><td><code>*/15 * * * *</code>, <code>bunkai_sweep_abandoned_runs(4)</code>: aborts runs with no activity for 4 hours</td><td>Every environment at once, since one Supabase project backs all three</td><td>Rows skipped under lock are retried on the next tick; outcome visible in <code>cron.job_run_details</code></td><td><code>supabase/migrations/0075_run_inactivity_sweep.sql</code></td></tr>
+              <tr><td>Deleted-workspace purge <code>bunkai-purge-deleted-workspaces</code></td><td>Postgres <code>pg_cron</code></td><td><code>0 3 * * *</code> (03:00 UTC), hard-deletes workspaces soft-deleted more than 30 days ago</td><td>Every environment at once</td><td>A failing workspace is counted and skipped</td><td><code>supabase/migrations/0084_workspace_deletion.sql</code></td></tr>
+              <tr><td>Notification digest</td><td>Vercel function</td><td>Vercel Cron <code>0 8 * * *</code> → <code>GET /api/v1/admin/send-digest</code>; <code>POST</code> is the manual same-day retry; both need <code>Bearer {CRON_SECRET}</code></td><td>Production deployment only (Vercel registers crons from production); staging is exercised by a manual <code>POST</code></td><td>Claim-before-send: one claim row per user and UTC day in <code>notification_digest_log</code>; a failed send marks the row failed and the notifications stay unread</td><td><code>vercel.json</code>, <code>app/api/v1/admin/send-digest/route.ts</code>, <code>lib/notifications/send-digest-run.ts</code></td></tr>
+              <tr><td>Jira import worker</td><td><code>after()</code> of <code>POST /api/v1/imports</code></td><td>Per request; one active job per project</td><td>The deployment that took the request</td><td>Job row marked failed (auth) or completed with per-issue errors; a lost <code>after()</code> leaves the job queued and nothing retries it</td><td><code>app/api/v1/imports/route.ts</code>, <code>lib/jira/import-runner.ts</code></td></tr>
+              <tr><td>Workspace export worker</td><td><code>after()</code> of <code>POST /api/v1/workspaces/{id}/data-export</code></td><td>Per request</td><td>Same</td><td>Job marked failed; archive kept 168 hours for download</td><td><code>app/api/v1/workspaces/[id]/data-export/route.ts</code>, <code>lib/workspace-export/</code></td></tr>
+              <tr><td>Deletion emails</td><td><code>after()</code> of <code>DELETE /api/v1/workspaces/{id}</code></td><td>Per request</td><td>Same</td><td>Deletion stands; email failure is logged only</td><td><code>app/api/v1/workspaces/[id]/route.ts</code>, <code>lib/workspace-deletion/email.ts</code></td></tr>
+              <tr><td>Stripe webhook</td><td>Vercel function</td><td>Stripe event delivery</td><td>Whichever endpoint is registered in each Stripe account (not in the repo)</td><td>5xx for an unknown session so Stripe redelivers; duplicates deduplicated by event id</td><td><code>app/api/v1/billing/webhook/route.ts</code></td></tr>
+              <tr><td>Realtime fan-out</td><td>Supabase Realtime</td><td>Row changes on <code>run_atcs</code>, <code>run_steps</code>, <code>notifications</code></td><td>Every environment (shared project)</td><td>Pages stop updating live; writes still succeed</td><td><code>supabase/migrations/0043_run_realtime_replication.sql</code>, <code>supabase/migrations/0053_notifications.sql</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          No route sets <code>maxDuration</code>, so every <code>after()</code> worker runs inside the platform's default function
+          time limit for the plan; an import or export that outruns it is cut off and its job stays queued. Nothing purges
+          expired <code>idempotency_keys</code> rows or expired export archives in Storage (no cron, no <code>remove()</code> call).
+        </p>
+        <p>
+          QA relevance: the two <code>pg_cron</code> jobs act on production rows too, so a staging test that seeds an abandoned run
+          or a deleted workspace is acting on the same database production reads. Assert the sweep by seeding a run whose last
+          activity is over 4 hours old and waiting one tick (or calling the function as an inspector); assert the digest on
+          staging with a manual <code>POST</code>, never by waiting for the cron.
         </p>
       </section>
 
       <section
         id="nfr-performance"
-        data-sources="middleware.ts,app/api/openapi/route.ts,app/api/v1/route.ts,app/(app)/projects/[projectSlug]/atcs/[atcId]/actions.ts,supabase/migrations/0004_atcs.sql,supabase/migrations/0007_save_atc.sql,components/atcs/AtcEditor.tsx,.context/SRS/non-functional-specs.md"
-        data-updated="2026-10-02"
+        data-sources="middleware.ts,lib/api/principal.ts,lib/api/user-jwt.ts,app/api/openapi/route.ts,app/api/v1/route.ts,app/(app)/projects/[projectSlug]/atcs/[atcId]/actions.ts,lib/pagination/keyset-cursor.ts,lib/bugs/list-cursor.ts,lib/jira/client.ts,supabase/migrations/0027_atc_search.sql,supabase/migrations/0059_home_recent_projects_indexes.sql,supabase/migrations/0060_home_active_runs_index.sql,supabase/migrations/0061_home_open_bugs_index.sql,components/atcs/AtcEditor.tsx,components/atcs/NewAtcEditor.tsx,.context/SRS/non-functional-specs.md"
+        data-updated="2026-10-13"
       >
         <h2>NFR: performance</h2>
         <div class="table-wrap">
@@ -420,25 +511,29 @@
             </thead>
             <tbody>
               <tr><td>NFR-PERF-001</td><td>API latency budgets</td><td>SRS intent: under 200 ms p95 single-entity reads, under 500 ms p95 paged lists</td><td>Not measured; no load test or budget check in the repo</td><td><code>.context/SRS/non-functional-specs.md</code> §1 (intent only)</td></tr>
-              <tr><td>NFR-PERF-002</td><td>Session refresh on every request</td><td>[unknown]</td><td>Middleware calls Supabase <code>auth.getUser()</code> on every matched request, <code>/api/*</code> included: one Auth round trip of latency per request</td><td><code>middleware.ts</code></td></tr>
-              <tr><td>NFR-PERF-003</td><td>Atomic ATC save in one round trip</td><td>Inferred: one RPC per save</td><td><code>bunkai_save_atc</code> replaces per-table writes with one transaction</td><td><code>supabase/migrations/0007_save_atc.sql</code></td></tr>
-              <tr><td>NFR-PERF-004</td><td>ATC search index</td><td>[unknown]</td><td><code>atcs.tsv</code> kept by trigger, GIN-indexed</td><td><code>supabase/migrations/0004_atcs.sql</code></td></tr>
+              <tr><td>NFR-PERF-002</td><td>Auth round trips per request</td><td>[unknown]</td><td>The middleware calls <code>auth.getUser()</code> on every matched request, <code>/api/*</code> included, and the gateway calls <code>getUser</code> again to resolve a cookie principal: two Auth round trips per cookie API call</td><td><code>middleware.ts</code>, <code>lib/api/principal.ts</code></td></tr>
+              <tr><td>NFR-PERF-003</td><td>Atomic writes in one round trip</td><td>Inferred: one RPC per business write</td><td><code>bunkai_*</code> RPCs do each write and its audit row in one transaction</td><td><code>supabase/migrations/</code></td></tr>
+              <tr><td>NFR-PERF-004</td><td>ATC search index</td><td>[unknown]</td><td><code>atcs.tsv</code> kept by trigger, GIN-indexed; search RPC added</td><td><code>supabase/migrations/0004_atcs.sql</code>, <code>supabase/migrations/0027_atc_search.sql</code></td></tr>
               <tr><td>NFR-PERF-005</td><td>Spec and preflight caching</td><td>300 s spec cache; 600 s CORS preflight</td><td><code>Cache-Control: public, max-age=300, s-maxage=300</code> on <code>/api/openapi</code> (<code>force-static</code>); <code>access-control-max-age: 600</code> on <code>OPTIONS /api/v1</code> only</td><td><code>app/api/openapi/route.ts</code>, <code>app/api/v1/route.ts</code></td></tr>
-              <tr><td>NFR-PERF-006</td><td>Editor code-splitting</td><td>SRS intent: initial JS bundle of 300 KB gzipped or less on Project View</td><td>Monaco step editor loaded with <code>next/dynamic</code>; bundle size not measured</td><td><code>components/atcs/AtcEditor.tsx</code></td></tr>
+              <tr><td>NFR-PERF-006</td><td>Editor code-splitting</td><td>SRS intent: initial JS bundle of 300 KB gzipped or less on Project View</td><td>Monaco loaded with <code>next/dynamic</code> in both ATC editors; bundle size not measured</td><td><code>components/atcs/AtcEditor.tsx</code>, <code>components/atcs/NewAtcEditor.tsx</code></td></tr>
+              <tr><td>NFR-PERF-007</td><td>Keyset pagination on long lists</td><td>Stable pages without offset scans</td><td>Base64url <code>(timestamp, id)</code> cursors on run history, activity, notifications and bugs; a malformed cursor answers 400</td><td><code>lib/pagination/keyset-cursor.ts</code>, <code>lib/bugs/list-cursor.ts</code></td></tr>
+              <tr><td>NFR-PERF-008</td><td>Home dashboard indexes</td><td>[unknown]</td><td>Dedicated indexes for recent projects, active runs and open bugs</td><td><code>supabase/migrations/0059_home_recent_projects_indexes.sql</code> to <code>0061_home_open_bugs_index.sql</code></td></tr>
+              <tr><td>NFR-PERF-009</td><td>PAT request overhead</td><td>[unknown]</td><td>Per call: prefix lookup with the service-role client, SHA-256 compare, a fresh 60-second user JWT; nothing cached between calls</td><td><code>lib/api/middleware/bearer.ts</code>, <code>lib/api/user-jwt.ts</code></td></tr>
+              <tr><td>NFR-PERF-010</td><td>Jira import throughput</td><td>[unknown]</td><td>100 issues per page; 429 backoff 1 to 16 s over 5 retries; runs in <code>after()</code> with no <code>maxDuration</code></td><td><code>lib/jira/client.ts</code>, <code>lib/jira/import-runner.ts</code></td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          No pagination on list endpoints (no <code>.range()</code> in handlers), no HTTP caching on read endpoints, no app-level cache.
-          QA relevance: latency is testable with k6 or Artillery against staging once a budget is agreed; the per-request
-          <code>getUser</code> call is the first thing to profile.
+          No app-level cache and no HTTP caching on read endpoints. QA relevance: latency is testable with k6 or Artillery against
+          staging once a budget is agreed; the double <code>getUser</code> on cookie calls and the shared Supabase project (staging
+          load lands on the production database) are the first two things to account for.
         </p>
       </section>
 
       <section
         id="nfr-security"
-        data-sources="lib/api/auth.ts,lib/api/middleware/bearer.ts,lib/api/pat.ts,lib/api/invite-tokens.ts,lib/api/workspace-cookie.ts,lib/env.ts,middleware.ts,next.config.ts,app/auth/callback/route.ts,app/api/v1/auth/,app/api/v1/workspaces/[id]/invites/route.ts,app/api/v1/route.ts,supabase/migrations/0005_rls_helpers.sql,supabase/migrations/0011_split_token_secrets.sql"
-        data-updated="2026-10-02"
+        data-sources="lib/api/handler.ts,lib/api/principal.ts,lib/api/capabilities.ts,lib/api/middleware/bearer.ts,lib/api/pat.ts,lib/api/user-jwt.ts,lib/api/route-posture-scan.ts,lib/api/invite-tokens.ts,lib/api/workspace-cookie.ts,lib/env.ts,middleware.ts,next.config.ts,app/auth/,app/api/v1/auth/,app/api/v1/tokens/route.ts,app/api/v1/workspaces/[id]/invites/route.ts,app/api/v1/admin/send-digest/route.ts,app/api/v1/billing/webhook/route.ts,lib/markdown/sanitize.ts,supabase/migrations/0005_rls_helpers.sql,supabase/migrations/0011_split_token_secrets.sql,supabase/migrations/0085_qa_inspector_role_bootstrap_and_function_grants.sql,supabase/migrations/0083_workspace_data_export.sql"
+        data-updated="2026-10-13"
       >
         <h2>NFR: security</h2>
         <div class="table-wrap">
@@ -447,33 +542,39 @@
               <tr><th>ID</th><th>Title</th><th>Target</th><th>Implementation</th><th>Evidence</th></tr>
             </thead>
             <tbody>
-              <tr><td>NFR-SEC-001</td><td>Tenant isolation</td><td>No cross-workspace access</td><td>RLS on every table via SECURITY DEFINER membership helpers</td><td><code>supabase/migrations/0005_rls_helpers.sql</code></td></tr>
+              <tr><td>NFR-SEC-001</td><td>Tenant isolation</td><td>No cross-workspace access</td><td>RLS on every table via SECURITY DEFINER membership helpers; deleted workspaces excluded by the helpers</td><td><code>supabase/migrations/0005_rls_helpers.sql</code>, <code>supabase/migrations/0089_workspace_helpers_deleted_guard.sql</code></td></tr>
               <tr><td>NFR-SEC-002</td><td>PAT storage and verification</td><td>Secret never stored in clear</td><td>32 random bytes; SHA-256 in <code>access_token_secrets</code>; 12-char prefix lookup; uniform 401 on any failure; revocation and expiry checked</td><td><code>lib/api/pat.ts</code>, <code>lib/api/middleware/bearer.ts</code></td></tr>
-              <tr><td>NFR-SEC-003</td><td>PAT lifetime</td><td>At most 365 days when set; no expiry by default</td><td>zod <code>max(365)</code> on <code>expires_in_days</code> / <code>pat_expires_in_days</code>; omitted means <code>expires_at = null</code></td><td><code>app/api/v1/tokens/route.ts</code>, <code>app/api/v1/auth/signin/route.ts</code></td></tr>
-              <tr><td>NFR-SEC-004</td><td>PAT scopes</td><td>SRS intent: scoped tokens</td><td>Stored but not enforced: no handler calls <code>requireScope</code></td><td><code>lib/api/auth.ts</code>, <code>app/api/v1/</code></td></tr>
+              <tr><td>NFR-SEC-003</td><td>PAT lifetime</td><td>At most 365 days when set; no expiry by default</td><td>zod <code>max(365)</code> on <code>expires_in_days</code> / <code>pat_expires_in_days</code>; omitted means <code>expires_at = null</code>. Every headless sign-in and confirm mints a new non-expiring PAT unless asked otherwise</td><td><code>app/api/v1/tokens/route.ts</code>, <code>app/api/v1/auth/signin/route.ts</code>, <code>app/api/v1/auth/confirm/route.ts</code></td></tr>
+              <tr><td>NFR-SEC-004</td><td>PAT scopes</td><td>Scoped tokens</td><td>Enforced: every handler declares a posture; 74 require a capability (<code>atc:read</code>, <code>atc:write</code>, <code>run:execute</code>, <code>workspace:admin</code>); <code>workspace:admin</code> needs a workspace-bound token and cannot be minted by sign-in; a source scan pins postures to a committed snapshot</td><td><code>lib/api/handler.ts</code>, <code>lib/api/principal.ts</code>, <code>lib/api/route-posture-scan.ts</code>, <code>lib/api/route-capability-coverage.snapshot.json</code></td></tr>
               <tr><td>NFR-SEC-005</td><td>Secret side-tables</td><td>QA inspection roles cannot read hashes</td><td><code>*_secrets</code> tables revoked from <code>anon</code>, <code>authenticated</code>, <code>qa_inspector_ro</code>, <code>qa_inspector_rw</code></td><td><code>supabase/migrations/0011_split_token_secrets.sql</code></td></tr>
-              <tr><td>NFR-SEC-006</td><td>Input validation</td><td>Reject malformed input with 422</td><td>zod on request bodies; email max 254, password 6 to 128 chars on signup / signin; ZodError maps to <code>validation_failed</code></td><td><code>app/api/v1/auth/signup/route.ts</code>, <code>lib/api/handler.ts</code></td></tr>
-              <tr><td>NFR-SEC-007</td><td>Open-redirect guard</td><td>Only root-relative <code>next</code></td><td><code>next</code> must start with <code>/</code> and not <code>//</code></td><td><code>app/auth/callback/route.ts</code>, <code>app/api/v1/auth/magic-link/route.ts</code></td></tr>
-              <tr><td>NFR-SEC-008</td><td>Server-only secrets</td><td>Service-role key never in the browser bundle</td><td><code>lib/env.ts</code>, <code>lib/supabase/admin.ts</code> import <code>server-only</code>; the browser reads only <code>NEXT_PUBLIC_*</code></td><td><code>lib/env.ts</code>, <code>lib/supabase/client.ts</code></td></tr>
-              <tr><td>NFR-SEC-009</td><td>Invite tokens</td><td>7-day expiry, hashed at rest</td><td><code>bk_inv_</code> + 32 random bytes; SHA-256 stored; column default <code>now() + 7 days</code>; acceptance checks status, expiry and invitee email</td><td><code>lib/api/invite-tokens.ts</code>, <code>supabase/migrations/0010_workspace_invites.sql</code>, <code>app/api/v1/invites/accept/route.ts</code></td></tr>
-              <tr><td>NFR-SEC-010</td><td>Invite secret in logs</td><td>Finding</td><td>The invite handler <code>console.log</code>s the full accept URL (raw token) to stdout, so anyone with log access can redeem a pending invite</td><td><code>app/api/v1/workspaces/[id]/invites/route.ts</code></td></tr>
-              <tr><td>NFR-SEC-011</td><td>Public user provisioning</td><td>Finding</td><td><code>POST /api/v1/auth/signup</code> is unauthenticated, creates confirmed users and mints full-scope PATs, with no rate limit or CAPTCHA in the app. Whether it is exposed in production is unknown</td><td><code>app/api/v1/auth/signup/route.ts</code></td></tr>
+              <tr><td>NFR-SEC-006</td><td>Input validation</td><td>Reject malformed input with 422</td><td>zod on request bodies; ZodError maps to <code>validation_failed</code>. Passwords: 8 to 128 chars on sign-up, 6 to 128 on sign-in; email max 254; confirmation code 6 to 8 digits</td><td><code>app/api/v1/auth/signup/route.ts</code>, <code>app/api/v1/auth/signin/route.ts</code>, <code>app/api/v1/auth/confirm/route.ts</code>, <code>lib/api/handler.ts</code></td></tr>
+              <tr><td>NFR-SEC-007</td><td>Open-redirect guard</td><td>Only root-relative <code>next</code></td><td><code>safeInternalPath</code>: must start with <code>/</code> and not <code>//</code>, shared by login, callback and magic link</td><td><code>lib/urls.ts</code>, <code>app/auth/callback/route.ts</code></td></tr>
+              <tr><td>NFR-SEC-008</td><td>Server-only secrets</td><td>Service-role and integration keys never in the browser bundle</td><td><code>lib/env.ts</code>, <code>lib/supabase/admin.ts</code>, <code>lib/billing/stripe.ts</code>, <code>lib/mail/resend-client.ts</code> import <code>server-only</code>; the browser reads only <code>NEXT_PUBLIC_*</code>; no secret-looking name carries the public prefix</td><td><code>lib/env.ts</code>, <code>lib/supabase/client.ts</code></td></tr>
+              <tr><td>NFR-SEC-009</td><td>Invite tokens</td><td>7-day expiry, hashed at rest</td><td><code>bk_inv_</code> + 32 random bytes; SHA-256 stored; acceptance checks status, expiry and invitee email</td><td><code>lib/api/invite-tokens.ts</code>, <code>supabase/migrations/0010_workspace_invites.sql</code>, <code>app/api/v1/invites/accept/route.ts</code></td></tr>
+              <tr><td>NFR-SEC-010</td><td>Invite secret in logs</td><td>Finding (still open)</td><td>The invite handler <code>console.log</code>s the full accept URL (raw token) to stdout, so anyone with log access can redeem a pending invite</td><td><code>app/api/v1/workspaces/[id]/invites/route.ts</code> line 144</td></tr>
+              <tr><td>NFR-SEC-011</td><td>Public user provisioning</td><td>Finding (changed)</td><td>Sign-up now goes through Supabase's public <code>signUp</code> and needs the emailed code before any credential is issued, so it is throttled by Supabase's auth email limit (the release ledger records 30 per hour, project-wide). <code>POST /api/v1/auth/check-email</code> is public, deliberately reveals whether an address exists and is confirmed, and has no limiter of its own (its comment says Supabase throttling does not cover it; a limiter is a follow-up in product ADR-0007)</td><td><code>app/api/v1/auth/signup/route.ts</code>, <code>app/api/v1/auth/check-email/route.ts</code>, <code>.context/release/pending-production-v2.md</code></td></tr>
               <tr><td>NFR-SEC-012</td><td>Security headers</td><td>SRS intent: strict CSP, HSTS</td><td>None configured: <code>next.config.ts</code> has no <code>headers()</code> and the middleware adds none (platform defaults only)</td><td><code>next.config.ts</code>, <code>middleware.ts</code></td></tr>
               <tr><td>NFR-SEC-013</td><td>Active-workspace cookie</td><td>Preference, not auth</td><td><code>bk_active_ws</code>: httpOnly, <code>SameSite=Lax</code>, <code>Secure</code> in production, 90-day max-age</td><td><code>lib/api/workspace-cookie.ts</code></td></tr>
+              <tr><td>NFR-SEC-014</td><td>System callers</td><td>No unauthenticated trigger of system work</td><td>Digest route compares <code>Authorization</code> with <code>CRON_SECRET</code> (required at boot, so a deployment cannot run without it); Stripe webhook verifies <code>stripe-signature</code> (400 otherwise)</td><td><code>app/api/v1/admin/send-digest/route.ts</code>, <code>app/api/v1/billing/webhook/route.ts</code>, <code>lib/env.ts</code></td></tr>
+              <tr><td>NFR-SEC-015</td><td>OAuth CSRF</td><td>Reject forged callbacks</td><td>State cookie set before the provider redirect; the callback rejects a mismatch with 403 before the code exchange</td><td><code>app/auth/oauth/[provider]/route.ts</code>, <code>lib/auth/oauth-state.ts</code></td></tr>
+              <tr><td>NFR-SEC-016</td><td>User-supplied Markdown</td><td>No stored XSS</td><td>Rendered with <code>react-markdown</code> through a <code>rehype-sanitize</code> schema</td><td><code>components/markdown/markdown-renderer.tsx</code>, <code>lib/markdown/sanitize.ts</code></td></tr>
+              <tr><td>NFR-SEC-017</td><td>QA inspector roles</td><td>Inspection without committed credentials</td><td>Migration creates <code>qa_inspector_ro</code> / <code>qa_inspector_rw</code> NOLOGIN with no password, <code>BYPASSRLS</code> by design; <code>bun run db:qa-roles</code> sets the login password from <code>.env</code> over the non-pooled connection</td><td><code>supabase/migrations/0085_qa_inspector_role_bootstrap_and_function_grants.sql</code>, <code>scripts/provision-qa-roles.ts</code></td></tr>
+              <tr><td>NFR-SEC-018</td><td>Export archive access</td><td>Only the owner downloads</td><td>Private bucket with no client policy; download goes through the API with an owner check and a 168-hour window</td><td><code>supabase/migrations/0083_workspace_data_export.sql</code>, <code>lib/workspace-export/authorize.ts</code></td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          No hard-coded secrets found in the product files read. Password policy is enforced only by the zod minimum plus whatever the
-          Supabase project sets. QA relevance: RLS and authorization matrices with API tests; OWASP ZAP baseline for headers; explicit
-          tests for SEC-004, SEC-010 and SEC-011 as risk items.
+          No hard-coded secret values found in the product files read. Unmapped database errors return 500 with the raw database
+          message, which can leak schema detail (<code>business-api-context</code> <code>discovery-gaps</code>). QA relevance: auth
+          matrix per posture and scope with API tests; OWASP ZAP baseline for headers; explicit tests for SEC-010, SEC-011 and the
+          workspace-bound token boundary as risk items.
         </p>
       </section>
 
       <section
         id="nfr-reliability"
-        data-sources="lib/api/handler.ts,lib/api/error-envelope.ts,lib/api/idempotency.ts,lib/api/middleware/bearer.ts,app/api/v1/health/route.ts,app/api/v1/auth/magic-link/route.ts,supabase/migrations/0007_save_atc.sql,supabase/migrations/0009_cross_cutting.sql,app/"
-        data-updated="2026-10-02"
+        data-sources="lib/api/handler.ts,lib/api/error-envelope.ts,lib/api/idempotency.ts,lib/api/middleware/bearer.ts,app/api/v1/health/route.ts,app/api/v1/runs/route.ts,app/api/v1/tests/route.ts,app/api/v1/test-plans/[id]/tests/route.ts,app/api/v1/workspaces/[id]/billing/checkout/route.ts,app/api/v1/billing/webhook/route.ts,lib/jira/client.ts,lib/notifications/send-digest-run.ts,supabase/migrations/0009_cross_cutting.sql,supabase/migrations/0075_run_inactivity_sweep.sql,app/"
+        data-updated="2026-10-13"
       >
         <h2>NFR: reliability</h2>
         <div class="table-wrap">
@@ -483,25 +584,29 @@
             </thead>
             <tbody>
               <tr><td>NFR-REL-001</td><td>Uniform error envelope</td><td>Every <code>/api/v1</code> error is <code>{ error: { code, message, details?, request_id } }</code></td><td><code>withApiHandler</code> maps ApiError, ZodError (422) and anything else (500); fixed code → status table</td><td><code>lib/api/handler.ts</code>, <code>lib/api/error-envelope.ts</code></td></tr>
-              <tr><td>NFR-REL-002</td><td>Transactional multi-row writes</td><td>No partial ATC saves</td><td><code>bunkai_save_atc</code> runs in one transaction; workspace bootstrap is one RPC</td><td><code>supabase/migrations/0007_save_atc.sql</code>, <code>supabase/migrations/0006_bootstrap_workspace.sql</code></td></tr>
-              <tr><td>NFR-REL-003</td><td>Idempotent POST replay</td><td>SRS intent; table TTL 24 h; key 8 to 128 chars</td><td>Helper and table exist (column default <code>now() + 24 hours</code>, key regex), but no route uses them, and nothing purges expired rows</td><td><code>lib/api/idempotency.ts</code>, <code>supabase/migrations/0009_cross_cutting.sql</code></td></tr>
+              <tr><td>NFR-REL-002</td><td>Transactional multi-row writes</td><td>No partial business writes</td><td>Each business write is one <code>bunkai_*</code> RPC transaction with its audit row</td><td><code>supabase/migrations/</code></td></tr>
+              <tr><td>NFR-REL-003</td><td>Idempotent POST replay</td><td>Replay the first answer for the same key; 24 h rows</td><td>Required (400 without a key) on 4 creates: runs, tests, test-plan membership, billing checkout; 409 on a different body or an in-flight duplicate. Nothing purges expired rows</td><td><code>lib/api/idempotency.ts</code>, <code>app/api/v1/runs/route.ts</code>, <code>app/api/v1/tests/route.ts</code>, <code>app/api/v1/test-plans/[id]/tests/route.ts</code>, <code>app/api/v1/workspaces/[id]/billing/checkout/route.ts</code></td></tr>
               <tr><td>NFR-REL-004</td><td>Health endpoint</td><td>Liveness only</td><td><code>GET /api/v1/health</code> returns <code>ok</code>, service, env and timestamp without touching the database: not a readiness check</td><td><code>app/api/v1/health/route.ts</code></td></tr>
-              <tr><td>NFR-REL-005</td><td>Best-effort side writes</td><td>Never fail the user request</td><td>Magic-link audit rows and PAT <code>last_used_at</code> are fire-and-forget with swallowed errors</td><td><code>app/api/v1/auth/magic-link/route.ts</code>, <code>lib/api/middleware/bearer.ts</code></td></tr>
-              <tr><td>NFR-REL-006</td><td>UI error boundaries</td><td>[none]</td><td>No <code>error.tsx</code>, <code>loading.tsx</code> or <code>not-found.tsx</code> under <code>app/</code>; the Next.js default error page applies</td><td><code>app/</code></td></tr>
+              <tr><td>NFR-REL-005</td><td>Best-effort side writes</td><td>Never fail the user request</td><td>Magic-link audit rows, PAT <code>last_used_at</code> and deletion emails are fire-and-forget</td><td><code>app/api/v1/auth/magic-link/route.ts</code>, <code>lib/api/middleware/bearer.ts</code>, <code>app/api/v1/workspaces/[id]/route.ts</code></td></tr>
+              <tr><td>NFR-REL-006</td><td>UI error boundaries</td><td>[none beyond one]</td><td>One <code>not-found.tsx</code> under <code>app/(app)/projects/[projectSlug]/</code>; no <code>error.tsx</code>, <code>global-error.tsx</code> or <code>loading.tsx</code> anywhere, so the Next.js default error page applies</td><td><code>app/</code></td></tr>
+              <tr><td>NFR-REL-007</td><td>Outbound retries</td><td>Survive transient upstream limits</td><td>Jira 429: 5 retries, 1 to 16 s or <code>Retry-After</code>. Stripe webhook: 5xx for an unknown session so Stripe redelivers. No retry around Supabase, Resend or Stripe API calls</td><td><code>lib/jira/client.ts</code>, <code>app/api/v1/billing/webhook/route.ts</code></td></tr>
+              <tr><td>NFR-REL-008</td><td>Self-healing run state</td><td>No run stays running forever</td><td><code>pg_cron</code> sweep every 15 minutes aborts runs idle for 4 hours</td><td><code>supabase/migrations/0075_run_inactivity_sweep.sql</code></td></tr>
+              <tr><td>NFR-REL-009</td><td>At-most-once digest</td><td>One digest per user per UTC day</td><td>Claim row written before sending; a manual <code>POST</code> retries the same day without duplicates</td><td><code>lib/notifications/send-digest-run.ts</code></td></tr>
+              <tr><td>NFR-REL-010</td><td>Background work durability</td><td>[none]</td><td><code>after()</code> jobs have no retry or reaper: a lost callback leaves the job queued; an import or export longer than the default function limit is cut off</td><td><code>app/api/v1/imports/route.ts</code>, <code>app/api/v1/workspaces/[id]/data-export/route.ts</code></td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          No retry, backoff or timeout wrappers around Supabase calls. SRS intent (99.5% uptime, under 1% 5xx, under 30 min MTTR) has no
-          implementation evidence. QA relevance: assert the error envelope and <code>x-request-id</code> on every negative API test; treat
-          idempotency as untested-by-design until a route wires it.
+          SRS intent (99.5% uptime, under 1% 5xx, under 30 min MTTR) has no implementation evidence. QA relevance: assert the
+          error envelope and <code>x-request-id</code> on every negative API test; send an <code>Idempotency-Key</code> on the four
+          creates and test replay and conflict explicitly; test stuck-job behaviour for import and export.
         </p>
       </section>
 
       <section
         id="nfr-scalability"
-        data-sources="lib/supabase/,lib/api/,lib/urls.ts,supabase/migrations/,package.json"
-        data-updated="2026-10-02"
+        data-sources="lib/supabase/,lib/api/,lib/urls.ts,vercel.json,supabase/migrations/,package.json,.agents/project.yaml"
+        data-updated="2026-10-13"
       >
         <h2>NFR: scalability</h2>
         <div class="table-wrap">
@@ -510,22 +615,24 @@
               <tr><th>ID</th><th>Title</th><th>Target</th><th>Implementation</th><th>Evidence</th></tr>
             </thead>
             <tbody>
-              <tr><td>NFR-SCAL-001</td><td>Stateless request handling</td><td>Horizontal scale on Vercel</td><td>Session in cookies (JWT) and PATs in the DB; server code keeps no in-memory state (the only singleton is the per-tab browser client)</td><td><code>lib/supabase/client.ts</code>, <code>lib/api/auth.ts</code></td></tr>
+              <tr><td>NFR-SCAL-001</td><td>Stateless request handling</td><td>Horizontal scale on Vercel</td><td>Session in cookies, PATs and job state in the DB; server code keeps no in-memory state across requests (the lazy Stripe client is a per-instance cache only)</td><td><code>lib/supabase/client.ts</code>, <code>lib/api/principal.ts</code>, <code>lib/billing/stripe.ts</code></td></tr>
               <tr><td>NFR-SCAL-002</td><td>Database access path</td><td>[unknown]</td><td>HTTP through PostgREST, no direct pooled connection from the app; pool and plan limits live in the Supabase project</td><td><code>lib/supabase/</code></td></tr>
-              <tr><td>NFR-SCAL-003</td><td>Async processing</td><td>[none]</td><td>No queues, cron handlers or background workers in the product code; every write happens in the request</td><td><code>package.json</code>, <code>app/</code></td></tr>
+              <tr><td>NFR-SCAL-003</td><td>Async processing</td><td>Work off the request path</td><td><code>after()</code> callbacks (import, export, deletion email), <code>pg_cron</code> (sweep, purge), one Vercel Cron (digest); no queue, so concurrency is bounded only by function instances and the one-active-import-per-project rule</td><td><code>app/api/v1/imports/route.ts</code>, <code>vercel.json</code>, <code>supabase/migrations/0075_run_inactivity_sweep.sql</code></td></tr>
+              <tr><td>NFR-SCAL-004</td><td>Shared database across environments</td><td>[none]</td><td>One Supabase project backs local, staging and production for the MVP, so test load and production load share one pool, one Auth email quota and one Realtime quota</td><td>product <code>.agents/project.yaml</code> <code>environments</code>, <code>.context/release/pending-production-v2.md</code></td></tr>
+              <tr><td>NFR-SCAL-005</td><td>Plan limits</td><td>Projects per workspace by plan</td><td>Trigger refuses a project above the plan limit (Community 3, Cloud 50, Enterprise unlimited, per <code>business-data-context</code>)</td><td><code>supabase/migrations/</code></td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          SRS intent (50 concurrent active users per workspace for the MVP, Supavisor pooling) has no code evidence. QA relevance: any load
-          test must budget for the Supabase plan limits and the per-request <code>getUser</code> call.
+          SRS intent (50 concurrent active users per workspace for the MVP, Supavisor pooling) has no code evidence. QA relevance:
+          any load test against staging is a load test against the production database; agree a window and a budget first.
         </p>
       </section>
 
       <section
         id="nfr-observability"
-        data-sources="lib/api/logging.ts,lib/api/request-id.ts,lib/api/handler.ts,app/api/v1/workspaces/[id]/invites/route.ts,package.json"
-        data-updated="2026-10-02"
+        data-sources="lib/api/logging.ts,lib/api/request-id.ts,lib/api/handler.ts,lib/billing/stripe.ts,lib/notifications/send-digest-run.ts,app/api/v1/workspaces/[id]/invites/route.ts,supabase/migrations/0045_activity_stream.sql,package.json"
+        data-updated="2026-10-13"
       >
         <h2>NFR: observability</h2>
         <div class="table-wrap">
@@ -534,28 +641,58 @@
               <tr><th>ID</th><th>Title</th><th>Target</th><th>Implementation</th><th>Evidence</th></tr>
             </thead>
             <tbody>
-              <tr><td>NFR-OBS-001</td><td>Structured access log</td><td>One JSON line per API request</td><td><code>logRequest</code> writes <code>{ level, ts, component: "api", request_id, method, path, status, duration_ms, error_code?, message? }</code> to stdout (info / warn for 4xx / error for 5xx), meant for Vercel log indexing</td><td><code>lib/api/logging.ts</code>, <code>lib/api/handler.ts</code></td></tr>
+              <tr><td>NFR-OBS-001</td><td>Structured access log</td><td>One JSON line per API request</td><td><code>logRequest</code> writes <code>{ level, ts, component: "api", request_id, method, path, status, duration_ms, error_code?, message? }</code> to stdout (info / warn for 4xx / error for 5xx). The type declares <code>user_id</code> but the gateway never fills it</td><td><code>lib/api/logging.ts</code>, <code>lib/api/handler.ts</code></td></tr>
               <tr><td>NFR-OBS-002</td><td>Request correlation</td><td><code>x-request-id</code> on every API response</td><td>Inbound header reused if 1 to 128 chars, else a new UUID; echoed in the header and in error bodies</td><td><code>lib/api/request-id.ts</code></td></tr>
               <tr><td>NFR-OBS-003</td><td>Error tracking, metrics, tracing</td><td>SRS intent: Sentry, PostHog, Vercel Analytics</td><td>None installed</td><td><code>package.json</code></td></tr>
+              <tr><td>NFR-OBS-004</td><td>Business audit trail</td><td>Who did what, per workspace</td><td><code>activity_log</code> is now written by the business RPCs and read by the activity feed</td><td><code>supabase/migrations/0045_activity_stream.sql</code>, <code>supabase/migrations/</code></td></tr>
+              <tr><td>NFR-OBS-005</td><td>Job outcome records</td><td>Background work leaves a trace</td><td>Import and export job rows, <code>notification_digest_log</code>, <code>stripe_webhook_events</code>, <code>cron.job_run_details</code> (pg_cron's own table)</td><td><code>supabase/migrations/</code></td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          Routes outside <code>withApiHandler</code> (<code>/api/openapi</code>, <code>/auth/callback</code>, pages, the Server Action) emit no access
-          log. The <code>activity_log</code> table exists but nothing writes to it. QA relevance: quote <code>request_id</code> in every API bug
-          report; log access per environment is unverified.
+          Routes outside <code>withApiHandler</code> (<code>/api/openapi</code>, <code>/auth/callback</code>,
+          <code>/auth/oauth/{provider}</code>, pages, the Server Action) and the <code>after()</code> workers emit no access log;
+          workers log with plain <code>console.error</code>. Integration misconfiguration (a missing Stripe key) is logged
+          server-side only. QA relevance: quote <code>request_id</code> in every API bug report; for async work, read the job row,
+          not the log; log access per environment is unverified.
+        </p>
+      </section>
+
+      <section
+        id="nfr-compliance"
+        data-sources="app/api/v1/workspaces/[id]/data-export/route.ts,lib/workspace-export/,app/api/v1/workspaces/[id]/route.ts,supabase/migrations/0083_workspace_data_export.sql,supabase/migrations/0084_workspace_deletion.sql,supabase/migrations/0084a_workspace_deletion_recursion_fix.sql,app/(app)/settings/data-export/page.tsx,app/workspaces/[id]/restore/page.tsx"
+        data-updated="2026-10-13"
+      >
+        <h2>NFR: compliance</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Title</th><th>Target</th><th>Implementation</th><th>Evidence</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>NFR-COMP-001</td><td>Workspace data export</td><td>An owner can take all workspace data out</td><td>Asynchronous zip export to the private bucket, downloadable by the owner for 168 hours; browser session only</td><td><code>app/api/v1/workspaces/[id]/data-export/route.ts</code>, <code>lib/workspace-export/constants.ts</code>, <code>supabase/migrations/0083_workspace_data_export.sql</code></td></tr>
+              <tr><td>NFR-COMP-002</td><td>Workspace erasure</td><td>Permanently erased 30 days after deletion</td><td>Soft delete with a 30-day restore window and a restore link by email; daily <code>pg_cron</code> purge hard-deletes after the deadline and leaves a tombstone</td><td><code>supabase/migrations/0084_workspace_deletion.sql</code>, <code>app/workspaces/[id]/restore/page.tsx</code></td></tr>
+              <tr><td>NFR-COMP-003</td><td>Account (user) deletion</td><td>[unknown]</td><td>No API deletes a user account; erasure is per workspace only</td><td><code>app/api/v1/</code></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          No GDPR, SOC 2 or retention policy document in the code; export archives are not removed from Storage after their
+          window. Needs review. QA relevance: export contents, the restore window and purge timing are testable on staging, but the
+          purge runs on the shared database (see <code>background-jobs</code>).
         </p>
       </section>
 
       <section
         id="backend"
-        data-sources="package.json,bun.lock,tsconfig.json,next.config.ts,lib/env.ts,.env.example,.envrc,lib/supabase/,lib/api/auth.ts,lib/api/middleware/bearer.ts,lib/api/pat.ts,lib/urls.ts,app/api/v1/auth/,app/auth/callback/route.ts,app/api/v1/health/route.ts,supabase/migrations/,scripts/gen-supabase-types.ts,scripts/openapi-gen.ts,scripts/openapi-diff.ts,app/qa/qa-config.ts,.husky/"
-        data-updated="2026-10-02"
+        data-sources="package.json,bun.lock,tsconfig.json,next.config.ts,lib/env.ts,.env.example,.envrc,lib/supabase/,lib/api/principal.ts,lib/api/middleware/bearer.ts,lib/api/pat.ts,lib/api/user-jwt.ts,lib/urls.ts,app/api/v1/auth/,app/auth/,app/api/v1/health/route.ts,supabase/migrations/,supabase/migrations/README.md,scripts/gen-supabase-types.ts,scripts/openapi-gen.ts,scripts/openapi-diff.ts,scripts/provision-qa-roles.ts,scripts/check-release-readiness.ts,middleware.test.ts,lib/tests/rls-isolation.test.ts,app/qa/qa-config.ts,.husky/"
+        data-updated="2026-10-13"
       >
         <h2>Backend</h2>
         <p>
-          The backend is the server half of the single Next.js app: Route Handlers under <code>app/api/v1/**</code>, one Server Action,
-          server components, and Supabase (Postgres + Auth) reached over HTTP. No separate service, no ORM, no Docker.
+          The backend is the server half of the single Next.js app: Route Handlers under <code>app/api/v1/**</code>, one Server
+          Action, server components, <code>after()</code> workers, and Supabase (Postgres, Auth, Realtime, Storage) reached over
+          HTTP. No separate service, no ORM, no Docker.
         </p>
 
         <h3>Runtime environment</h3>
@@ -565,9 +702,9 @@
               <tr><th>Aspect</th><th>Value</th><th>Found in</th></tr>
             </thead>
             <tbody>
-              <tr><td>Language</td><td>TypeScript <code>^5.9</code>, <code>strict: true</code>, target ES2022; path aliases <code>@/*</code>, <code>@app/*</code>, <code>@components/*</code>, <code>@lib/*</code></td><td><code>tsconfig.json</code></td></tr>
+              <tr><td>Language</td><td>TypeScript <code>^5.9.3</code>, <code>strict: true</code>, target ES2022; path aliases <code>@/*</code>, <code>@app/*</code>, <code>@components/*</code>, <code>@lib/*</code></td><td><code>tsconfig.json</code></td></tr>
               <tr><td>Framework</td><td>Next.js <code>^15</code> (App Router), React <code>^19</code></td><td><code>package.json</code></td></tr>
-              <tr><td>Runtime</td><td>Node.js server via <code>next start</code> / Vercel functions. No route sets <code>runtime = 'edge'</code>; the middleware runs in Next's middleware (edge) runtime. Node version not pinned (no <code>.nvmrc</code>, <code>.node-version</code> or <code>engines</code>)</td><td><code>package.json</code>, <code>app/api/</code>, <code>middleware.ts</code></td></tr>
+              <tr><td>Runtime</td><td>Node.js server via <code>next start</code> / Vercel functions; no route sets <code>runtime = 'edge'</code> or <code>maxDuration</code>; the middleware runs in Next's middleware runtime. Node version not pinned (no <code>.nvmrc</code>, <code>.node-version</code> or <code>engines</code>)</td><td><code>package.json</code>, <code>app/api/</code>, <code>middleware.ts</code></td></tr>
               <tr><td>Package manager</td><td>Bun (<code>bun.lock</code>; scripts call <code>bun</code>)</td><td><code>bun.lock</code>, <code>package.json</code></td></tr>
               <tr><td>Env loading</td><td>Next.js reads <code>.env</code> / <code>.env.local</code>; <code>.envrc</code> (direnv) exports <code>.env</code> into the shell, optional</td><td><code>.envrc</code></td></tr>
             </tbody>
@@ -584,17 +721,21 @@
               <tr><td><code>dev</code></td><td><code>next dev</code></td><td>Local server on port 3000 (no <code>--turbo</code> flag)</td></tr>
               <tr><td><code>build</code></td><td><code>next build</code></td><td>Production build into <code>.next/</code> (no <code>standalone</code> / <code>export</code> output)</td></tr>
               <tr><td><code>start</code></td><td><code>next start</code></td><td>Serve the build</td></tr>
+              <tr><td><code>test</code></td><td><code>bun test</code></td><td>Runs every <code>*.test.ts(x)</code> file (product and boilerplate) with Bun's runner</td></tr>
               <tr><td><code>typecheck</code> / <code>types:check</code></td><td><code>tsc --noEmit</code></td><td>Type check (same command twice)</td></tr>
-              <tr><td><code>types:gen</code></td><td><code>bun scripts/gen-supabase-types.ts</code></td><td>Regenerate <code>lib/types/supabase.ts</code> with <code>bunx supabase gen types typescript --project-id {ref} --schema public</code>; ref from <code>SUPABASE_PROJECT_REF</code> or derived from <code>NEXT_PUBLIC_SUPABASE_URL</code></td></tr>
-              <tr><td><code>openapi:gen</code></td><td><code>bun scripts/openapi-gen.ts</code></td><td>Regenerate the committed <code>public/openapi.json</code> from every <code>route.openapi.ts</code></td></tr>
-              <tr><td><code>openapi:diff</code></td><td><code>bun scripts/openapi-diff.ts</code></td><td>Informational diff of the generated spec against <code>.context/SRS/api-contracts.yaml</code>; always exits 0</td></tr>
+              <tr><td><code>types:gen</code></td><td><code>bun scripts/gen-supabase-types.ts</code></td><td>Regenerate <code>lib/types/supabase.ts</code> from the live project schema; ref from <code>SUPABASE_PROJECT_REF</code> or derived from <code>NEXT_PUBLIC_SUPABASE_URL</code></td></tr>
+              <tr><td><code>openapi:gen</code> / <code>openapi:check</code></td><td><code>bun scripts/openapi-gen.ts</code> (<code>--check</code>)</td><td>Regenerate, or fail when stale, the committed <code>public/openapi.json</code></td></tr>
+              <tr><td><code>openapi:diff</code></td><td><code>bun scripts/openapi-diff.ts</code></td><td>Informational diff against <code>.context/SRS/api-contracts.yaml</code>; always exits 0</td></tr>
+              <tr><td><code>db:qa-roles</code></td><td><code>bun scripts/provision-qa-roles.ts</code></td><td>Sets login passwords on the QA inspector roles from <code>.env</code> over <code>POSTGRES_URL_NON_POOLING</code></td></tr>
+              <tr><td><code>release:check</code></td><td><code>bun scripts/check-release-readiness.ts</code></td><td>Runs the <code>verify</code> block of each pending entry in <code>.context/release/pending-production-*.md</code>; non-zero while anything is pending</td></tr>
               <tr><td><code>lint:check</code></td><td><code>eslint .</code></td><td>Lint (antfu config + Next plugin)</td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          Every other script in <code>package.json</code> (<code>setup</code>, <code>up</code>, <code>jira:*</code>, <code>skills:*</code>, <code>vars:*</code>,
-          <code>api:sync</code>, <code>repo:check</code>) belongs to the inherited agentic boilerplate, not the product.
+          Every other script in <code>package.json</code> (<code>setup</code>, <code>up</code>, <code>jira:*</code>,
+          <code>skills:*</code>, <code>vars:*</code>, <code>agents:*</code>, <code>api:sync</code>, <code>repo:check</code>) belongs
+          to the inherited agentic boilerplate, not the product.
         </p>
 
         <h3>Core dependencies</h3>
@@ -604,12 +745,15 @@
               <tr><th>Category</th><th>Package</th><th>Version</th><th>Purpose</th></tr>
             </thead>
             <tbody>
-              <tr><td>Data / auth client</td><td><code>@supabase/supabase-js</code></td><td><code>^2.106.0</code></td><td>PostgREST queries, RPCs, Auth admin API</td></tr>
+              <tr><td>Data / auth client</td><td><code>@supabase/supabase-js</code></td><td><code>^2.106.0</code></td><td>PostgREST queries, RPCs, Auth, Realtime, Storage</td></tr>
               <tr><td>SSR auth</td><td><code>@supabase/ssr</code></td><td><code>^0.10.3</code></td><td>Cookie-bound server and browser clients, middleware session refresh</td></tr>
               <tr><td>Validation</td><td><code>zod</code></td><td><code>^4.4.3</code></td><td>Request bodies, env schema</td></tr>
               <tr><td>API contract</td><td><code>@asteasolutions/zod-to-openapi</code></td><td><code>^8.5.0</code></td><td>OpenAPI generation from zod</td></tr>
               <tr><td>API docs UI</td><td><code>@scalar/api-reference-react</code></td><td><code>^0.9.38</code></td><td><code>/api/docs</code></td></tr>
-              <tr><td>Test runner</td><td>none</td><td>-</td><td>No jest, vitest, Playwright or Cypress dependency</td></tr>
+              <tr><td>Payments</td><td><code>stripe</code></td><td><code>^22.6.0</code></td><td>Checkout Sessions, webhook signature check</td></tr>
+              <tr><td>Email</td><td><code>resend</code></td><td><code>^6.24.0</code></td><td>Digest and deletion emails</td></tr>
+              <tr><td>Archive</td><td><code>fflate</code></td><td><code>^0.8.3</code></td><td>Workspace export zip</td></tr>
+              <tr><td>Test runner</td><td>Bun built-in (<code>bun test</code>), <code>@happy-dom/global-registrator</code> <code>^20.12.0</code> for DOM-dependent tests</td><td>-</td><td>Unit, route and live-database tests</td></tr>
             </tbody>
           </table>
         </div>
@@ -621,21 +765,26 @@
               <tr><th>Class</th><th>Key</th><th>Read by</th><th>Notes</th></tr>
             </thead>
             <tbody>
-              <tr><td>Required</td><td><code>NEXT_PUBLIC_SUPABASE_URL</code></td><td><code>lib/env.ts</code>, <code>lib/supabase/client.ts</code>, <code>middleware.ts</code>, <code>scripts/gen-supabase-types.ts</code></td><td>Public; inlined into the browser bundle</td></tr>
-              <tr><td>Required</td><td><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code></td><td><code>lib/env.ts</code>, <code>lib/supabase/client.ts</code>, <code>middleware.ts</code></td><td>Public; <strong>not declared</strong> in <code>.env.example</code></td></tr>
-              <tr><td>Required (server-only)</td><td><code>SUPABASE_SERVICE_ROLE_KEY</code></td><td><code>lib/env.ts</code> → <code>lib/supabase/admin.ts</code></td><td>Bypasses RLS; <strong>not declared</strong> in <code>.env.example</code></td></tr>
-              <tr><td>Optional</td><td><code>SUPABASE_JWT_SECRET</code></td><td><code>lib/env.ts</code></td><td>Validated, read by no code</td></tr>
-              <tr><td>Optional</td><td><code>NEXT_PUBLIC_APP_URL</code></td><td><code>lib/env.ts</code></td><td>Default <code>http://localhost:3000</code>; validated but read by no code: redirect and invite URLs come from the hard-coded <code>APP_URLS</code> in <code>lib/urls.ts</code></td></tr>
+              <tr><td>Required</td><td><code>NEXT_PUBLIC_SUPABASE_URL</code></td><td><code>lib/env.ts</code>, <code>lib/supabase/client.ts</code>, <code>middleware.ts</code></td><td>Public; inlined into the browser bundle</td></tr>
+              <tr><td>Required</td><td><code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code></td><td><code>lib/env.ts</code>, <code>lib/supabase/client.ts</code>, <code>middleware.ts</code></td><td>Public; not declared in <code>.env.example</code></td></tr>
+              <tr><td>Required (server-only)</td><td><code>SUPABASE_SERVICE_ROLE_KEY</code></td><td><code>lib/env.ts</code> → <code>lib/supabase/admin.ts</code></td><td>Bypasses RLS; not declared in <code>.env.example</code></td></tr>
+              <tr><td>Required (server-only)</td><td><code>CRON_SECRET</code></td><td><code>lib/env.ts</code> → <code>app/api/v1/admin/send-digest/route.ts</code></td><td>Boot fails without it (ADR-0017); not declared in <code>.env.example</code></td></tr>
+              <tr><td>Optional in schema, required for PATs</td><td><code>SUPABASE_JWT_SECRET</code></td><td><code>lib/api/principal.ts</code>, <code>lib/api/user-jwt.ts</code></td><td>Signs the 60-second user JWT; without it every PAT call answers 500 <code>internal_error</code></td></tr>
+              <tr><td>Optional (default)</td><td><code>NEXT_PUBLIC_APP_URL</code></td><td><code>lib/billing/checkout.ts</code></td><td>Default <code>http://localhost:3000</code>; only the Stripe success and cancel URLs read it</td></tr>
+              <tr><td>External service</td><td><code>STRIPE_SECRET_KEY</code>, <code>STRIPE_WEBHOOK_SECRET</code>, <code>STRIPE_CLOUD_PRICE_ID</code></td><td><code>lib/billing/stripe.ts</code></td><td>Missing → 503 <code>payment_processor_unavailable</code> when needed</td></tr>
+              <tr><td>External service</td><td><code>RESEND_API_KEY</code>, <code>RESEND_DIGEST_FROM_EMAIL</code></td><td>digest and workspace routes</td><td>Missing key → failed send, never a boot error; sender defaults to Resend's sandbox address</td></tr>
+              <tr><td>External service</td><td><code>ATLASSIAN_URL</code>, <code>ATLASSIAN_EMAIL</code>, <code>ATLASSIAN_API_TOKEN</code></td><td><code>lib/jira/client.ts</code> via <code>lib/env.ts</code></td><td>Missing → import job fails with <code>jira_unauthorized</code></td></tr>
               <tr><td>Platform</td><td><code>VERCEL_ENV</code>, <code>NODE_ENV</code></td><td><code>lib/urls.ts</code>, <code>lib/api/workspace-cookie.ts</code></td><td>Set by Vercel / Next</td></tr>
-              <tr><td>Tooling</td><td><code>SUPABASE_PROJECT_REF</code></td><td><code>scripts/gen-supabase-types.ts</code></td><td>Optional override for <code>types:gen</code></td></tr>
-              <tr><td>Declared, unread</td><td><code>SUPABASE_PUBLISHABLE_KEY</code>, <code>SUPABASE_SECRET_KEY</code>, <code>POSTGRES_HOST</code>, <code>POSTGRES_USER</code>, <code>POSTGRES_PASSWORD</code>, <code>POSTGRES_DATABASE</code>, <code>POSTGRES_URL</code>, <code>POSTGRES_URL_NON_POOLING</code>, <code>POSTGRES_PRISMA_URL</code></td><td>no product code</td><td>In <code>.env.example</code> only (Vercel + Supabase integration snippet)</td></tr>
+              <tr><td>Tooling and tests</td><td><code>SUPABASE_PROJECT_REF</code>, <code>POSTGRES_URL</code>, <code>POSTGRES_URL_NON_POOLING</code>, <code>QA_E2E_USER_EMAIL</code>, <code>QA_E2E_USER_PASSWORD</code></td><td><code>scripts/</code>, live-database test files</td><td>Not read by the running app</td></tr>
+              <tr><td>Declared, unread by the app</td><td><code>SUPABASE_PUBLISHABLE_KEY</code>, <code>SUPABASE_SECRET_KEY</code>, <code>SUPABASE_ACCESS_TOKEN</code>, <code>POSTGRES_HOST</code>, <code>POSTGRES_USER</code>, <code>POSTGRES_PASSWORD</code>, <code>POSTGRES_DATABASE</code>, <code>POSTGRES_PRISMA_URL</code>, <code>DBHUB_*</code>, <code>JIRA_PROJECT_KEY</code>, <code>JIRA_SYNC_OUTPUT</code>, <code>N8N_API_KEY</code>, <code>N8N_API_URL</code>, <code>TAVILY_API_KEY</code></td><td>no product code</td><td>In <code>.env.example</code> for the Vercel + Supabase integration, MCP servers and boilerplate tooling (<code>SUPABASE_ACCESS_TOKEN</code> is used by the release ledger checks)</td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          Consequence: <code>cp .env.example .env</code> alone does not boot the app. Any server module importing <code>lib/env.ts</code> throws
-          <code>[bunkai/env] Invalid environment variables</code> until <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> and
-          <code>SUPABASE_SERVICE_ROLE_KEY</code> are added by hand.
+          Consequence: <code>cp .env.example .env</code> alone still does not boot the app. Any server module importing
+          <code>lib/env.ts</code> throws <code>[bunkai/env] Invalid environment variables</code> until
+          <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code> and <code>CRON_SECRET</code> are added by
+          hand, and PAT calls fail until <code>SUPABASE_JWT_SECRET</code> is set.
         </p>
 
         <h3>Database configuration</h3>
@@ -646,12 +795,13 @@
             </thead>
             <tbody>
               <tr><td>Type / provider</td><td>PostgreSQL on Supabase, reached through PostgREST (HTTPS), never a direct connection from the app</td><td><code>lib/supabase/</code></td></tr>
-              <tr><td>ORM</td><td>none; typed client <code>SupabaseClient</code> typed with <code>Database</code></td><td><code>lib/supabase/server.ts</code>, <code>lib/types/supabase.ts</code></td></tr>
-              <tr><td>Migrations</td><td>Forward-only plain SQL, <code>0001_tenancy.sql</code> to <code>0012_drop_legacy_token_hashes.sql</code>, no down scripts</td><td><code>supabase/migrations/</code></td></tr>
-              <tr><td>Migration tool / apply command</td><td>None in the repo: no <code>supabase/config.toml</code>, no Supabase CLI dependency, no script that applies migrations</td><td><code>supabase/</code>, <code>package.json</code></td></tr>
+              <tr><td>ORM</td><td>none; <code>SupabaseClient</code> typed with <code>Database</code></td><td><code>lib/supabase/server.ts</code>, <code>lib/types/supabase.ts</code></td></tr>
+              <tr><td>Extensions</td><td><code>pgcrypto</code>, <code>pg_cron</code>; Realtime publication on 3 tables; Storage bucket <code>workspace-exports</code> (private)</td><td><code>supabase/migrations/0001_tenancy.sql</code>, <code>0075_run_inactivity_sweep.sql</code>, <code>0043_run_realtime_replication.sql</code>, <code>0083_workspace_data_export.sql</code></td></tr>
+              <tr><td>Migrations</td><td>Forward-only plain SQL, 89 files <code>0001</code> to <code>0090</code>, no down scripts</td><td><code>supabase/migrations/</code></td></tr>
+              <tr><td>Migration tool / apply</td><td>Applied to the one remote Supabase project through the Supabase MCP <code>apply_migration</code> tool, one ledger row per file in <code>supabase_migrations.schema_migrations</code>; DDL through <code>execute_sql</code> is forbidden by convention. No <code>supabase/config.toml</code>, no CLI script</td><td><code>supabase/migrations/README.md</code></td></tr>
               <tr><td>Seed</td><td>None (no <code>seed.sql</code>, no seed script)</td><td><code>supabase/</code></td></tr>
-              <tr><td>Generated types</td><td><code>lib/types/supabase.ts</code> (from the LIVE project schema via <code>types:gen</code>), plus hand-written <code>lib/types.ts</code></td><td><code>scripts/gen-supabase-types.ts</code></td></tr>
-              <tr><td>QA DB access</td><td>DBHub over the Supabase session pooler (port 5432) with <code>qa_inspector_ro.{project-ref}</code>; keys <code>DBHUB_TYPE</code>, <code>DBHUB_HOST</code>, <code>DBHUB_PORT</code>, <code>DBHUB_DATABASE</code>, <code>DBHUB_USER</code>, <code>DBHUB_PASSWORD</code>. The <code>/qa</code> page describes both inspector roles as <code>BYPASSRLS</code></td><td><code>dbhub.toml</code>, <code>app/qa/qa-config.ts</code></td></tr>
+              <tr><td>Generated types</td><td><code>lib/types/supabase.ts</code> from the live schema via <code>types:gen</code>, plus hand-written <code>lib/types.ts</code></td><td><code>scripts/gen-supabase-types.ts</code></td></tr>
+              <tr><td>QA DB access</td><td>DBHub over the Supabase pooler with the inspector roles; keys <code>DBHUB_TYPE</code>, <code>DBHUB_HOST</code>, <code>DBHUB_PORT</code>, <code>DBHUB_DATABASE</code>, <code>DBHUB_USER</code>, <code>DBHUB_PASSWORD</code>. Roles are created by migration 0085 (<code>BYPASSRLS</code>, NOLOGIN until <code>db:qa-roles</code> runs)</td><td><code>dbhub.toml</code>, <code>app/qa/qa-config.ts</code>, <code>supabase/migrations/0085_qa_inspector_role_bootstrap_and_function_grants.sql</code></td></tr>
             </tbody>
           </table>
         </div>
@@ -663,10 +813,12 @@ bun install
 # 2. Environment: .env.example is NOT sufficient on its own (see the table above)
 cp .env.example .env
 #    then set at least:
-#    NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+#    NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
+#    SUPABASE_SERVICE_ROLE_KEY, CRON_SECRET, SUPABASE_JWT_SECRET
+#    optional per feature: STRIPE_*, RESEND_API_KEY, ATLASSIAN_*
 
 # 3. Database: no local Supabase stack and no migrate/seed command in the repo.
-#    Point the keys at an existing Supabase project whose schema matches supabase/migrations/.
+#    The keys point at the one shared Supabase project (production data lives there too).
 #    Optional, after a schema change on that project:
 bun run types:gen
 
@@ -682,13 +834,17 @@ bun run start</code></pre>
 
         <h3>Test and quality commands</h3>
         <p>
-          The product has <strong>no automated tests</strong>: no test runner, no <code>test</code> script, no test files under
-          <code>app/</code>, <code>components/</code> or <code>lib/</code>. The only gates are type check and lint, run by git hooks
-          (details in <code>ci-cd</code>):
+          The product now has its own automated tests: 185 product test files (<code>app/</code>, <code>lib/</code>,
+          <code>components/</code> and <code>middleware.test.ts</code>) run by <code>bun test</code>. 54 of them read live Supabase
+          credentials (service key, JWT secret or the <code>QA_E2E_USER_*</code> account) and switch to <code>describe.skip</code>
+          when they are missing, so a run without credentials passes without exercising the database. With credentials they
+          create and delete their own rows and users in the shared Supabase project. No git hook and no CI runs them
+          (<code>ci-cd</code>).
         </p>
-        <pre><code>bun run typecheck
+        <pre><code>bun test
+bun run typecheck
 bun run lint:check
-bun run openapi:gen   # then check git diff on public/openapi.json</code></pre>
+bun run openapi:check</code></pre>
 
         <h3>Auth flow (the contract tests must speak)</h3>
         <div class="table-wrap">
@@ -697,40 +853,41 @@ bun run openapi:gen   # then check git diff on public/openapi.json</code></pre>
               <tr><th>Path</th><th>Request</th><th>Success</th><th>Credential produced</th><th>Found in</th></tr>
             </thead>
             <tbody>
-              <tr><td>UI login (magic link)</td><td><code>POST /api/v1/auth/magic-link</code> <code>{ email, next? }</code> (<code>next</code> root-relative, default <code>/projects</code>)</td><td><code>200 { ok: true }</code>; then the email link hits <code>GET /auth/callback?code=…&amp;next=…</code></td><td>Supabase session cookies <code>sb-{project-ref}-auth-token</code> set by <code>exchangeCodeForSession</code>, then redirect to <code>next</code>. Errors redirect to <code>/login?error=missing_code</code> or <code>otp_exchange_failed</code>; 429 <code>rate_limited</code> on OTP limit</td><td><code>app/api/v1/auth/magic-link/route.ts</code>, <code>app/auth/callback/route.ts</code></td></tr>
-              <tr><td>Headless sign-up</td><td><code>POST /api/v1/auth/signup</code> <code>{ email, password, pat_name?, pat_scopes?, pat_expires_in_days? }</code></td><td><code>201</code>; <code>409 conflict</code> if the email exists; <code>422 validation_failed</code></td><td>Session cookies on the response + session tokens + PAT in the body</td><td><code>app/api/v1/auth/signup/route.ts</code></td></tr>
-              <tr><td>Headless sign-in</td><td><code>POST /api/v1/auth/signin</code>, same body</td><td><code>200</code>; uniform <code>401</code> for unknown email or wrong password</td><td>Same as sign-up</td><td><code>app/api/v1/auth/signin/route.ts</code></td></tr>
-              <tr><td>PAT from a cookie session</td><td><code>POST /api/v1/tokens</code> <code>{ scopes, name?, workspace_id?, expires_in_days? }</code> with the session cookie</td><td><code>201</code></td><td>PAT</td><td><code>app/api/v1/tokens/route.ts</code></td></tr>
-              <tr><td>API call with PAT</td><td><code>Authorization: Bearer bk_pat_{12-char prefix}.{rest}</code></td><td>Accepted only by <code>GET /api/v1/me</code> and <code>GET /api/v1/workspaces</code></td><td>-</td><td><code>lib/api/auth.ts</code>, <code>lib/api/middleware/bearer.ts</code></td></tr>
+              <tr><td>Email lookup</td><td><code>POST /api/v1/auth/check-email</code> <code>{ email }</code></td><td><code>200 { exists, confirmed }</code></td><td>none (routes the login form)</td><td><code>app/api/v1/auth/check-email/route.ts</code></td></tr>
+              <tr><td>Sign-up</td><td><code>POST /api/v1/auth/signup</code> <code>{ email, password }</code> (password 8 to 128)</td><td><code>202 { status: "pending_confirmation", email }</code>; Supabase emails a code</td><td>none yet</td><td><code>app/api/v1/auth/signup/route.ts</code></td></tr>
+              <tr><td>Confirm</td><td><code>POST /api/v1/auth/confirm</code> <code>{ email, token, pat_name?, pat_scopes?, pat_expires_in_days? }</code> (token 6 to 8 digits)</td><td><code>200</code>, same body as sign-in</td><td><code>sb-*</code> cookies + session tokens + PAT</td><td><code>app/api/v1/auth/confirm/route.ts</code></td></tr>
+              <tr><td>Resend code</td><td><code>POST /api/v1/auth/resend</code></td><td><code>202 { status: "sent", email }</code></td><td>none</td><td><code>app/api/v1/auth/resend/route.ts</code></td></tr>
+              <tr><td>Sign-in</td><td><code>POST /api/v1/auth/signin</code> <code>{ email, password, pat_name?, pat_scopes?, pat_expires_in_days? }</code> (password 6 to 128)</td><td><code>200</code>; uniform <code>401</code> "Invalid email or password."; <code>403</code> if <code>workspace:admin</code> is requested</td><td><code>sb-*</code> cookies + session tokens + PAT (default scopes <code>atc:read</code>, <code>atc:write</code>, <code>run:execute</code>)</td><td><code>app/api/v1/auth/signin/route.ts</code>, <code>lib/api/pat.ts</code></td></tr>
+              <tr><td>Magic link</td><td><code>POST /api/v1/auth/magic-link</code> <code>{ email, next? }</code></td><td><code>200 { ok: true }</code> also for unknown emails; the link lands on <code>GET /auth/callback</code></td><td><code>sb-*</code> cookies, redirect to <code>next</code></td><td><code>app/api/v1/auth/magic-link/route.ts</code>, <code>app/auth/callback/route.ts</code></td></tr>
+              <tr><td>OAuth</td><td><code>GET /auth/oauth/{github|google}?next=…</code></td><td>302 to the provider, back to <code>/auth/callback</code></td><td><code>sb-*</code> cookies</td><td><code>app/auth/oauth/[provider]/route.ts</code></td></tr>
+              <tr><td>PAT from a session</td><td><code>POST /api/v1/tokens</code> <code>{ scopes, name?, workspace_id?, expires_in_days? }</code> with the session cookie</td><td><code>201</code>; a PAT gets 403 here</td><td>PAT (any scope subset; <code>workspace:admin</code> needs <code>workspace_id</code> and admin or owner role)</td><td><code>app/api/v1/tokens/route.ts</code></td></tr>
+              <tr><td>API call with PAT</td><td><code>Authorization: Bearer bk_pat_{12-char prefix}.{rest}</code></td><td>Accepted by every non-cookie-only handler whose scope the token holds</td><td>-</td><td><code>lib/api/principal.ts</code>, <code>lib/api/middleware/bearer.ts</code></td></tr>
             </tbody>
           </table>
         </div>
-        <pre><code># Sign-up / sign-in body (password 6 to 128 chars, email max 254)
-{ "email": "...", "password": "...",
-  "pat_name": "optional, 1-80 chars",          # default "cli-signup" / "cli-signin"
-  "pat_scopes": ["atc:read","atc:write","run:execute","workspace:admin"],  # default: all four
-  "pat_expires_in_days": 7 }                   # optional, 1-365; omitted = never expires
-
-# Response body (201 signup / 200 signin)
-{ "user":    { "id": "&lt;uuid&gt;", "email": "..." },
+        <pre><code># Sign-in / confirm response body (200)
+{ "user": { "id": "&lt;uuid&gt;", "email": "..." },
   "session": { "access_token", "refresh_token", "expires_at", "token_type" },
-  "pat":     { "token": "bk_pat_&lt;prefix&gt;.&lt;secret&gt;", "id", "name", "scopes", "expires_at" },
+  "pat": { "token": "bk_pat_&lt;prefix&gt;.&lt;secret&gt;", "id", "name", "scopes", "expires_at" },
   "warning": "Store the PAT token now — it cannot be retrieved later." }
 # plus Set-Cookie: sb-&lt;project-ref&gt;-auth-token... (Supabase SSR cookies)</code></pre>
         <ul>
-          <li>The UI offers <strong>magic link only</strong>; there is no password field. A user created through the magic link has no password, so <code>signin</code> cannot authenticate it (the <code>/qa</code> guide says the same).</li>
-          <li>The Supabase <code>access_token</code> is <strong>not</strong> accepted as a Bearer: <code>requireBearerToken</code> rejects anything not starting with <code>bk_pat_</code>. Cookie-only endpoints need the <code>sb-*</code> cookies.</li>
-          <li><code>signup</code> uses the service-role admin API with <code>email_confirm: true</code>, so it sends no email; every <code>signin</code> mints a new PAT row.</li>
-          <li>The session cookie name embeds the Supabase project ref, so it differs per environment; the browser receives it for the app's own host only.</li>
+          <li>Sign-up no longer creates a confirmed user or mints a PAT: a new test identity needs the emailed code, so headless provisioning needs a readable inbox or a pre-provisioned account (the product team uses <code>QA_E2E_USER_*</code>).</li>
+          <li>The Supabase <code>access_token</code> is not accepted as a Bearer: only <code>bk_pat_</code> tokens are.</li>
+          <li>A Bearer header wins over a cookie on the same request.</li>
+          <li>The session cookie name embeds the Supabase project ref; with one shared project it is the same name on every environment, but cookies are scoped to the app's own host.</li>
           <li>Health: <code>GET /api/v1/health</code> (liveness, no DB). Discovery banner: <code>GET /api/v1</code>. Spec: <code>GET /api/openapi</code>, whose paths carry the full <code>/api/v1/…</code> prefix and whose <code>servers</code> are bare hosts.</li>
         </ul>
-        <p>Test-architecture decisions built on this contract: ADR-0009 (headless signup / signin, both credentials) and ADR-0010 (fresh user + workspace per mutating test).</p>
+        <p>
+          Test-architecture decisions built on this contract: ADR-0009 and ADR-0010 in this QA repo; ADR-0009 needs revisiting for
+          the confirm step (see <code>discovery-gaps</code>).
+        </p>
       </section>
 
       <section
         id="frontend"
-        data-sources="package.json,next.config.ts,tsconfig.json,tailwind.config.ts,components.json,DESIGN.md,app/layout.tsx,app/page.tsx,app/(app)/,app/(auth)/login/,app/qa/,app/invites/accept/,app/design-tokens/page.tsx,components/,middleware.ts,public/"
-        data-updated="2026-10-02"
+        data-sources="package.json,next.config.ts,tsconfig.json,tailwind.config.ts,components.json,DESIGN.md,app/layout.tsx,app/page.tsx,app/(app)/,app/(auth)/login/,app/qa/,app/about/,app/invites/accept/,app/workspaces/[id]/restore/,app/design-tokens/page.tsx,components/,lib/runs/realtime-run-channel.ts,lib/notifications/realtime-notifications-channel.ts,middleware.ts,public/"
+        data-updated="2026-10-13"
       >
         <h2>Frontend</h2>
 
@@ -744,7 +901,7 @@ bun run openapi:gen   # then check git diff on public/openapi.json</code></pre>
               <tr><td>Framework / router</td><td>Next.js 15 App Router only (<code>app/</code>, no <code>pages/</code>); route groups <code>(app)</code> and <code>(auth)</code></td><td><code>app/</code></td></tr>
               <tr><td>Bundler</td><td>Next.js default for <code>next dev</code> / <code>next build</code> (Turbopack not requested)</td><td><code>package.json</code></td></tr>
               <tr><td>Output mode</td><td>Server-rendered Node app; default <code>.next/</code> output</td><td><code>next.config.ts</code></td></tr>
-              <tr><td>Config flags</td><td><code>reactStrictMode: true</code>, <code>typedRoutes: true</code>, <code>images.remotePatterns: []</code>, <code>outputFileTracingRoot</code> = repo root</td><td><code>next.config.ts</code></td></tr>
+              <tr><td>Config flags</td><td><code>reactStrictMode: true</code>, <code>typedRoutes: true</code>, <code>images.remotePatterns: []</code>, <code>outputFileTracingRoot</code> = repo root; unchanged</td><td><code>next.config.ts</code></td></tr>
               <tr><td>TypeScript</td><td><code>strict: true</code>, aliases <code>@components/*</code>, <code>@lib/*</code>, <code>@app/*</code></td><td><code>tsconfig.json</code></td></tr>
               <tr><td>Browser targets</td><td>No <code>browserslist</code>; Next.js defaults</td><td><code>package.json</code></td></tr>
             </tbody>
@@ -753,11 +910,12 @@ bun run openapi:gen   # then check git diff on public/openapi.json</code></pre>
 
         <h3>Rendering model</h3>
         <ul>
-          <li><strong>React Server Components</strong> for every authenticated page under <code>app/(app)/</code>: they read Supabase with the cookie session (RLS applies) and redirect to <code>/login</code> when there is no user.</li>
-          <li><strong>Client components</strong> (<code>'use client'</code>) for interactive parts: login form, onboarding form, members, invite accept, ATC editor and table, layout shell, auth provider. They call <code>/api/v1/*</code> with <code>fetch</code> and the session cookie.</li>
-          <li><strong>One Server Action</strong>: <code>saveAtcAction</code> (ATC save) followed by <code>revalidatePath</code>.</li>
-          <li><strong>Middleware</strong> refreshes the session on every non-static request and redirects anonymous users from <code>/projects*</code> and <code>/onboarding*</code>. <code>/</code> redirects to <code>/login</code>.</li>
-          <li>Theme is dark only (<code>dark</code> class fixed on the root element; Tailwind <code>darkMode: ['class']</code>).</li>
+          <li>React Server Components for authenticated pages under <code>app/(app)/</code>: they read Supabase with the cookie session (RLS applies).</li>
+          <li>Client components for interactive parts; they call <code>/api/v1/*</code> with <code>fetch</code> and the session cookie.</li>
+          <li>Live updates: the run page (<code>components/runs/RunnerView.tsx</code>) and the sidebar inbox (<code>components/layout/AppSidebar.tsx</code>) subscribe to Supabase Realtime channels.</li>
+          <li>One Server Action: <code>saveAtcAction</code> followed by <code>revalidatePath</code>.</li>
+          <li>Middleware redirects anonymous users from <code>/home</code>, <code>/projects</code>, <code>/onboarding</code>, <code>/settings</code>, <code>/activity</code>; <code>/workspaces/{id}/members</code> checks the user in the page. <code>/</code> redirects to <code>/login</code>.</li>
+          <li>Theme is dark only (<code>dark</code> class fixed on the root element; sonner <code>Toaster</code> with <code>theme="dark"</code>).</li>
         </ul>
 
         <h3>Routing map</h3>
@@ -767,86 +925,92 @@ bun run openapi:gen   # then check git diff on public/openapi.json</code></pre>
               <tr><th>Route</th><th>Access</th><th>Purpose</th></tr>
             </thead>
             <tbody>
-              <tr><td><code>/</code></td><td>public</td><td>Redirect to <code>/login</code></td></tr>
-              <tr><td><code>/login</code></td><td>public</td><td>Magic-link request form</td></tr>
-              <tr><td><code>/auth/callback</code></td><td>public (route handler)</td><td>OTP code exchange, sets the session</td></tr>
-              <tr><td><code>/onboarding</code></td><td>authenticated</td><td>Create the first workspace</td></tr>
-              <tr><td><code>/projects</code></td><td>authenticated</td><td>Project list</td></tr>
-              <tr><td><code>/projects/[projectSlug]</code></td><td>authenticated</td><td>Project view, ATC table</td></tr>
-              <tr><td><code>/projects/[projectSlug]/atcs/[atcId]</code></td><td>authenticated</td><td>ATC editor (Monaco steps, AC anchoring)</td></tr>
+              <tr><td><code>/</code>, <code>/login</code></td><td>public</td><td>Redirect; email-first login with password, emailed code, magic link and OAuth</td></tr>
+              <tr><td><code>/auth/callback</code>, <code>/auth/oauth/{provider}</code></td><td>public (route handlers)</td><td>Session establishment</td></tr>
+              <tr><td><code>/home</code>, <code>/activity</code>, <code>/onboarding</code></td><td>authenticated</td><td>Dashboard, activity feed, first workspace</td></tr>
+              <tr><td><code>/projects</code>, <code>/projects/new</code></td><td>authenticated</td><td>Project list and creation</td></tr>
+              <tr><td><code>/projects/[projectSlug]/…</code></td><td>authenticated</td><td>Project view; <code>atcs</code>, <code>tests</code>, <code>plans</code>, <code>runs</code>, <code>bugs</code>, <code>milestones</code>, <code>metrics</code>, <code>traceability</code> (list and detail pages)</td></tr>
+              <tr><td><code>/settings/…</code></td><td>authenticated</td><td>Account, billing and upgrade, data export, notifications, tokens, workspaces</td></tr>
               <tr><td><code>/workspaces/[id]/members</code></td><td>authenticated (page-level check)</td><td>Members and invites</td></tr>
-              <tr><td><code>/invites/accept</code></td><td>public page, accepts with session</td><td>Invite acceptance client</td></tr>
-              <tr><td><code>/qa</code></td><td>public</td><td>QA testability guide (Spanish content)</td></tr>
-              <tr><td><code>/design-tokens</code></td><td>public</td><td>Design-token showcase</td></tr>
-              <tr><td><code>/api/docs</code></td><td>public</td><td>Scalar API reference</td></tr>
+              <tr><td><code>/workspaces/[id]/restore</code>, <code>/invites/accept</code></td><td>public page, acts with a session</td><td>Restore a deleted workspace; accept an invite</td></tr>
+              <tr><td><code>/qa</code>, <code>/about</code>, <code>/design-tokens</code>, <code>/api/docs</code></td><td>public</td><td>QA guide (Spanish), about, token showcase, Scalar API reference</td></tr>
             </tbody>
           </table>
         </div>
 
         <h3>Styling and component library</h3>
         <ul>
-          <li>Tailwind CSS 3 with CSS-variable design tokens (<code>tailwind.config.ts</code>, <code>app/globals.css</code>); token spec in <code>DESIGN.md</code>.</li>
-          <li>shadcn/ui configuration, style <code>new-york</code>, RSC on, lucide icons (<code>components.json</code>); primitives in <code>components/ui/</code>: badge, button, card, input, label, tabs. Built on Radix (dialog, dropdown-menu, tabs, tooltip) with <code>class-variance-authority</code> and <code>tailwind-merge</code>.</li>
-          <li>Feature libraries: TanStack Table (<code>components/atcs/AtcTable.tsx</code>), Monaco loaded via <code>next/dynamic</code> (<code>components/atcs/StepEditor.tsx</code>), cmdk command palette (<code>components/layout/CommandPalette.tsx</code>), sonner toasts (<code>Toaster</code> top-right in <code>app/layout.tsx</code>).</li>
+          <li>Tailwind CSS 3 with CSS-variable design tokens (<code>tailwind.config.ts</code>, <code>app/globals.css</code>); spec in <code>DESIGN.md</code>.</li>
+          <li>shadcn/ui configuration (<code>components.json</code>); primitives in <code>components/ui/</code>: badge, button, card, input, label, meter, switch, tabs. Radix dialog, dropdown-menu, tabs, tooltip.</li>
+          <li>Feature libraries: TanStack Table, Monaco via <code>next/dynamic</code>, cmdk, sonner, dnd-kit (drag-and-drop reordering of tests), react-markdown + remark-gfm + rehype-sanitize; shiki only on <code>/qa</code>.</li>
           <li>Fonts: Inter, JetBrains Mono, Noto Serif JP via <code>next/font/google</code>.</li>
         </ul>
 
         <h3>State, data fetching and auth integration</h3>
         <ul>
-          <li>No global store and no fetching library (no Redux, Zustand, TanStack Query or SWR): server components query Supabase, client components use <code>fetch</code> + <code>useState</code>.</li>
-          <li><code>AuthProvider</code> (<code>components/providers/auth-context.tsx</code>) wraps <code>app/(app)/layout.tsx</code> and tracks the Supabase session with <code>onAuthStateChange</code> on the browser client.</li>
-          <li>Active workspace persists in the <code>bk_active_ws</code> cookie, switched through <code>POST /api/v1/me/active-workspace</code> from the workspace switcher.</li>
-          <li>Client env vars: <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> (plus the unused <code>NEXT_PUBLIC_APP_URL</code>). No secret-looking name carries the public prefix.</li>
+          <li>No global store and no fetching library: server components query Supabase, client components use <code>fetch</code> + <code>useState</code>, plus Realtime subscriptions for runs and the inbox.</li>
+          <li><code>AuthProvider</code> (<code>components/providers/auth-context.tsx</code>) tracks the Supabase session on the browser client.</li>
+          <li>Active workspace persists in the <code>bk_active_ws</code> cookie, switched through <code>POST /api/v1/me/active-workspace</code>.</li>
+          <li>Client env vars: <code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code> (and <code>NEXT_PUBLIC_APP_URL</code>, read server-side only). No secret-looking name carries the public prefix.</li>
         </ul>
 
         <h3>Static assets and SEO</h3>
         <p>
-          <code>public/</code> holds only <code>openapi.json</code>: no favicon, <code>robots.txt</code> or sitemap. No <code>next/image</code> usage. Root
-          metadata sets the title and a <code>metadataBase</code> hard-coded to <code>http://localhost:3000</code> in every environment. Bundle size is
-          not measured (see <code>nfr-performance</code>).
+          <code>public/</code> holds only <code>openapi.json</code>: no favicon, <code>robots.txt</code> or sitemap. No
+          <code>next/image</code> usage. Root metadata sets the title and a <code>metadataBase</code> hard-coded to
+          <code>http://localhost:3000</code> in every environment. Bundle size is not measured (see <code>nfr-performance</code>).
         </p>
 
         <h3>Test-ID strategy</h3>
         <ul>
-          <li><code>data-testid</code> exists in two places only, kebab-case and area-prefixed: the login form (<code>login-email</code>, <code>login-submit</code>) and the <code>/qa</code> page (<code>qa-page</code>, <code>qa-title</code>, <code>qa-credentials-card</code>, <code>qa-credentials-button</code>, <code>qa-docs-button</code>, <code>qa-db-ways</code>, <code>qa-api-ways</code>, <code>qa-auth-methods</code>, <code>qa-env-setup</code>, <code>qa-code-block</code>, <code>qa-copy-code-button</code>, <code>qa-agent-tabs</code>, <code>qa-toc</code>, <code>qa-toc-link-{id}</code>, <code>qa-architecture-diagram</code>, <code>qa-repos</code>).</li>
-          <li>Zero <code>data-testid</code> in <code>components/</code> and the authenticated pages; almost no <code>aria-*</code> attributes and no explicit <code>role=</code> attributes in app or components.</li>
-          <li>Workable today: role and accessible-name locators that come from native elements and Radix primitives (buttons with visible text, inputs wrapped in a label element on the login form), plus the two login test IDs. A selector contract for the app is a team decision (see <code>discovery-gaps</code>).</li>
+          <li><code>data-testid</code> is now the de facto selector contract: 596 distinct static values across about 80 component and page files, covering home, projects, ATCs, tests, runs (the runner), bugs, reports, billing, settings, notifications and the login form.</li>
+          <li>Naming is mostly kebab-case with an area prefix (<code>home-*</code>, <code>bug-*</code>, <code>runner-*</code>, <code>traceability-*</code>), with a few outliers in camelCase or snake_case (for example <code>notificationRow</code>, <code>notification_unread_dot</code>); dynamic ids are built with template literals.</li>
+          <li>About 230 <code>aria-*</code> attributes in app and components, so role and accessible-name locators work alongside the test ids.</li>
+          <li>Component tests in the product use <code>@happy-dom/global-registrator</code> (for example <code>components/billing/BillingOverviewView.test.ts</code>).</li>
         </ul>
 
         <h3>Internationalization</h3>
-        <p>None: no i18n library, <code>lang="en"</code> on the root element, English strings hard-coded in components. Only the <code>/qa</code> guide content is written in Spanish.</p>
+        <p>None: no i18n library, <code>lang="en"</code> on the root element, English strings hard-coded. Only the <code>/qa</code> guide content is Spanish.</p>
 
         <h3>Install and run</h3>
         <pre><code>bun install
-bun run dev        # http://localhost:3000 → redirects to /login
+bun run dev     # http://localhost:3000 → redirects to /login
 bun run build
 bun run start</code></pre>
       </section>
 
       <section
         id="environments"
-        data-sources="lib/urls.ts,lib/env.ts,lib/openapi/registry.ts,public/openapi.json,.env.example,.gitignore,dbhub.toml,app/qa/qa-config.ts,lib/api/logging.ts,supabase/migrations/,.agents/project.yaml"
-        data-updated="2026-10-02"
+        data-sources="lib/urls.ts,lib/env.ts,lib/billing/checkout.ts,app/auth/oauth/[provider]/route.ts,public/openapi.json,vercel.json,.env.example,.gitignore,dbhub.toml,app/qa/qa-config.ts,supabase/migrations/README.md,.context/release/pending-production-v2.md,.agents/project.yaml"
+        data-updated="2026-10-13"
       >
         <h2>Environments</h2>
         <p>
           The app decides its environment from Vercel's <code>VERCEL_ENV</code> and maps it to a hard-coded URL table
-          (<code>lib/urls.ts</code> <code>APP_URLS</code>, also used as the OpenAPI <code>servers</code>). This QA repo declares
-          <code>local</code> and <code>staging</code> under <code>environments:</code> in <code>.agents/project.yaml</code>.
+          (<code>lib/urls.ts</code> <code>APP_URLS</code>, also the OpenAPI <code>servers</code>). The product repo's own
+          <code>.agents/project.yaml</code> names the branches (<code>main</code> = production, <code>staging</code> = integration,
+          release by fast-forward promotion) and declares one Supabase project for all environments during the MVP. This QA repo
+          declares <code>local</code> and <code>staging</code> under <code>environments:</code> in <code>.agents/project.yaml</code>.
         </p>
         <div class="table-wrap">
           <table>
             <thead>
-              <tr><th>Environment</th><th>URL</th><th>Detected when</th><th>Branch</th><th>Auto deploy</th><th>Supabase project</th><th>Status</th></tr>
+              <tr><th>Environment</th><th>URL</th><th>Branch</th><th>Auto deploy</th><th>Approval</th><th>Supabase project</th><th>Status</th></tr>
             </thead>
             <tbody>
-              <tr><td>Local</td><td><code>http://localhost:3000</code></td><td>no <code>VERCEL_ENV</code></td><td>any</td><td>-</td><td>Whatever <code>NEXT_PUBLIC_SUPABASE_URL</code> in the local <code>.env</code> points at (no local Supabase stack)</td><td>Declared in <code>project.yaml</code>; QA MCPs <code>local-dbhub</code>, <code>local-openapi</code></td></tr>
-              <tr><td>Preview</td><td>[unknown] per-deployment Vercel URL</td><td><code>VERCEL_ENV=preview</code></td><td>[unknown]</td><td>[unknown]</td><td>[unknown]</td><td>Not evidenced. If previews exist, the app treats them as staging: magic-link and invite links point at the staging URL, not the preview</td></tr>
-              <tr><td>Staging</td><td><code>https://staging-upexbunkai.vercel.app</code></td><td><code>VERCEL_ENV=preview</code> (inferred from <code>lib/urls.ts</code>)</td><td>[unknown]</td><td>[unknown]</td><td>[unknown]; separate from production or shared is unverified</td><td>QA default (<code>testing.default_env</code>); MCPs <code>staging-dbhub</code>, <code>staging-openapi</code>; reachability not exercised</td></tr>
-              <tr><td>Production</td><td><code>https://upexbunkai.vercel.app</code></td><td><code>VERCEL_ENV=production</code></td><td>[unknown]</td><td>[unknown]</td><td>[unknown]</td><td>In code (<code>lib/urls.ts</code>, OpenAPI servers) and <code>project.webapp_domain</code>; not under <code>environments:</code>; liveness unverified; read-only by policy</td></tr>
+              <tr><td>Local</td><td><code>http://localhost:3000</code></td><td>any</td><td>-</td><td>-</td><td>The shared project (no local Supabase stack)</td><td>QA MCPs <code>local-dbhub</code>, <code>local-openapi</code></td></tr>
+              <tr><td>Preview</td><td>[unknown] per-deployment Vercel URL</td><td>[unknown] (PR branches, if enabled)</td><td>[unknown]</td><td>-</td><td>The shared project</td><td>Not evidenced. If previews exist the app treats them as staging: email links point at the staging URL</td></tr>
+              <tr><td>Staging</td><td><code>https://staging-upexbunkai.vercel.app</code></td><td><code>staging</code> (Vercel preview alias, per the product <code>project.yaml</code>)</td><td>Inferred yes (Vercel git integration); not verified</td><td>PR into <code>staging</code></td><td>The shared project</td><td>QA default (<code>testing.default_env</code>); runs <code>98ee1b4</code>-era code; no Vercel Cron</td></tr>
+              <tr><td>Production</td><td><code>https://upexbunkai.vercel.app</code></td><td><code>main</code></td><td>Inferred yes; not verified</td><td>Fast-forward promotion of <code>staging</code>, gated by <code>bun run release:check</code></td><td>The shared project</td><td><code>main</code> is at <code>e88512e</code>, 1,042 commits behind <code>staging</code>; that commit has no <code>vercel.json</code>, so no cron is registered anywhere yet. Read-only by policy for QA</td></tr>
             </tbody>
           </table>
         </div>
+        <p>
+          Consequence of one shared Supabase project: every migration applied for staging is live under production at once, while
+          production still runs the <code>e88512e</code> app code; the two <code>pg_cron</code> jobs, the Auth email quota, Auth
+          templates and the <code>site_url</code> (pinned to <code>http://localhost:3000</code>, per the release ledger) are common to
+          all environments. A staging test writes into the database production reads.
+        </p>
 
         <h3>Environment variables by environment (names only)</h3>
         <div class="table-wrap">
@@ -855,12 +1019,17 @@ bun run start</code></pre>
               <tr><th>Key</th><th>Local</th><th>Staging / Production</th></tr>
             </thead>
             <tbody>
-              <tr><td><code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code></td><td><code>.env</code> (hand-added, see <code>backend</code>)</td><td>Vercel project settings, assumed; which key names the deployments actually set is unverified</td></tr>
+              <tr><td><code>NEXT_PUBLIC_SUPABASE_URL</code>, <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code>, <code>SUPABASE_JWT_SECRET</code>, <code>CRON_SECRET</code></td><td><code>.env</code> (hand-added, see <code>backend</code>)</td><td>Vercel project settings, assumed; which keys each deployment sets is unverified</td></tr>
+              <tr><td><code>STRIPE_*</code>, <code>RESEND_*</code>, <code>ATLASSIAN_*</code></td><td>optional</td><td>Unverified per environment; test or live Stripe mode unknown</td></tr>
               <tr><td><code>VERCEL_ENV</code></td><td>unset</td><td>set by Vercel</td></tr>
-              <tr><td><code>NEXT_PUBLIC_APP_URL</code></td><td>default localhost</td><td>"must be set in every deployed env" per <code>lib/env.ts</code> comment, but no code reads it</td></tr>
+              <tr><td><code>NEXT_PUBLIC_APP_URL</code></td><td>default localhost</td><td>Read only by the Stripe success and cancel URLs; if unset there, Stripe sends buyers back to localhost</td></tr>
             </tbody>
           </table>
         </div>
+        <p>
+          Three URL sources coexist: <code>APP_URLS</code> by <code>VERCEL_ENV</code> (magic link, invites, digest and deletion
+          emails), <code>NEXT_PUBLIC_APP_URL</code> (Stripe return URLs) and the request origin (OAuth redirect).
+        </p>
 
         <h3>Secrets management</h3>
         <div class="table-wrap">
@@ -869,9 +1038,11 @@ bun run start</code></pre>
               <tr><th>Secret</th><th>Storage</th><th>Access scope</th></tr>
             </thead>
             <tbody>
-              <tr><td>Supabase service-role key</td><td>Local <code>.env</code> (gitignored); deployed: Vercel env settings, inferred from the <code>.env.example</code> note on the Vercel + Supabase storage integration</td><td>Server only (<code>server-only</code> import)</td></tr>
-              <tr><td>QA test-user credentials</td><td>The <code>/qa</code> page points to a Jira Epic as the credentials source; this QA repo reads <code>STAGING_USER_*</code> / <code>LOCAL_USER_*</code> from <code>.env</code></td><td>QA team</td></tr>
-              <tr><td>QA DB credentials</td><td>This QA repo's <code>.env</code> <code>DBHUB_*</code>, expanded into <code>dbhub.toml</code> at MCP spawn</td><td>Inspector roles (<code>qa_inspector_ro</code> / <code>qa_inspector_rw</code>)</td></tr>
+              <tr><td>Supabase service-role key, JWT secret, <code>CRON_SECRET</code>, Stripe, Resend and Atlassian keys</td><td>Local <code>.env</code> (gitignored); deployed: Vercel env settings, inferred</td><td>Server only (<code>server-only</code> imports)</td></tr>
+              <tr><td>Supabase Auth configuration (SMTP, templates, OTP length, rate limits, <code>uri_allow_list</code>)</td><td>Supabase dashboard only; no snapshot in git (release ledger entry INFRA-GAP)</td><td>Supabase project owner</td></tr>
+              <tr><td>Stripe webhook endpoint and secret</td><td>Stripe dashboard</td><td>Stripe account owner</td></tr>
+              <tr><td>QA test-user credentials</td><td>The <code>/qa</code> page points to a Jira Epic as the credentials source; this QA repo reads <code>STAGING_USER_*</code> / <code>LOCAL_USER_*</code> from <code>.env</code>; the product team uses <code>QA_E2E_USER_*</code></td><td>QA team</td></tr>
+              <tr><td>QA DB credentials</td><td>This QA repo's <code>.env</code> <code>DBHUB_*</code>, expanded into <code>dbhub.toml</code> at MCP spawn; role passwords set by <code>db:qa-roles</code></td><td>Inspector roles (<code>qa_inspector_ro</code> / <code>qa_inspector_rw</code>)</td></tr>
             </tbody>
           </table>
         </div>
@@ -883,39 +1054,43 @@ bun run start</code></pre>
               <tr><th>Service</th><th>Provider</th><th>Purpose</th><th>Known</th></tr>
             </thead>
             <tbody>
-              <tr><td>App hosting</td><td>Vercel</td><td>Next.js server + static assets</td><td>Region, plan, preview settings: unknown</td></tr>
-              <tr><td>Database + Auth</td><td>Supabase (<code>https://{ref}.supabase.co</code> shape required by <code>types:gen</code>)</td><td>Postgres, RLS, Auth, magic-link email</td><td>Region, backups, PITR, pooler limits, SMTP: unknown (dashboard settings)</td></tr>
-              <tr><td>QA DB access</td><td>Supabase session pooler, port 5432, <code>sslmode=require</code></td><td>Read / inspect data for tests</td><td>Inspector roles are described as <code>BYPASSRLS</code>: DB checks do not exercise RLS</td></tr>
+              <tr><td>App hosting, cron</td><td>Vercel</td><td>Next.js server, static assets, <code>after()</code>, Cron</td><td>Region, plan, function time limit, preview settings: unknown</td></tr>
+              <tr><td>Database, Auth, Realtime, Storage</td><td>Supabase, one project for every environment</td><td>Postgres + RLS + <code>pg_cron</code>, Auth, live updates, export archives</td><td>Region, backups, PITR, pooler limits, SMTP provider: unknown (dashboard). Auth email limit 30/hour and OTP length 8 per the release ledger</td></tr>
+              <tr><td>Payments</td><td>Stripe</td><td>Cloud plan checkout</td><td>Account, mode and webhook registration: unknown</td></tr>
+              <tr><td>Email</td><td>Resend</td><td>Digest and deletion emails</td><td>No verified sending domain yet; sender defaults to Resend's sandbox address (<code>lib/env.ts</code> comment)</td></tr>
+              <tr><td>Issue tracker</td><td>Atlassian Jira Cloud</td><td>Story import</td><td>One platform-level account</td></tr>
+              <tr><td>QA DB access</td><td>Supabase pooler, <code>sslmode=require</code></td><td>Inspect data for tests</td><td>Inspector roles are <code>BYPASSRLS</code>: DB checks do not exercise RLS</td></tr>
             </tbody>
           </table>
         </div>
 
         <h3>Monitoring and rollback</h3>
         <ul>
-          <li>Monitoring: only the JSON access log on stdout (<code>lib/api/logging.ts</code>), visible wherever Vercel keeps function logs. No error tracking, uptime monitor or APM (<code>nfr-observability</code>).</li>
-          <li>Rollback: no procedure in the repo. App code can only roll back through the hosting platform; schema changes are forward-only SQL with no down scripts, so a DB rollback needs a hand-written reverse migration or a Supabase backup restore.</li>
+          <li>Monitoring: the JSON access log on stdout (Vercel function logs), job rows in the database and <code>cron.job_run_details</code>. No error tracking, uptime monitor or APM (<code>nfr-observability</code>).</li>
+          <li>Rollback: app code through Vercel (redeploy a previous deployment); <code>main</code> moves only by fast-forward, so a code rollback is a revert commit. Schema changes are forward-only with no down scripts and land on the one shared database, so a DB rollback needs a hand-written reverse migration or a Supabase backup restore affecting every environment.</li>
         </ul>
 
         <h3>QA relevance</h3>
         <ul>
-          <li>Run against staging by default; never write to production.</li>
-          <li>Auth cookies are named per Supabase project ref, so a <code>storageState</code> captured on one environment is useless on another.</li>
-          <li>Magic-link and invite URLs are built from <code>APP_URLS</code>, not from the request host: a test on a preview or a non-3000 local port follows links to another host.</li>
+          <li>Run against staging by default; never write to production. With one shared Supabase project, "staging data" is a convention (own users and workspaces), not an isolation boundary.</li>
+          <li>Production is behind staging by the whole feature set added since <code>e88512e</code>: a regression run against production tests a different product.</li>
+          <li>Auth cookies carry the shared project ref, but are host-scoped, so a <code>storageState</code> from one host does not apply to another.</li>
+          <li>Email links use <code>APP_URLS</code>, not the request host: a test on a preview or a non-3000 local port follows links to another host.</li>
         </ul>
       </section>
 
       <section
         id="ci-cd"
-        data-sources=".husky/pre-commit,.husky/pre-push,package.json,.gitignore,.env.example,lib/urls.ts,scripts/openapi-gen.ts,supabase/migrations/"
-        data-updated="2026-10-02"
+        data-sources=".husky/pre-commit,.husky/pre-push,package.json,vercel.json,.gitignore,scripts/openapi-gen.ts,scripts/check-release-readiness.ts,.context/release/,supabase/migrations/README.md,.agents/project.yaml"
+        data-updated="2026-10-13"
       >
         <h2>CI/CD</h2>
 
         <h3>CI pipelines</h3>
         <p>
-          <strong>None in the repo.</strong> No <code>.github/workflows/</code>, <code>.gitlab-ci.yml</code>, CircleCI, Azure or Jenkins config. No
-          pipeline runs tests, because there are no tests. The only automated gates are local git hooks (husky), which a developer can skip with
-          <code>--no-verify</code>:
+          None in the repo, and none in its history: no <code>.github/workflows/</code>, <code>.gitlab-ci.yml</code> or other CI
+          config. The product's 185 test files run only when a developer runs <code>bun test</code>. The automated gates are local
+          git hooks (husky), skippable with <code>--no-verify</code>, and neither runs the tests:
         </p>
         <div class="table-wrap">
           <table>
@@ -923,76 +1098,84 @@ bun run start</code></pre>
               <tr><th>Hook</th><th>Runs</th></tr>
             </thead>
             <tbody>
-              <tr><td><code>pre-commit</code></td><td><code>bunx lint-staged</code> (<code>eslint --fix</code> on TS/JS, <code>prettier --write</code> on JSON/YAML/CSS/HTML), <code>bun run types:check</code>, <code>vars:check</code>, <code>skills:check</code>, and <code>skills:registry:check</code> when skill files are staged</td></tr>
-              <tr><td><code>pre-push</code></td><td><code>bun run repo:check</code> (format, lint, types, vars, vars:env, skills, skills registry)</td></tr>
+              <tr><td><code>pre-commit</code></td><td><code>bunx lint-staged</code> (<code>eslint --fix</code>, <code>prettier --write</code>), <code>bun run types:check</code>, <code>vars:check</code>, <code>skills:check</code>; conditionally <code>skills:registry:check</code>, <code>openapi:check</code> (when a <code>route.openapi.ts</code>, <code>lib/openapi/</code> or <code>public/openapi.json</code> is staged) and <code>agents:compat:check</code></td></tr>
+              <tr><td><code>pre-push</code></td><td><code>format:check</code>, <code>lint:check</code>, <code>vars:env:check</code> (drift as warning), <code>skills:registry:check</code>, <code>bun scripts/openapi-gen.ts --check</code>, <code>agents:compat:check</code></td></tr>
             </tbody>
           </table>
         </div>
         <p>
-          Of those, only lint, prettier and <code>tsc</code> touch the product; the rest checks the inherited boilerplate. Nothing checks that
-          <code>public/openapi.json</code> matches the route definitions (it is regenerated by hand with <code>bun run openapi:gen</code>).
+          Of those, lint, prettier, <code>tsc</code> and the OpenAPI freshness check touch the product; the rest checks the
+          inherited boilerplate. The OpenAPI spec can no longer drift from the routes silently (both hooks check it).
         </p>
 
         <h3>Deployment</h3>
         <ul>
-          <li>Target: Vercel, inferred from <code>VERCEL_ENV</code> handling in <code>lib/urls.ts</code>, <code>.vercel</code> in <code>.gitignore</code> and the Vercel notes in <code>.env.example</code>.</li>
-          <li>No <code>vercel.json</code>: build, install and output settings are Vercel's Next.js defaults or live in the Vercel dashboard. Whether deploys come from the Vercel git integration, and from which branches, is unverified.</li>
+          <li>Target: Vercel. Branch model from the product <code>.agents/project.yaml</code>: feature branches merge into <code>staging</code> by <code>--no-ff</code> PR; a release fast-forwards <code>main</code> to <code>staging</code>; hotfixes branch off <code>main</code> and back-merge the same day. <code>main</code> and <code>staging</code> are protected.</li>
+          <li><code>vercel.json</code> holds only the cron entry; build, install and output settings are Vercel's Next.js defaults or live in the dashboard. Whether the git integration deploys each branch automatically is inferred, not verified.</li>
+          <li>Release gate: <code>bun run release:check</code> runs the executable checks in <code>.context/release/pending-production-v2.md</code>, which lists five entries for the v2 promotion (stateless magic-link switch, auth email rate limit, confirmation email copy, release tag and version, Supabase config snapshot). The repo has no release tag yet.</li>
           <li>No Dockerfile, Compose file or other host config.</li>
         </ul>
 
         <h3>Database migrations</h3>
         <p>
-          No migration pipeline: no Supabase CLI config, no apply script, no workflow. How <code>supabase/migrations/*.sql</code> reach each
-          Supabase project, and in what order relative to the app deploy, is undocumented. <code>.env.example</code> names a
-          <code>SUPABASE_ACCESS_TOKEN</code> for the Supabase MCP "migrations" capability, which hints that migrations are applied by hand or
-          by an agent; unverified.
+          No pipeline: migrations are applied by hand (or by an agent) to the one Supabase project through the Supabase MCP
+          <code>apply_migration</code> tool, which writes one ledger row per file; <code>supabase/migrations/README.md</code> holds
+          the convention and a repair log. Because the project is shared, a migration reaches production's database the moment it
+          is applied for staging, before the matching code is promoted.
         </p>
 
         <h3>Infrastructure as code</h3>
-        <p>Not present (no Terraform, Pulumi, CDK or Serverless files).</p>
+        <p>Not present (no Terraform, Pulumi, CDK or Serverless files; no Supabase config snapshot).</p>
 
-        <h3>Deployment checklist (derived; nothing in the repo enforces it)</h3>
+        <h3>Deployment checklist (derived; only the release ledger is enforced, by command)</h3>
         <ul>
-          <li>Pre-deploy: <code>bun run typecheck</code>, <code>bun run lint:check</code>, <code>bun run openapi:gen</code> with no diff, migrations applied to the target Supabase project before code that depends on them ships.</li>
-          <li>Post-deploy: <code>GET /api/v1/health</code> answers <code>ok</code>; <code>/login</code> renders; a headless <code>signin</code> returns 200.</li>
-          <li>Rollback: revert the app through Vercel; reverse migrations by hand (see <code>environments</code>).</li>
+          <li>Pre-deploy: <code>bun test</code> with live credentials, <code>bun run typecheck</code>, <code>bun run lint:check</code>, <code>bun run openapi:check</code>, <code>bun run release:check</code> exit 0; migrations backward-compatible with the code still on <code>main</code>.</li>
+          <li>Post-deploy: <code>GET /api/v1/health</code> answers <code>ok</code>; <code>/login</code> renders; a headless <code>signin</code> returns 200; <code>vercel crons list</code> shows the digest after the first production deploy that carries <code>vercel.json</code>.</li>
+          <li>Rollback: redeploy the previous Vercel deployment; reverse migrations by hand (see <code>environments</code>).</li>
         </ul>
 
         <h3>QA relevance</h3>
         <ul>
-          <li>This QA repo's own CI workflows would be the first automated test job for the product. Nothing links a product deploy to a QA run (no deploy webhook or status check), so regression runs are triggered by hand or on schedule.</li>
-          <li>Staging can change without notice: there is no deploy log in the repo to correlate a failure with a release.</li>
+          <li>This QA repo's own CI would be the first automated test job against the product; nothing links a product deploy to a QA run, so regression runs are triggered by hand or on schedule.</li>
+          <li>Staging changes with every merge (272 merge commits between <code>e88512e</code> and <code>98ee1b4</code>); correlate a failure with the staging branch log, since there is no deploy log in the repo.</li>
+          <li>The product's live-database tests and this QA repo's tests write into the same Supabase project; coordinate data naming and cleanup.</li>
         </ul>
       </section>
 
       <section
         id="discovery-gaps"
-        data-sources="app/,lib/,supabase/migrations/,package.json,.context/SRS/,.diagram-design"
-        data-updated="2026-10-02"
+        data-sources="app/,lib/,supabase/migrations/,package.json,.context/SRS/,.context/release/,.agents/project.yaml,.diagram-design"
+        data-updated="2026-10-13"
       >
         <h2>Discovery gaps</h2>
         <ul>
-          <li><strong>Compliance</strong>: no GDPR, SOC 2 or data-export / deletion implementation in code (the SRS places it on a Phase 3 horizon). Needs review; not implemented.</li>
-          <li><strong>Rate limiting</strong>: no app-level limiter. The magic-link OpenAPI description names a Supabase free-tier OTP limit; the actual limit of each Supabase project is unverified. SRS intent of per-token limits is not implemented.</li>
+          <li><strong>Snapshot scope</strong>: built from <code>origin/staging</code> <code>98ee1b4</code> read from disk; nothing was deployed, called or measured. <code>origin/main</code> = <code>e88512e</code> is as of the local repo's last fetch.</li>
+          <li><strong>Shared Supabase project</strong>: declared by the product team (one project for local, staging, production). Whether production's database really carries all 89 migrations while serving <code>e88512e</code> code, and whether that old code still works against the newer schema, was not verified. Source: Supabase project owner.</li>
+          <li><strong>Production branch lag</strong>: <code>main</code> is 1,042 commits behind <code>staging</code>; when v2 will be promoted is a release decision outside the repo.</li>
+          <li><strong>Digest cron</strong>: registered from production only, and production has no <code>vercel.json</code> yet, so the digest runs nowhere on a schedule; the presence of <code>CRON_SECRET</code> on staging was not checked.</li>
+          <li><strong>Magic-link rail</strong>: the code still sends PKCE links (<code>app/api/v1/auth/magic-link/route.ts</code>); the stateless <code>token_hash</code> rail in <code>/auth/callback</code> is built but not switched on (release ledger BK-400). <code>business-api-context</code> <code>auth-cookie-session</code> describes the stateless rail as live: that contradicts the code.</li>
+          <li><strong>Test identity for QA</strong>: sign-up now needs the emailed code, so QA ADR-0009's "headless signup" path needs an inbox or a pre-provisioned account. Revisit ADR-0009.</li>
+          <li><strong>Rate limiting</strong>: no app-level limiter; <code>check-email</code> reveals whether an address exists and has no limiter (follow-up in product ADR-0007). Supabase limits are dashboard values recorded only in the release ledger.</li>
           <li><strong>Performance numbers</strong>: no latency, throughput or bundle-size measurement exists; SRS budgets are intent only.</li>
-          <li><strong>Accessibility</strong>: SRS targets WCAG 2.1 AA; not verified from code in this phase.</li>
-          <li><strong>Selector contract</strong>: <code>data-testid</code> appears only in <code>app/(auth)/login/magic-link-form.tsx</code> and <code>app/qa/</code>; none in <code>components/</code> or the authenticated pages. No convention to record as an ADR yet; ask the team whether one will be adopted.</li>
-          <li><strong>Signup endpoint in production</strong>: whether <code>POST /api/v1/auth/signup</code> is reachable on production and intended to be is unknown (affects ADR-0009 and ADR-0010).</li>
-          <li><strong>Data cleanup</strong>: no API deletes users, workspaces or projects; how test data is purged on staging is undecided.</li>
-          <li><strong>Supabase project settings</strong>: SMTP provider, OTP limits, JWT expiry, password policy and backups are set in the Supabase dashboard, not in the repo. Source: Supabase project owner.</li>
-          <li><strong>Unused schema</strong>: <code>activity_log</code>, <code>feature_flags</code>, <code>user_view_state</code> and the idempotency helper have no product callers at <code>e88512e</code>; confirm whether they are planned or dead.</li>
-          <li><strong>Monaco CDN</strong>: the editor's runtime asset source is inferred from the library default, not observed; an offline or CSP-restricted environment could break the editor.</li>
-          <li><strong>API contract drift</strong>: the served spec (generated from <code>route.openapi.ts</code>) and the design-time <code>.context/SRS/api-contracts.yaml</code> were not compared; spot-check before relying on either (<code>bun run api:sync</code>, then <code>project-context</code> mode <code>api</code>).</li>
-          <li><strong>Diagram style</strong>: no <code>.diagram-design</code> marker at the QA repo root; the figure uses diagram-design's default skin, which matches this map's palette. A team skin can be chosen later.</li>
-          <li><strong>Runtime version</strong>: no Node.js version is pinned (no <code>.nvmrc</code>, <code>.node-version</code> or <code>engines</code>); the version Vercel builds with is unknown. Source: Vercel project settings.</li>
-          <li><strong>Local bootstrap</strong>: <code>.env.example</code> lacks the two keys <code>lib/env.ts</code> requires (<code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code>), so a fresh clone does not boot from it; which Supabase project local development should use is undocumented. Source: target maintainers.</li>
-          <li><strong>Migration workflow</strong>: no Supabase CLI config, apply script, seed or pipeline; how and when <code>supabase/migrations/</code> reach each environment, and whether staging and production share one Supabase project, is unknown. Source: Supabase project owner.</li>
-          <li><strong>Deploy mechanics</strong>: staging is inferred to run as <code>VERCEL_ENV=preview</code>; its branch, the production branch, whether the Vercel git integration deploys automatically and whether per-PR previews exist are unverified. Source: Vercel project settings.</li>
-          <li><strong>Production liveness</strong>: <code>https://upexbunkai.vercel.app</code> is in code but was not contacted (no network calls in discovery). Source: Vercel project owner.</li>
-          <li><strong>Hard-coded URLs</strong>: redirect and invite links use <code>APP_URLS</code> by <code>VERCEL_ENV</code>, <code>NEXT_PUBLIC_APP_URL</code> is validated but unused, and <code>metadataBase</code> is localhost everywhere. Confirm whether this is intended before testing previews or a non-default local port.</li>
-          <li><strong>API base path for the test client</strong>: the OpenAPI <code>servers</code> are bare hosts with <code>/api/v1/…</code> paths, <code>environments.*.api_url</code> in <code>.agents/project.yaml</code> ends in <code>/api</code>, and the <code>/qa</code> guide uses <code>/api/v1</code> as <code>API_BASE_URL</code>. <code>/test-framework-adaptation</code> must pick one convention.</li>
-          <li><strong>CI, monitoring, rollback</strong>: no CI, no deploy-to-QA trigger, no monitoring beyond stdout logs and no rollback runbook exist in the repo; confirm whether any live outside it (Vercel dashboard, Supabase backups). Source: target maintainers.</li>
-          <li><strong>Inspector roles</strong>: the <code>/qa</code> page describes <code>qa_inspector_ro</code> / <code>qa_inspector_rw</code> as <code>BYPASSRLS</code>; their existence and grants per environment are unverified, and DB-level checks through them cannot prove RLS behaviour.</li>
+          <li><strong>Function time limit</strong>: no <code>maxDuration</code>; the Vercel plan's default limit for <code>after()</code> imports and exports is unknown. Source: Vercel project settings.</li>
+          <li><strong>Background cleanup</strong>: nothing purges expired <code>idempotency_keys</code> rows or expired export archives; confirm whether intended.</li>
+          <li><strong>Accessibility</strong>: SRS targets WCAG 2.1 AA; not verified from code.</li>
+          <li><strong>Selector convention</strong>: <code>data-testid</code> is widespread but not uniformly kebab-case; whether the team treats it as a contract (and will fix outliers) is a team decision.</li>
+          <li><strong>Data cleanup</strong>: workspaces can now be deleted (30-day purge) but no API deletes a user; how QA users accumulating in the shared project are purged is undecided.</li>
+          <li><strong>Supabase project settings</strong>: SMTP provider, templates, JWT expiry, password policy and backups live in the dashboard with no snapshot in git (ledger INFRA-GAP). Source: Supabase project owner.</li>
+          <li><strong>Integration accounts</strong>: Stripe mode and webhook registration, Resend sending domain, OAuth app settings and the Jira account per environment live in external dashboards and were not verified.</li>
+          <li><strong>Unused schema</strong>: <code>feature_flags</code> and <code>user_view_state</code> still have no caller in <code>app/</code>, <code>lib/</code> or <code>components/</code> at <code>98ee1b4</code>; confirm whether they are planned or dead.</li>
+          <li><strong>Monaco CDN</strong>: the editor's runtime asset source is inferred from the library default, not observed.</li>
+          <li><strong>API contract drift</strong>: the served spec (102 operations) and <code>.context/SRS/api-contracts.yaml</code> were not compared; the QA repo's synced types are stale (<code>business-api-context</code> <code>discovery-gaps</code>).</li>
+          <li><strong>Diagram style</strong>: no <code>.diagram-design</code> marker at the QA repo root; the redrawn figure keeps diagram-design's default skin, matching the earlier figure. A team skin can be chosen later.</li>
+          <li><strong>Runtime version</strong>: no Node.js version pinned; the version Vercel builds with is unknown. Source: Vercel project settings.</li>
+          <li><strong>Local bootstrap</strong>: <code>.env.example</code> lacks <code>NEXT_PUBLIC_SUPABASE_ANON_KEY</code>, <code>SUPABASE_SERVICE_ROLE_KEY</code>, <code>CRON_SECRET</code>, the Stripe keys and <code>RESEND_DIGEST_FROM_EMAIL</code>, so a fresh clone does not boot from it. Source: target maintainers.</li>
+          <li><strong>Deploy mechanics</strong>: automatic deploys per branch and per-PR previews are inferred, not verified. Source: Vercel project settings.</li>
+          <li><strong>Production liveness</strong>: <code>https://upexbunkai.vercel.app</code> was not contacted.</li>
+          <li><strong>Hard-coded URLs</strong>: three URL sources (<code>APP_URLS</code>, <code>NEXT_PUBLIC_APP_URL</code>, request origin) and a localhost <code>metadataBase</code>; confirm intent before testing previews, a non-default local port or Stripe return URLs.</li>
+          <li><strong>API base path for the test client</strong>: the OpenAPI <code>servers</code> are bare hosts with <code>/api/v1/…</code> paths, <code>environments.*.api_url</code> in <code>.agents/project.yaml</code> ends in <code>/api</code>, and the <code>/qa</code> guide uses <code>/api/v1</code>. <code>/test-framework-adaptation</code> must pick one convention.</li>
+          <li><strong>CI, monitoring</strong>: no CI and no monitoring beyond stdout logs and job rows exist in the repo; confirm whether any live outside it. Source: target maintainers.</li>
+          <li><strong>Inspector roles</strong>: created by migration 0085 and made loginable by <code>db:qa-roles</code>; their state on the shared project was not checked, and DB-level checks through them cannot prove RLS behaviour.</li>
         </ul>
       </section>
     </main>
