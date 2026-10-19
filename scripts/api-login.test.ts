@@ -177,7 +177,8 @@ describe('runApiLogin', () => {
 
     expect(calls).toHaveLength(1);
     expect(calls[0]?.url).toBe(`${config.apiUrl}${config.auth.loginEndpoint}`);
-    expect(calls[0]?.body).toEqual({ email: config.testUser.email, password: config.testUser.password });
+    // Project edit: the payload is the adapter's (Bunkai adds PAT name + expiry).
+    expect(calls[0]?.body).toEqual(projectAdapter.buildAuthPayload(config.testUser.email, config.testUser.password, { env: env.current, role: 'user', profile: null, flags: {} }));
 
     expect(readFileSync(join(root, 'tokens.env'), 'utf-8')).toBe(`export API_TOKEN_USER_${ENV_UPPER}='tok-123'\n`);
     const meta = JSON.parse(readFileSync(join(root, 'tokens.json'), 'utf-8')) as Record<string, { var: string, profile: string | null, expiresIn: number }>;
@@ -225,7 +226,7 @@ describe('runApiLogin', () => {
       delete process.env[`${ENV_UPPER}_ADMIN_EMAIL`];
       delete process.env[`${ENV_UPPER}_ADMIN_PASSWORD`];
     }
-    expect(calls[0]?.body).toEqual({ email: 'qa-admin@example.com', password: 'qa-admin-password' });
+    expect(calls[0]?.body).toEqual(projectAdapter.buildAuthPayload('qa-admin@example.com', 'qa-admin-password', { env: env.current, role: 'admin', profile: null, flags: {} }));
     expect(readFileSync(join(root, 'tokens.env'), 'utf-8')).toContain(`export API_TOKEN_ADMIN_${ENV_UPPER}=`);
     expect(existsSync(join(root, 'api-state.json'))).toBe(false);
   });

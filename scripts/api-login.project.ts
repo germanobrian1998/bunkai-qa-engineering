@@ -72,20 +72,35 @@ export function buildAuthPayload(
   password: string,
   _context: ApiLoginContext,
 ): Record<string, unknown> {
-  return { email, password };
+  // Bunkai mints a fresh PAT on every signin; a 1-day expiry matches
+  // config.auth.tokenLifetimeSeconds and keeps old tokens from piling up.
+  return { email, password, pat_name: 'qa-api-login', pat_expires_in_days: 1 };
 }
 
 /**
  * Extract the token fields from the auth response.
  * Override if your API returns tokens in a different shape.
  *
- * Expected response format (default):
+ * Bunkai POST /api/v1/auth/signin returns
+ *   { user, session, pat: { token, expires_at, ... } }
+ * and the API v1 Bearer is `pat.token`. The boilerplate default shape below is
+ * kept as the fallback the synced scripts/api-login.test.ts stubs:
  *   { access_token: string, token_type: string, expires_in: number, refresh_token?: string }
  */
 export function extractTokenFromResponse(
   body: Record<string, unknown>,
   _context: ApiLoginContext,
 ): ExtractedToken {
+  const pat = body.pat as { token?: string, expires_at?: string | null } | undefined;
+  if (pat?.token) {
+    const expiresAt = pat.expires_at ? Date.parse(pat.expires_at) : Number.NaN;
+    return {
+      accessToken: pat.token,
+      tokenType: 'Bearer',
+      expiresIn: Number.isNaN(expiresAt) ? 86400 : Math.max(0, Math.round((expiresAt - Date.now()) / 1000)),
+      refreshToken: null,
+    };
+  }
   return {
     accessToken: String(body.access_token ?? ''),
     tokenType: String(body.token_type ?? 'Bearer'),
