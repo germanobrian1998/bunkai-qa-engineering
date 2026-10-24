@@ -47,6 +47,7 @@ through it.
 | **Shift-Left** | `shift-left-testing` | pre-sprint (batch) | L1 — Prevention | (Stage 0) |
 | **Planning** | `sprint-testing` | in-sprint | L1 — Prevention | (Stage 1) |
 | **Execution** | `sprint-testing` | in-sprint | L2 — Early Detection | (Stage 2) |
+| **Execution** (exploration without a ticket) | *declared, not implemented* | in-sprint or post-sprint | L2 — Early Detection | (none) |
 | **Reporting** | `sprint-testing` | in-sprint | L2 — Early Detection | (Stage 3) |
 | **Documentation** | `test-documentation` | post-sprint | L3 — Continuous Detection | (Stage 4) |
 | **Automation** | `test-automation` | post-sprint | L3 — Continuous Detection | (Stage 5) |
@@ -58,6 +59,12 @@ unit is an **agentic routine** (a recurring or autonomous run, not a user-invoke
 skill), and its capability level is **L4**. It is named here so the pipeline is
 honest about where it stops: no skill under `.agents/skills/` owns it. It deliberately carries **no DoD checklist** below — an empty checklist
 would read as an implemented gate that an orchestrator could tick.
+
+**Exploration without a ticket is declared, not implemented.** It is a second entry into the
+Execution stage, not a new stage: its scope is a module or a flow instead of a ticket, and it
+produces characterized scenarios (`oracle: observed`) for a person to confirm
+(`discovery-driven-doctrine.md` §1, §4). Like Observation it carries no DoD checklist until a skill
+owns it.
 
 **Sprint close is not a stage.** It is the batch boundary where the sprint-altitude
 artifacts (STP / STR) are closed out, and it is reached from Reporting or from
@@ -145,7 +152,7 @@ terminal there) is `artifact-lifecycle.md` §1. Do not restate it; resolve again
 | **Reporting** | ATR · ATS · ATP · Story · filed Bug/Defect/Improvement | ATR at `close` (via `complete`, after every run status is recorded); ATS at `close` (via `done`); ATP at `completed` (via `complete`); Story at `qa_approved` or `blocked`; each filed issue at `open`, parented to **QA Defect Management** |
 | **Sprint close** | STP · STR | STP at `completed` (via `complete`); STR at `close` (via `complete`) after the verdict is written |
 | **Documentation** | promoted TCs · RTP · feature TS · Preconditions | Candidate TCs at `candidate` (via `automation_review_from_ready` → `approve_to_automate`); Manual TCs at `manual` (via `for_manual`, **from `ready` — there is no `in_review` → `manual` edge**); Deferred TCs stay `ready`; RTP at `ready` and **stays there** (long-lived, never `completed`); feature TS stays `designing`; Preconditions stay `active` (no transition exists) |
-| **Automation** | TCs in scope | `in_automation` at Code start (via `start_automation`); `pull_request` when the ticket PR opens (via `create_pr`); `automated` ONLY after the suite PR merges to `main` with CI green (via `merged`) |
+| **Automation** | TCs in scope | `in_automation` at Code start (via `start_automation`); `pull_request` when the ticket PR opens (via `create_pr`); `automated` ONLY once the code is on the production branch (`git_strategy.branches.production`) with CI green (via `merged`), never at a trunk or integration merge (`discovery-driven-doctrine.md` §6) |
 | **Regression** | RTR · STR · RTP | RTR at `close` (via `complete`) after the verdict comment is posted on it, one RTR per verdict; STR at `close` (via `complete`) only when the run is the sprint close; RTP **untouched at `ready`** — a regression run never completes the plan it ran from |
 | **Observation** | *(no skill, no artifacts)* | n/a |
 
@@ -225,7 +232,9 @@ the stage NEEDS REVISION.
 [ ] Smoke pass run first (Go/No-Go) before deep exploration
 [ ] Planned outlines executed AND exploration probed beyond them
 [ ] Newly-discovered partition/boundary/transition folded back into the outline set
-[ ] Evidence captured under the PBI folder; outline/Test status updated
+[ ] Evidence captured under the PBI folder; outline/Test status updated: PASSED / FAILED only
+    on observation in the precondition's environment, else NOT RUN with its ladder reason
+    (`discovery-driven-doctrine.md` §5)
 [ ] Bugs filed with story + AC traceability where found
 [ ] Artifact statuses match §"Lifecycle expectations per stage"; light stage verifier run
 ```
@@ -235,6 +244,7 @@ the stage NEEDS REVISION.
 ```
 [ ] ATR authored as a **Test Execution** item (`ATR: {STORY-KEY}: Story Testing`); Story custom field only as fallback
 [ ] QA comment posted; ticket transitioned to the correct status
+[ ] No case left `BLOCKED`; every `DEFERRED (execution)` recorded in the ATR and listed in the QA comment
 [ ] Regression follow-up noted for any regression-worthy bug (Stage-4 hand-off); bug retest (xray):
     repro Test's run recorded PASSED/FAILED in the retest Execution
 [ ] Traceability verified — xray: Story↔ATS (`test` slug, coverage) + ATS membership complete

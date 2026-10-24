@@ -15,9 +15,10 @@ compact_rules: |
   - Apply techniques by trigger: EP always; BVA wherever a range/limit/length/date-window exists; State-Transition for stateful entities; Decision Table when 2+ conditions interact; Pairwise when 3+ combinable factors.
   - Parametrize for artifact economy: same-behavior data variants → ONE Test (`Scenario Outline` + `Examples` rows) per partition, NOT N separate Tests; split only when action / outcome / status / state differs. (Canon: doctrine §"Part 2.5".)
   - Cross-cutting characteristics (XSS, perf, a11y) deferred to app-level suites are an EXPLICIT handoff, not a silent drop — name the receiving suite or file the gap.
-  - Documents already-validated behavior only — not an exploration tool (exploration belongs to `/sprint-testing`).
+  - Documents already-validated behavior only (in a discovery-driven scope: behaviour a person confirmed, `oracle: confirmed`) — not an exploration tool (exploration belongs to `/sprint-testing`).
   - TC identity = Precondition + Action + verifiable outcome. Naming (TC): `{US_ID}: TC#: should <expected outcome> [<connector> <condition>] [given <precondition>]`; `Validate <feature>` is reserved for the GROUPING layer (Test Set summary / `describe()`). Reject `"Login test"`, `"Login - error"`, `"TC1: Test form"`.
   - ROI formula → one of three verdicts per TC: Candidate (feeds test-automation), Manual, Deferred. Prioritize by risk.
+  - No ROI verdict (Candidate or Manual) while a scenario is `oracle: observed`: a characterized behaviour needs a person's answer to "is this intended?" first (decision-protocol kind 1), and waits unscored until then. Canon: `agentic-qa-core/references/discovery-driven-doctrine.md` §4.
   - Cardinality: US→TC is 1:N; AC→TC is N:1 or N:M. Resolve TMS modality (Xray vs Jira-native) in Phase 0 before documenting.
   - Mode from `$ARGUMENTS`: a first token matching a mode in Mode routing (`repair-traceability`, `document`) IS the mode and the rest is forwarded; otherwise `document` for plain documentation work, ASK when it could be either.
   - Bug-driven (GOLDEN RULE): not every bug is a regression TC, but a regression-worthy bug MUST end with a Test — REUSE the existing failed Test if it came from one, else CREATE one (both modalities). A non-qualifying bug is treated like a failed test → Deferred, no new Test.
@@ -72,9 +73,10 @@ Requires `agentic-qa-core`. Loads on demand:
 
 **Test-documentation operational rules:**
 
-- Documents already-validated behavior only — not an exploration tool (exploration belongs to `/sprint-testing`).
+- Documents already-validated behavior only (in a discovery-driven scope: behaviour a person confirmed, `oracle: confirmed`) — not an exploration tool (exploration belongs to `/sprint-testing`).
 - TC identity = Precondition + Action + verifiable outcome. Naming (TC): `{US_ID}: TC#: should <expected outcome> [<connector> <condition>] [given <precondition>]`; `Validate <feature>` is reserved for the GROUPING layer (Test Set summary / `describe()`). Reject `"Login test"`, `"Login - error"`, `"TC1: Test form"`.
 - ROI formula → one of three verdicts per TC: Candidate (feeds test-automation), Manual, Deferred. Prioritize by risk.
+- No ROI verdict (Candidate or Manual) while a scenario is `oracle: observed`: a characterized behaviour needs a person's answer to "is this intended?" first (decision-protocol kind 1), and waits unscored until then. Canon: `agentic-qa-core/references/discovery-driven-doctrine.md` §4.
 - Cardinality: US→TC is 1:N; AC→TC is N:1 or N:M. Resolve TMS modality (Xray vs Jira-native) in Phase 0 before documenting.
 - Mode from `$ARGUMENTS`: a first token matching a mode in Mode routing (`repair-traceability`, `document`) IS the mode and the rest is forwarded; otherwise `document` for plain documentation work, ASK when it could be either.
 - Bug-driven (GOLDEN RULE): not every bug is a regression TC, but a regression-worthy bug MUST end with a Test — REUSE the existing failed Test if it came from one, else CREATE one (both modalities). A non-qualifying bug is treated like a failed test → Deferred, no new Test.
@@ -100,7 +102,7 @@ If the user has not supplied the ticket key required by `repair-traceability`, a
 
 > **Orchestration & Session contracts**: this skill follows `agentic-qa-core/references/orchestration-doctrine.md` (mandatory subagent dispatch — main thread is command center) AND `agentic-qa-core/references/session-management.md` (Phase 0 resume check, plan-first persistence at `.session/<skill-slug>/<scope>/`, archive on completion). Phase 0 (resume check) and Phase 1 (plan write) are NOT optional. The orchestrator also applies the per-stage **Definition-of-Done gates** in `agentic-qa-core/references/stage-gates.md`: verify a stage's DoD (planning stages include the Test-Design Checklist) BEFORE recording its progress checkpoint and advancing.
 
-This skill is **per-scope**: `<scope>` = `<JIRA-KEY>` (ticket / bug scope), `<module-slug>` (module scope), or `<YYYY-MM-DD>-adhoc` (ad-hoc scope). Session state lives at `.session/test-documentation/<scope>/{plan.md, progress.md}` per `agentic-qa-core/references/session-management.md` §3 + §9.
+This skill is **per-scope**: `<scope>` = `<JIRA-KEY>` (ticket / bug scope, or the coverage Tech Story of a discovery-driven gap), `<module-slug>` (module scope, or a per-module discovery-driven scope), or `<YYYY-MM-DD>-adhoc` (ad-hoc scope). Scope names are canonical in `agentic-qa-core/references/discovery-driven-doctrine.md` §2. Session state lives at `.session/test-documentation/<scope>/{plan.md, progress.md}` per `agentic-qa-core/references/session-management.md` §3 + §9.
 
 **Phase order**: Phase -1 (session resume) runs first, then Phase 0 (TMS modality), then the pipeline.
 
@@ -124,7 +126,7 @@ This skill is compliant with the doctrine in `AGENTS.md` §3 "Orchestration Mode
 
 ## Readiness Preflight Gate (MANDATORY — runs before Phase -1)
 
-> Full doctrine: `agentic-qa-core/references/preflight-gate.md`. Runs FIRST, before the resume check and before the TMS-modality gate. Two laws: (1) **args-as-answers** — the scope (module / ticket / bug / ad-hoc) and any stated modality are provided args; ask only the gaps. (2) **probe, don't assume**. Surface gaps + REDs as ONE `AskUserQuestion` checklist; self-fix with approval + explanation; STOP on any blocking RED. This skill documents already-validated behavior in the TMS — it does NOT execute against a live system, so its gate centers on TMS write capability. **Generic baseline** (env resolution, test-user creds, secret/restart handling, the two laws, output contract) is inherited from the reference §3.1 — not repeated here. Below is only this skill's **specific capability delta**.
+> Full doctrine: `agentic-qa-core/references/preflight-gate.md`. Runs FIRST, before the resume check and before the TMS-modality gate. Two laws: (1) **args-as-answers** — the scope (module / ticket / bug / discovery / ad-hoc) and any stated modality are provided args; ask only the gaps. (2) **probe, don't assume**. Surface gaps + REDs as ONE `AskUserQuestion` checklist; self-fix with approval + explanation; STOP on any blocking RED. This skill documents already-validated behavior in the TMS — it does NOT execute against a live system, so its gate centers on TMS write capability. **Generic baseline** (env resolution, test-user creds, secret/restart handling, the two laws, output contract) is inherited from the reference §3.1 — not repeated here. Below is only this skill's **specific capability delta**.
 
 | Capability | Need | Why here |
 |---|---|---|
@@ -138,7 +140,7 @@ Active env, test-user creds, DBHub, OpenAPI / API token, Playwright, `resend` an
 
 ## Phase -1 — Session resume check (MANDATORY, inline)
 
-Runs BEFORE Phase 0 (TMS modality gate). Compute prospective `<scope>` from invocation: `<JIRA-KEY>` for ticket/bug scope, `<module-slug>` for module scope, `<YYYY-MM-DD>-adhoc` for ad-hoc. Then:
+Runs BEFORE Phase 0 (TMS modality gate). Compute prospective `<scope>` from invocation: `<JIRA-KEY>` for ticket/bug scope (and the coverage Tech Story of a discovery-driven gap), `<module-slug>` for module scope (and a per-module discovery-driven scope), `<YYYY-MM-DD>-adhoc` for ad-hoc. Then:
 
 1. Check `.session/test-documentation/<scope>/progress.md`.
 2. If it does NOT exist → proceed to Phase 0 (TMS modality).
@@ -207,7 +209,7 @@ Reference implementations:
 
 ## When to use each scope
 
-Pick the scope based on the input, not the output. All four scopes share the same Analyze -> Prioritize -> Document pipeline; only the input source and defaults differ.
+Pick the scope based on the input, not the output. All scopes share the same Analyze -> Prioritize -> Document pipeline; only the input source and defaults differ. The names, their origins and their granularity are canonical in `agentic-qa-core/references/discovery-driven-doctrine.md` §2; this table is the subset this skill accepts.
 
 | Scope | Input | Typical volume | Default labels | Notes |
 |-------|-------|----------------|----------------|-------|
@@ -215,8 +217,9 @@ Pick the scope based on the input, not the output. All four scopes share the sam
 | **Ticket-driven** | A QA Approved user story from a sprint | 3-8 scenarios | `regression`, plus the test type | Output of a `sprint-testing` session. ATP/ATR created per US. |
 | **Bug-driven** | A closed bug with a verified fix | 0-2 scenarios | `regression`, `automation-candidate` (usually) | Run the Bug-driven decision (below). Not every bug qualifies; if it does, **reuse the existing failed Test or create one** — an important bug must end with a Test. ROI biased up: "it failed once, it can fail again." |
 | **Ad-hoc / Exploratory** | New scenarios found in exploratory testing | 1-10 scenarios | `regression` | Apply the 3 Phase-0 questions harshly; ad-hoc scenarios are often one-time validations. |
+| **Discovery-driven** | A coverage gap with no Story, anchored to a coverage Tech Story, with its characterized scenarios; only those a person confirmed (`oracle: confirmed`) are scored | 1-10 per gap, 20-100+ per module | `regression`, plus the test type | Gate 0 below: an `oracle: observed` scenario gets no ROI verdict, Candidate or Manual (`agentic-qa-core/references/discovery-driven-doctrine.md` §4). TCs use the Tech Story key as `{US_ID}` (§3 of the same file). |
 
-If the user gives you a story ID, use ticket-driven. If they give you a bug ID, use bug-driven. If they give you a module name or a session output, use module- or ad-hoc accordingly.
+If the user gives you a story ID, use ticket-driven. If they give you a bug ID, use bug-driven. If they give you a coverage Tech Story, use discovery-driven. If they give you a module name or a session output, use module- or ad-hoc accordingly.
 
 ### Bug-driven decision — "an important bug must have a test" (GOLDEN RULE)
 
@@ -237,7 +240,7 @@ Not every bug becomes a regression Test — a one-time typo in a stable area is 
 
 This **overrides** sprint-testing's "the bug is the test case" — that phrase covers only the immediate in-sprint retest, NOT future regression. The retest reproduces+verifies the fix now; this rule decides whether a *persistent* Test must exist (reuse or create) so the bug can never silently return.
 
-**Scope handoff to `/test-automation`.** The `Candidate` TCs produced here flow downstream to `/test-automation`, which **re-scopes** them into its own 3 planning scopes: `module-driven → Module (Macro)`, `ticket-driven → Ticket (Medium)`, `bug-driven → Regression-driven (Micro)`. `ad-hoc / exploratory` Candidates have no 1:1 automation scope — they enter under whichever fits (a module batch, or regression-driven for a single TC). `Manual` and `Deferred` verdicts are terminal and never reach automation.
+**Scope handoff to `/test-automation`.** The `Candidate` TCs produced here flow downstream to `/test-automation`, which plans them under the same scope names and sizes each work package as Macro / Medium / Micro (`agentic-qa-core/references/discovery-driven-doctrine.md` §2): `module-driven` (Macro), `ticket-driven` (Medium), `bug-driven` (Micro), `discovery-driven` (Macro per module, Medium or Micro per gap). `ad-hoc / exploratory` Candidates have no 1:1 automation scope: they enter under whichever fits (a module batch, or a Micro package for a single TC). `Manual` and `Deferred` verdicts are terminal and never reach automation.
 
 After scope confirmation, **write `.session/test-documentation/<scope>/plan.md`** per `agentic-qa-core/references/session-management.md` §6 — Goal (scope + TMS modality + expected TC count), Inputs (PBI references, ATP source, prior bugs), Approach (per-phase dispatch table above), Phase breakdown (Phase 1 Analyze → Phase 2 Prioritize → Phase 3 TC creation with chunk count → Traceability → Final report), Risks, Verification checklist (all TCs created with traceability + both reports written + the Deferred list mirrored to Jira), Cross-references (`.context/PBI/epics/EPIC-<KEY>-<slug>/stories/STORY-<KEY>-<slug>/test-cases/*.md` per-TC files + `.context/reports/COVERAGE-MATRIX-<scope>.md` + `.context/reports/PRIORITIZATION-<scope>.md` — filenames per §"Reports — fixed filenames"). Append `## Phase -1 — Session resume check — <ts>` with `status: completed`, `next: Phase 0 — Resolve TMS modality` to `progress.md`.
 
@@ -339,7 +342,11 @@ These are **candidate scenarios** derived by technique — not yet TMS work item
 
 ## Phase 2 — Prioritize (ROI)
 
+**Gate 0 (discovery-driven only)**: the scenario is `oracle: confirmed`; otherwise it waits, unscored (`agentic-qa-core/references/discovery-driven-doctrine.md` §4).
+
 Every scenario passes three gates in order. Fail any gate -> Deferred.
+
+MTP risk orders which gaps and scopes are worked first; it never sets a verdict. ROI decides per scenario, and a high-risk gap can still end Deferred, explicitly (`agentic-qa-core/references/discovery-driven-doctrine.md` §7).
 
 ### Phase 0: The three filter questions
 
@@ -579,7 +586,7 @@ The Manual branch is a catalog fact, not a style choice: **there is no `in_revie
 {US_ID}: TC#: should <expected outcome> [<connector> <condition>] [given <precondition>]
 ```
 
-- Prefix is **ALWAYS `{US_ID}`** (the User Story key) in every modality — Jira-native, Xray with Test Sets, Xray without. Test Set membership is a TC→ATS issue link in every modality with the Test Set work type, plus the Xray-internal membership under jira-xray (managed via `/xray-cli`, read via `bun xray test enrich`); it is NEVER in the TC title.
+- Prefix is **ALWAYS `{US_ID}`** (the key of the coverable: the User Story, or the coverage Tech Story of a discovery-driven scope, `agentic-qa-core/references/discovery-driven-doctrine.md` §3) in every modality — Jira-native, Xray with Test Sets, Xray without. Test Set membership is a TC→ATS issue link in every modality with the Test Set work type, plus the Xray-internal membership under jira-xray (managed via `/xray-cli`, read via `bun xray test enrich`); it is NEVER in the TC title.
 - `CORE` (expected outcome): verb + object phrased after `should` — the asserted behavior (`grant access`, `reject login`, `cap input length`).
 - `CONDITIONAL`: the optional connector clause (`when …` / `if …`) plus an optional `given <precondition>`. Omit entirely for unconditional behavior.
 - Vocabulary: entity and process names inside `<expected outcome>` / `<condition>` come from the `business-domain-context` map when generated — canonical business terms only; code identifiers must not appear in TC titles or bodies.
@@ -623,7 +630,7 @@ Phase 3 writes exactly two files to `.context/reports/`, both named from the ses
 | `.context/reports/COVERAGE-MATRIX-<scope>.md` | AC → scenario → TC key → verdict grid, plus the **e2e regression flow** each Candidate belongs to (§"Grouping Candidates into e2e regression flows"); the uncovered-AC list |
 | `.context/reports/PRIORITIZATION-<scope>.md` | Every scenario with its five ROI factors, score, and Candidate / Manual / Deferred verdict |
 
-`<scope>` is the SAME value as the session directory `.session/test-documentation/<scope>/`: `<JIRA-KEY>` for ticket / bug scope, `<module-slug>` for module scope, `<YYYY-MM-DD>-adhoc` for ad-hoc scope. One session, one pair of files; a re-run on the same scope overwrites its own pair and nothing else.
+`<scope>` is the SAME value as the session directory `.session/test-documentation/<scope>/`: `<JIRA-KEY>` for ticket / bug scope and a discovery-driven gap, `<module-slug>` for module scope and a per-module discovery-driven scope, `<YYYY-MM-DD>-adhoc` for ad-hoc scope. One session, one pair of files; a re-run on the same scope overwrites its own pair and nothing else.
 
 **Both files are `[LOCAL]`, not deliverables.** `.context/reports/` is gitignored and every file in it exists only on the machine that generated it (`.context/reports/README.md`). Nothing downstream may depend on either file being present.
 
@@ -941,10 +948,10 @@ for each {TEST_KEY} in run:
   [ISSUE_TRACKER_TOOL] Update Issue:
     issue: {TEST_KEY}
     fields:
-      Test Status: {PASSED|FAILED|BLOCKED}
+      Test Status: {PASSED|FAILED|NOT RUN}  # the native field has no BLOCKED: a KNOWN-BLOCKED test is NOT RUN
   [ISSUE_TRACKER_TOOL] Add Comment:
     issue: {TEST_KEY}
-    body: "Run {date}: {result}. Env: {env}. CI: {url}"
+    body: "Run {date}: {result}. Env: {env}. CI: {url}"  # KNOWN-BLOCKED: append "blocked by {BUG-KEY}"
 ```
 
 ### Workflow transition (both modalities — same state machine)

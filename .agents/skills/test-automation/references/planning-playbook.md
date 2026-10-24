@@ -116,11 +116,11 @@ Outputs:
 
 Expected TC count: 1–7 per ticket (story-driven).
 
-### 2.3 Regression-driven (micro)
+### 2.3 Micro (bug-driven or discovery-driven)
 
 Inputs:
 
-- A single TC (often added after a bug fix) or a focused coverage gap.
+- A single TC (often added after a bug fix), or a one-test coverage gap (origin `discovery-driven`, `../../agentic-qa-core/references/discovery-driven-doctrine.md` §2).
 - Target component (existing or new).
 - Module name for folder placement.
 
@@ -128,12 +128,12 @@ Outputs:
 
 ```
 .context/PBI/epics/EPIC-<KEY>-<slug>/test-specs/{PREFIX}-T{NN}-{name}/
-  spec.md                # 1–3 TCs (bug-driven) or 1–2 (gap-driven)
+  spec.md                # 1–3 TCs (bug-driven) or 1–2 (discovery-driven gap)
   automation-plan.md     # Optional — skip when the spec is trivially one method
   atc/{TICKET-ID}-{brief-title}.md  # Usually present — regression = one ATC in detail
 ```
 
-A regression-driven plan is the smallest unit of work. Often it is just `spec.md` + `atc/*.md`, no automation plan, because one ATC is the whole body of work.
+A Micro plan is the smallest unit of work. Often it is just `spec.md` + `atc/*.md`, no automation plan, because one ATC is the whole body of work.
 
 ---
 
@@ -323,7 +323,7 @@ Teardown: ...
 - [ ] No hardcoded waits
 - [ ] Aliases used
 - [ ] Tests pass locally
-- [ ] TMS TC moved to Pull Request on PR open (never "Automated" after local validation — Automated is exclusively the post-merge `merged` transition, once CI is green on main)
+- [ ] TMS TC moved to Pull Request on PR open (never "Automated" after local validation — Automated is exclusively the `merged` transition, once the code is on the production branch with CI green there)
 ```
 
 Implementation-order rule of thumb: each box in Section 6 should map to a single commit. If a commit would mix "new types" and "new ATC", split it.
@@ -367,7 +367,7 @@ Record a feasibility row per ticket inside the plan (module master doc §7 and a
 
 ## 8. `atc/{TICKET-ID}-{brief-title}.md` structure
 
-Produce a per-ATC spec when the ATC is complex enough that the implementation plan cannot carry the detail, or when a regression-driven plan is just one ATC.
+Produce a per-ATC spec when the ATC is complex enough that the implementation plan cannot carry the detail, or when a Micro plan is just one ATC.
 
 Template (abbreviated — full sections below):
 
@@ -526,7 +526,7 @@ On approval, Phase 2 begins. If approval is not forthcoming, revise the plan —
 - [ ] Every precondition classified (§7).
 - [ ] Implementation order written with one commit per step.
 
-### Regression-driven
+### Micro (bug-driven or discovery-driven)
 
 - [ ] Bug or gap is well-understood; the TC that would have caught it is written.
 - [ ] TMS TC exists (1–3 bug, 1–2 gap).
