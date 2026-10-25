@@ -1,6 +1,6 @@
 # Skill Registry (auto-generated)
 
-> Generated: `2026-10-24T13:55:08.591Z`
+> Generated: `2026-10-25T17:00:44.377Z`
 > Generator: `bun scripts/build-skill-registry.ts`
 > Protocol: `.agents/skills/agentic-qa-core/references/skill-resolver.md`
 
@@ -8,7 +8,7 @@ This file is the per-session compact-rules cache for the Skill Resolver protocol
 The orchestrator copies one or more `## Skill: <slug>` blocks below into every subagent briefing under `## Project Standards (auto-resolved)`.
 Subagents trust those compact rules and only read the full SKILL.md when explicitly instructed.
 
-Skills indexed: 26
+Skills indexed: 29
 
 ---
 ## Skill: acli
@@ -106,6 +106,7 @@ Skills indexed: 26
 - DO: read the rendered PNG back and expect at least one adjustment pass (move a circle, rewrap callout text, nudge the badge out of a collision). It is not one-shot.
 - DO: state the final PNG's repo-relative path in chat the moment it lands, unprompted, and repeat it leading the "Bug annotations" group in the session-close screenshot list.
 - WHEN embedding the annotated PNG into the bug issue: offer it and let the human confirm first; once published it leads the bug's Evidence section, ahead of the raw capture.
+- DIRECTION: the evidence page (the `evidence-artifact` skill) keeps marks as data on one page per ticket and per bug; when a ticket has one, link it and keep this PNG only where a tracker needs an inline image.
 
 **Read full SKILL.md when**: building the annotation HTML, choosing shape types, or handling a case the local render cannot cover (e.g. a photo of physical signage that would need anonymization).
 
@@ -189,6 +190,56 @@ Skills indexed: 26
 
 ---
 
+## Skill: evidence-artifact
+
+**Purpose**: Turns a ticket's test evidence into ONE private claude.ai page (an Artifact) that a developer or PM can open and read: a verdict header,...
+
+**Compact Rules**:
+- DO: load this skill in any dispatch whose stage captures evidence (sprint-testing Stage 2) or reports it (Stage 3, filing a bug), and append every proof to `<PBI>/evidence/evidence-pack.json` AS you test, never reconstructed at the end.
+- DO: take marks from the element's box via `playwright-cli eval` (`coords: "px"`); do NOT read a screenshot back to place a mark unless no element reaches it.
+- DO NOT: mask with a mark. Personal data on screen goes in the image's `redact` boxes, which the build burns into the pixels.
+- DO NOT: put a trace, a HAR, a token, a cookie or an `.auth` file in a pack. Credentials in API/SQL text are written as `<redacted>`; the build refuses the rest and names the field.
+- DO: give a bug its own pack (`evidence-pack-<BUG>.json`, `kind: "bug"`, a `repro` case) once the bug issue exists, and build and publish bug pages BEFORE the story page: a story's `RETEST PASSED` / `RETEST FAILED` bug card is refused unless the bug's own pack confirms it.
+- DO: build with `bun run evidence build --pack <pack>`; it needs Python 3.9+ and Pillow and names the one thing to install when either is missing.
+- DO: publish with the Artifact tool; when the pack already has `artifact.url`, run `Artifact action: "read"` on it first and publish with that `url`. Omitting `url` mints a second page and orphans every link.
+- DO: record the URL with `bun run evidence record --pack <pack> --url <url>` and on the board (`bun run board evidence-artifact <KEY> <url> [--bug <BUG>] --by worker`), add it to the issue with `bun run evidence link --pack <pack>`, then link it from the ATR, the bug description, the QA comment footer and each TC's notes.
+- DO: embed a bug's ONE thumbnail with `bun run evidence attach --pack <bug pack>` (`--dry-run` first prints every call), after the bug page link is in its Description; write "(image embedded below)" and pass `bun run board bug ... --evidence-embedded` only once a live run printed `read-back OK` (a dry run never does).
+- DO NOT: run `bun run evidence attach --replace` without a person's OK: it deletes the bug's earlier thumbnail attachment, which cannot be undone. `attach` refuses on its own when an earlier thumbnail (same name, other bytes) is there.
+- DO: on a retest, keep every earlier case and item with its `round`, set `currentRound` and `rounds[]`, append the retest case, and republish to the SAME URL. A retest never passes on a DEFERRED case.
+- DO: report the URLs as published private for the owner to share; when the Artifact tool is unavailable, report the pack path instead (the conductor publishes).
+- DO NOT: send evidence to any external image service, whatever the chat authorises.
+
+**Read full SKILL.md when**: the compact rules above are insufficient (e.g. novel scenario, debugging, or the briefing tells you to load the full skill).
+
+> Source: `.agents/skills/evidence-artifact/SKILL.md` · phase: `unknown` · kind: `workflow` · extraction strategy: A
+
+---
+
+## Skill: exploratory-testing
+
+**Purpose**: Ticket-free exploratory testing of a critical flow, a module or the whole product, across UI, API and DB together, in the Execution stage.
+
+**Compact Rules**:
+- Ticket-free entry into the Execution stage: the scope is a flow, a module or a sweep, never a ticket key (a named ticket routes to `sprint-testing`). Mode from the first `$ARGUMENTS` token (`flow` | `module` | `sweep`), or from a request that clearly names one flow, one module or a sweep (args-as-answers); otherwise ASK.
+- Five steps, always in order: Charter (main thread) -> Recon (Parallel) -> Refute (Parallel) -> Tie-break (main thread) -> Handoff (main thread). Planning and tie-breaks are never delegated. The charter is presented and confirmed before any Recon dispatch, unless the request already named the scope and said go.
+- Build the coverage view BEFORE Recon: the gap list of `project-context` mode `coverage` when it exists, else `coverage-view.json` from `kata-manifest.json` + the TMS Tests read by `bun run context:coverage collect` (never by `jira:sync-issues`: Tests are `sync: never`); a TMS not read is stated `TMS not read` and no manual cover counts. Every candidate is marked NEW / WEAK / COVERED; only a counted `exercises` cover makes COVERED; a `weak`, stale or unverified cover never dedupes a candidate away.
+- Compare at least 2-3 rows plus a control group before calling anything anomalous, and state the detection query verbatim.
+- Refute mandate: every Medium+ anomaly gets a Parallel verifier told to REFUTE it (join fan-out, data quirk, intended behaviour, harness artifact); it survives only if it cannot be explained away. Check a row's own invariant, not just that it differs from another row; execute competing hypotheses side by side, never infer them. Canon: `agentic-qa-core/references/adversarial-verification.md`.
+- Verifier disagreement goes to a main-thread tie-break: a decisive query plus a direct read of the live code path. Never a third verifier, never an average, never one agent's verdict alone on a data-integrity, money or security finding.
+- Oracle: behaviour with no AC is `oracle: observed`; "is this intended?" goes to a person (decision-protocol kind 1), a batch through the `mkd` deck, a single question through the question tool. `oracle: confirmed` (who, where, when) makes the observation PASSED; `not intended` makes it FAILED and a proposed defect. Canon: `agentic-qa-core/references/discovery-driven-doctrine.md` §4.
+- A candidate is PASSED or FAILED only when observed in the environment its precondition names; a code read, unit test, green CI or another environment leaves it NOT RUN with exactly one reason, BLOCKED or DEFERRED (execution), and it climbs the blocking ladder; with no coverable yet, its follow-up lives on the coverage Tech Story once approved, and until then as an item of the Handoff deck. Canon: `agentic-qa-core/references/discovery-driven-doctrine.md` §5.
+- Never call anything that sends, notifies or pushes downstream; reads and previews are fine. A project's own list (`## Never-call endpoints` in `agent-project.md`) is carried verbatim in briefing component 7.
+- Mutations only to set up a precondition, within the charter's budget. Every created row goes into `created_rows` the moment it exists; cleanup re-reads each one (a delete's response code is not proof).
+- Person-signed writes: every bug (`sprint-testing/references/reporting-templates.md` §1, gate §1.12, classified per `defect-management-doctrine.md` Part 1), every coverage Tech Story (`discovery-driven-doctrine.md` §3), every module-context write. This skill creates no Test and scores no ROI.
+- Evidence that reaches a person goes through the `evidence-artifact` skill; raw captures stay in the session `evidence/` until a coverable exists.
+- On any subagent failure: STOP, report which surface or finding failed, offer retry / skip-surface / abort; a skipped surface is recorded "not covered this round", never dropped silently. A skill that itself broke is reported upstream per `agentic-qa-core/references/upstream-feedback.md`.
+
+**Read full SKILL.md when**: starting a round cold, resuming a session, or handling a sweep, a tie-break or a Handoff not covered by the rules above.
+
+> Source: `.agents/skills/exploratory-testing/SKILL.md` · phase: `unknown` · kind: `workflow` · stage owner · source: frontmatter `compact_rules` (verbatim)
+
+---
+
 ## Skill: framework-development
 
 **Purpose**: Framework evolution mode — evolves the QA boilerplate itself (KATA, fixtures, cli/, scripts/, api/schemas/ pipeline, package.json deps).
@@ -240,7 +291,7 @@ Skills indexed: 26
 - DO: stop at PR creation — merging is the user's next step, never automatic. If the `gh` transport is missing or unauthenticated, surface the blocker instead of implying a PR was opened.
 - WHEN reconciling declared policy against the host: run the policy-verify tool once at the first push / PR / merge intent, never hand-query protection endpoints. A `404` on the classic protection endpoint does not mean unprotected, and a push that succeeded may have been a documented bypass, not permission. Report drift; never auto-correct it.
 - WHEN a planned change exceeds ~400 changed lines: run the chained-PR decision (single-pr / stacked-to-main / feature-branch-chain / size-exception) before coding, and re-run it if the real diff outgrows the estimate rather than silently up-budgeting. Return it with its trace, never as a bare label: `Chain strategy: <leaf>`, each tree question answered with the reason drawn from THIS change (`Q1=No (…) · Q2=… · Q3=…`, `n/a` past the leaf), `Decided by: /git-flow-master`. Answers that do not lead to the stated leaf, or a trace that only restates the conclusion, count as no decision; a re-run replaces the trace.
-- WHEN a promotion PR into the production branch merges: hand off the post-promotion `merged` pass to `/test-documentation` ("Promotion landed on `<production>`: run the post-promotion `merged` pass"). Never touch the TMS from this skill. Canon: `agentic-qa-core/references/discovery-driven-doctrine.md` §6.
+- WHEN a promotion PR into the production branch merges: hand off the post-promotion `merged` pass as `/test-documentation post-promotion` ("Promotion landed on `<production>`: run `/test-documentation post-promotion`"). Never touch the TMS from this skill. Canon: `agentic-qa-core/references/discovery-driven-doctrine.md` §6.
 - WHEN a conflict fires: diagnose and classify it first, present options ranked by safety, and prefer a safe abort over a guess. Never pick a destructive option silently.
 
 **Read full SKILL.md when**: running Strategy Setup, resolving a specific conflict type, picking a base branch or branch prefix for an unfamiliar strategy, or setting up an isolated worktree.
@@ -346,7 +397,7 @@ Skills indexed: 26
 **Purpose**: Multi-session agent orchestration for this repo: one conductor session coordinating a fleet of persistent worker sessions (one per story,...
 
 **Compact Rules**:
-- DO gate on the BINARY plus a reachable RUNTIME, never on "is a vendor skill installed". Three states: A no binary, B binary with unreachable runtime, C ready. In a workflow skill, states A and B are TOTAL SILENCE: never name the orchestrator, never list it as a prerequisite, never mention it in an ATR or a blocked-token sweep. The one-line install recommendation belongs to THIS skill and fires only because the user asked for orchestration.
+- DO gate on the BINARY plus a reachable RUNTIME, never on "is a vendor skill installed". Three states: A no binary, B binary with unreachable runtime, C ready. In a workflow skill, states A and B are TOTAL SILENCE: never name the orchestrator, never list it as a prerequisite, never mention it in an ATR or a blocked-token sweep. The one-line install recommendation belongs to THIS skill and fires only because the user asked for orchestration. One workflow skill is the declared exception: `/sprint-conductor` exists to run on Orca, so when the gate fails it stops with one line naming it (owner decision); every other workflow skill keeps the silence.
 - DO write the launch file ALWAYS, with or without a runtime, and keep the PROMPT identical on both paths, byte for byte, opening with `/<workflow-skill> <KEY> fleet worker` and carrying the no-stopping sentence. The launch line itself is for a human to paste or for a deliberately unsupervised terminal; the prompt is the payload both paths share, and a paraphrased prompt is the exact failure this rule exists to prevent.
 - DO NOT copy the vendor command grammar into this repo. LOAD the stubs listed in `orchestration.orchestrator_skills` (`.agents/project.yaml`) alongside this skill — conductor AND worker, they are small — and ask the binary only for the DEEP topics a stub points at. A copied grammar goes stale in silence on the next release; a grammar nobody loaded produces invented flags.
 - DO treat one-shot subagents as the DEFAULT executor (AGENTS.md §3, unchanged) and a supervised worker as the declared exception: persistent, addressable, owns a scope end to end. The conductor still uses subagents for its OWN reads.
@@ -403,8 +454,9 @@ Skills indexed: 26
 **Purpose**: Generate or refresh the business context maps (the HTML maps inside business-data-context, business-api-context and business-e2e-context)...
 
 **Compact Rules**:
-- Exactly ONE mode per run: `data` · `e2e` (synonym `features`) · `api` · `test-plan` · `refresh-all` · `context-skill`. Load only that mode's reference; never open a second one in the same pass.
+- Exactly ONE mode per run: `data` · `e2e` (synonym `features`) · `api` · `test-plan` · `refresh-all` · `context-skill` · `coverage`. Load only that mode's reference; never open a second one in the same pass.
 - `context-skill` scaffolds a project-owned `<aspect>-context` for an aspect the shipped context map skills (`CONTEXT_MAP_SKILLS`) do not cover (`../agentic-qa-core/references/skill-scaffold.md` §3): it cites its sources and never copies them. `refresh-all` never includes it. Its router row goes in the `## Project context skills` table of `.agents/instructions/agent-project.md`, its trigger phrases in that file's `triggers:`; NEVER in `agent-skills-and-mcps.md`, which `bun sync` overwrites.
+- `coverage` reads the maps, the KATA manifest and the TMS and buckets every behaviour (`automated` · `manual-only` · `weak` · `uncovered`); `refresh-all` never includes it. It writes only `<<PRIMARY_ROOT>>/.session/project-context/coverage/` (companion files: this skill opts out of the session Phase 0) and never edits a test or a map. The `weak` verdict and the risk level are agent judgments with one evidence line per row; the buckets, order and diff are `bun run context:coverage classify`. Coverage Tech Stories are created only after a person approves the gap list, picked by weight (`mkd` deck for per-item choices, the question tool for one yes/no).
 - Mode → reference → output: see the Mode routing table. A map mode writes ONLY its own skill's `references/<map>.html`; the legacy markdown files a project may hold (the skill's `legacy` list in `CONTEXT_MAP_SKILLS`, `cli/lib/context-maps.ts`) are read as input and never deleted. Domain vocabulary and architecture come from the maps `project-discovery` generates: `bun run context:map business-domain-context` and `bun run context:map infra-context`, never a `.context/` file. `test-plan` → `references/test-plan.md` → the `## Master Test Plan` section of the `QA Master Test Plan` Epic description in Jira (cached by the sync at `.context/PBI/qa-artifacts/master-test-plan.md`; never a local file).
 - User did not name a mode → ASK. NEVER infer `refresh-all` from a generic "refresh the context" request.
 - `refresh-all` runs strictly `data` → `e2e` → `api` → `test-plan`, one at a time. Each reference's own validation and approval gate must close before the next is loaded. Never skip ahead.
@@ -532,6 +584,30 @@ Skills indexed: 26
 
 ---
 
+## Skill: sprint-conductor
+
+**Purpose**: Boot, run and resume the sprint QA conductor: one session that conducts a fleet of sprint-testing workers (one per ticket) on Orca and wa...
+
+**Compact Rules**:
+- Orca is REQUIRED (owner decision, the one exception to the orchestrator-silence rule): run the gate of `orca-orchestration` (binary + reachable runtime) before anything else. It fails → say ONE line and stop, writing nothing: "/sprint-conductor runs on Orca and no reachable Orca runtime is on this machine; run the sprint with /sprint-testing sprint-wide and N executors, which writes paste-ready launch lines." Every other workflow skill keeps its silence unchanged.
+- Split of duties: this skill owns the MANEUVER (boot, watch pass, round close, resume); `sprint-testing/references/fleet-conductor.md` owns the fleet WHAT (briefs, launch.txt, rounds, claims, the sprint record); `sprint-testing/references/sprint-board.md` owns the board (commands per stage, the worker block, the four channels, the sentinel wake table); `orca-orchestration` owns the transport HOW. Cite them, never restate them.
+- Ask the owner only what the board, the tracker and the files cannot decide: the sprint when the CURRENT board and the tracker disagree or no board exists, and the worker cap when the ticket count exceeds it and the owner named none (held for this session, never persisted as a new default). Everything else is decided and reported.
+- The conductor never tests and never investigates a ticket. The line is fixture versus finding: seeding data, verifying with ONE query that a fixture exists and belongs to whom the brief says, and creating an owner-approved fixture user are conductor work; what a case asserts, the code behind it and any id the test needs are the worker's.
+- Conductor-owned pre-flight, before EVERY launch (a watch-pass launch included): tokens and browser states minted by the conductor only, refreshed when stale; a credential proven with the cheap API login before any browser login, stopping after 3 failed attempts; the sibling-repo fetch is a GATE (non-zero exit stops and escalates, never falls through to the counts) and its two drift counts go into every brief; the schema sync runs from a current checkout or is skipped with the skip written into every brief. Full: `references/boot-and-resume.md` §2.
+- The sentinel is armed at boot and re-armed after EVERY wake, as a background task, one per board, with the same `--baseline` file. Never a homemade monitor, never a scheduled pass when background tasks exist, never mailbox polling.
+- Every watch pass records each decision with `bun run board arrival <KEY> launched|held|skipped "<why>"`, so a missed pass costs nothing. The deploy check is never skipped: a tracker status is a hint, the deployed build is the truth. Fixture gaps are asked at triage, before launch. The cap counts every live worker, an ad-hoc retest included, and a collision is checked against the LIVE workers, not the round plan.
+- A finished worker's final ticket status is read back by the CONDUCTOR itself, with a bounded poll for the expected value; a worker's or a subagent's "verified" is never the proof (Critical Rule #16). The round close is ONE subagent per finished worker that verifies the artifacts, never the report; closes whose workers touched the same Epic run one after another, never in parallel, so only one of them publishes that Epic's `## Module Context (QA)` section at a time.
+- A redeploy while workers are live: fetch only (never fast-forward a sibling repo while a worker is live), then tell EVERY live worker once, with the repo, the old and new build and whether its own change's files moved.
+- Never message a developer without the owner's explicit order for that message, never commit, never print a credential. Reports to the owner are counts and tables that name who must answer, never a narrative.
+- Resume after a reboot or a session resume: find the workers by title (handles change), restart the board, re-arm the sentinel with the same baseline, replay the owner's actions with `listen --since`, read the mailbox, send ONE resume message per live worker, and launch nothing until every live worker confirmed. Full: `references/boot-and-resume.md` §4.
+- On any subagent failure: STOP, report which pass or ticket failed with full context, offer retry / skip / abort, never auto-fix. A skill that itself broke is reported upstream per `agentic-qa-core/references/upstream-feedback.md`.
+
+**Read full SKILL.md when**: booting a conductor cold, resuming one after a reboot, or deciding whether a
+
+> Source: `.agents/skills/sprint-conductor/SKILL.md` · phase: `unknown` · kind: `workflow` · stage owner · source: frontmatter `compact_rules` (verbatim)
+
+---
+
 ## Skill: sprint-testing
 
 **Purpose**: Orchestrates in-sprint manual QA per issue across Stages 1 (Planning), 2 (Execution) and 3 (Reporting).
@@ -566,7 +642,7 @@ Skills indexed: 26
 - STP find-or-create fires on the sprint's FIRST ticket: `STP: Sprint#{N}: {objective}` (Test Plan item, parent: QA Master Test Plan; a LIVING planner — append each tested ticket, keep progress current). The sprint recap Execution `STR: Sprint#{N}: Regression Testing` (parent: QA Test Artifacts) is created at sprint close. RTRs recorded during the sprint (`RTR: {scope-id}: Regression Testing`, one per regression verdict) belong to `/regression-testing`; the STR remains the sprint-close run and links to both the STP and the RTP (dual `testPlan` membership).
 - Two modes, ASKED at Session Start, never inferred: **sprint-wide** (the whole sprint's QA backlog) or **single-issue** (one issue from it). Only `sprint-wide` creates/updates the STP and the sprint session pair; `single-issue` creates neither.
 - Mode is a SCOPE, and scope is only one axis: **scope** (single-issue | sprint-wide) × **executors** (1 | N). One executor is the default and is unchanged in every detail. N>1 ("fleet mode") is sprint-wide ONLY, fires when the user answers the executors question with N (`orchestration.max_workers` in `.agents/project.yaml` is a round cap, never a switch); the orchestration gate then decides only who opens the sessions (pass → Orca launches/supervises; fail → the human pastes the same launch lines), and never changes what an issue's pipeline does — only who runs it. Canon: `sprint-testing/references/fleet-conductor.md`.
-- Fleet mode invariants: the launch file is written ALWAYS (gate or no gate — without the gate the human pastes its N lines) and when the gate fails the orchestration tool is NEVER named to the user; a worker = single-issue mode, detected from the prompt token `fleet worker` plus its brief (env vars are an optional extra signal on the human-paste path only), no checkpoints, preflight MCP probes NOT skippable, zero sprint-altitude writes, runs to `worker_done` without returning to its prompt; **rounds** (concurrency groups) are NOT **waves** (Jira-status buckets).
+- Fleet mode invariants: the launch file is written ALWAYS (gate or no gate — without the gate the human pastes its N lines) and when the gate fails the orchestration tool is NEVER named to the user; a worker = single-issue mode, detected from the prompt token `fleet worker` plus its brief (env vars are an optional extra signal on the human-paste path only), no checkpoints, preflight MCP probes NOT skippable, zero sprint-altitude writes, no write to its Epic's `## Module Context (QA)` section (it stages `## Module Learnings (candidate)` in its `test-session-memory.md`; the conductor publishes once per module), runs to `worker_done` without returning to its prompt; **rounds** (concurrency groups) are NOT **waves** (Jira-status buckets).
 - `sprint-wide` is a REAL session scope, not a folder: `.session/sprint-testing/sprint-<N>/{plan.md, progress.md}` per `agentic-qa-core/references/session-management.md` §6/§7, holding one nested `<JIRA-KEY>/` sub-scope per issue. `plan.md` is the local STP (queue + waves + assignment); `progress.md` is the append-only sprint log, one entry per issue close. There is NO local sprint tracker file — anything the team needs lives in the STP in Jira.
 - Sprint scope is a JQL QUERY, never a hardcoded issue-type list: take the work types declared `coverable: true` in `.agents/jira-required.yaml`, resolve each one's `jira_issue_type` (`A | B | C` = ordered alternatives, first the instance has wins), intersect with `.agents/jira-workflows.json`. A declared type the instance lacks is SKIPPED WITH A NOTE, never a blocker.
 - STP maintenance parity (concurrent testers): `plan.md` ↔ the STP issue DESCRIPTION — rewritten wholesale, so ONE writer (whoever plans the sprint), read-first before writing. `progress.md` ↔ the STP issue COMMENTS — append-only on both sides, one comment per issue close, so two testers never clobber each other. Where the comment log and a Story's ATR disagree, the **ATR wins** — it is the artifact of record.
@@ -587,7 +663,7 @@ Skills indexed: 26
 - Apply techniques by trigger: EP always; BVA on ranges/limits; State-Transition for stateful flows; Decision Table when 2+ conditions interact; Pairwise when 3+ combinable factors (log the reduction).
 - Parametrize for artifact economy: same-behavior data variants → ONE parameterized `@atc` (fixture / data-factory rows iterated by the test) per partition, NOT N ATCs; split only when action / outcome / state differs. (Canon: doctrine §"Part 2.5".)
 - An AC is the business assertion; an ATC is its concrete exploration (Precondition + Action + Assertions). Run the Test-Design Checklist before finalizing the plan.
-- Plan → Code → Review, always in order. Only automate `Candidate` verdicts from `/test-documentation`.
+- Plan → Code → Review, always in order, behind the TC source gate (also first on every resume): in scope = the Tests at `candidate` whose `Verdict signed:` ROI comment has Jira `created` AND `updated` older than this run's start; Manual and recorded-Deferred Tests are listed out of scope. STOP and route to `/test-documentation` only on a named TC that is not a signed Candidate, a Test with no verdict, or zero signed Candidates; never sign or wait inside the run. This skill never creates a Test, scores ROI or fires a verdict transition. Signed ROI is a hard gate, never collapsed.
 - A TC reaches `automated` (labels `+automated -automation-candidate`) only when its code is on the production branch (`git_strategy.branches.production`); a merge into an integration branch or a suite trunk is not `automated`. Canon: `agentic-qa-core/references/discovery-driven-doctrine.md` §6.
 - Fixture selection: API-only → `{ api }` (no browser); UI-only → `{ ui }`; hybrid → `{ test }`.
 - ATC = atomic mini-flow; NEVER calls another ATC. Reusable chains → a Steps module.
@@ -604,7 +680,7 @@ Skills indexed: 26
 
 ## Skill: test-documentation
 
-**Purpose**: Analyze, prioritize, and document test cases in TMS (Jira/Xray), or repair an existing Story-ATS-ATP-ATR-TC cascade through a sealed expl...
+**Purpose**: Analyze, prioritize, and document test cases in TMS (Jira/Xray), repair an existing Story-ATS-ATP-ATR-TC cascade through a sealed explici...
 
 **Compact Rules**:
 - Documenting an AC→TC map is the FLOOR (≥1 TC per AC is a minimum, never a target). Coverage = AC-conformance + risk-beyond-AC; the TC set must include boundary / negative / state / anomaly cases the AC is silent on. (Canon: `agentic-qa-core/references/test-design-doctrine.md`.)
@@ -612,12 +688,15 @@ Skills indexed: 26
 - Apply techniques by trigger: EP always; BVA wherever a range/limit/length/date-window exists; State-Transition for stateful entities; Decision Table when 2+ conditions interact; Pairwise when 3+ combinable factors.
 - Parametrize for artifact economy: same-behavior data variants → ONE Test (`Scenario Outline` + `Examples` rows) per partition, NOT N separate Tests; split only when action / outcome / status / state differs. (Canon: doctrine §"Part 2.5".)
 - Cross-cutting characteristics (XSS, perf, a11y) deferred to app-level suites are an EXPLICIT handoff, not a silent drop — name the receiving suite or file the gap.
-- Documents already-validated behavior only (in a discovery-driven scope: behaviour a person confirmed, `oracle: confirmed`) — not an exploration tool (exploration belongs to `/sprint-testing`).
+- Documents already-validated behavior only (in a discovery-driven scope: behaviour a person confirmed, `oracle: confirmed`) — not an exploration tool (exploration belongs to `/sprint-testing` per ticket and `/exploratory-testing` per module, flow or sweep).
 - TC identity = Precondition + Action + verifiable outcome. Naming (TC): `{US_ID}: TC#: should <expected outcome> [<connector> <condition>] [given <precondition>]`; `Validate <feature>` is reserved for the GROUPING layer (Test Set summary / `describe()`). Reject `"Login test"`, `"Login - error"`, `"TC1: Test form"`.
 - ROI formula → one of three verdicts per TC: Candidate (feeds test-automation), Manual, Deferred. Prioritize by risk.
 - No ROI verdict (Candidate or Manual) while a scenario is `oracle: observed`: a characterized behaviour needs a person's answer to "is this intended?" first (decision-protocol kind 1), and waits unscored until then. Canon: `agentic-qa-core/references/discovery-driven-doctrine.md` §4.
+- A Candidate or Manual verdict is fired only after a person signs it (a batch through the `mkd` deck, one verdict through the question tool), and the TC's ROI comment then carries `Verdict signed: <who>, <where>, <when>`, `<where>` a checkable record (the person's own comment id, or the saved mkd result / decision record path), the line `/test-automation`'s TC source gate reads. Only an attended session writes it; a subagent, worker or routine lists the verdicts as pending. Format + the sign-only pass: `references/tms-conventions.md` §9.
+- Discovery intake (`references/discovery-intake.md`): a COVERED candidate is dropped with a line, a WEAK one becomes a strengthen proposal for the existing test (never a new Test), a NEW one runs the full pipeline anchored to its coverage Tech Story; the >50% alarm is computed per chunk.
+- `PASSED` / `FAILED` only from a run observed in the environment the TC's precondition names, else `NOT RUN` with its reason (doctrine §5); `automated` (`merged`) only once the spec is on the production branch, through mode `post-promotion` (doctrine §6).
 - Cardinality: US→TC is 1:N; AC→TC is N:1 or N:M. Resolve TMS modality (Xray vs Jira-native) in Phase 0 before documenting.
-- Mode from `$ARGUMENTS`: a first token matching a mode in Mode routing (`repair-traceability`, `document`) IS the mode and the rest is forwarded; otherwise `document` for plain documentation work, ASK when it could be either.
+- Mode from `$ARGUMENTS`: a first token matching a mode in Mode routing (`repair-traceability`, `post-promotion`, `document`) IS the mode and the rest is forwarded; otherwise `document` for plain documentation work, ASK when it could be either.
 - Bug-driven (GOLDEN RULE): not every bug is a regression TC, but a regression-worthy bug MUST end with a Test — REUSE the existing failed Test if it came from one, else CREATE one (both modalities). A non-qualifying bug is treated like a failed test → Deferred, no new Test.
 - ATS is MANDATORY per Story (`ATS: {US_ID}: {story title}`, even with a single TC): a `Test Set` holding ALL the Story's TCs, parented to the QA Test Artifacts epic, `components` INHERITED from the Story (mandatory — the components exemption applies ONLY to the optional feature-level `TS:` grouping sets).
 - Set-first creation order: find-or-create the ATS, ATP and ATR BEFORE the first TC (module-driven pre-creates the containers because parallel TC sharding needs the targets to exist); add each TC to the ATS, THEN derive the ATP's and the Execution's test lists FROM the ATS membership — never three independent id lists.
@@ -666,6 +745,7 @@ Skills indexed: 26
 - DO: treat Xray run statuses as PER-INSTANCE vocabulary. `TODO` / `EXECUTING` / `PASSED` / `FAILED` are the safe floor; `ABORTED` and `BLOCKED` are Xray defaults a project may not define, and the mutation is rejected when it does not. Record a blocked case in a status the project DOES define and explain it in the run comment — never leave the run `TODO`, which reads as never executed.
 - WHEN a Jira-fallback path created the container without authenticated Xray: the Xray layer never registered the tests and runs come back empty. Reconcile with the per-entity sync (or the bulk repair scan) before importing results.
 - DO: import results onto an existing Execution key, never scoped to a project — the import API cannot set a parent, so a project-scoped import mints a fresh unparented Execution on every run, outside the artifact ladder.
+- DO NOT: import results that could create or rewrite a Test. `import junit` refuses any testcase without a `test_key` / `test_id` inside its own `<properties>` (or with two keys, or with `test_summary` / `test_description` / `tags`) and `import xray` refuses `testInfo` or a missing, malformed or repeated `testKey`, naming each one. A KATA run is imported per ATC with explicit keys (`bun run xray:payload`, then `import xray`), never as its `junit.xml`; a missing Test is created by `/test-documentation` behind a signed ROI verdict, never by an import.
 - DO NOT: hand-craft Xray JSON payloads outside this CLI, or reuse a bearer token past its 24h TTL. A stale token produces silent 401s mid-import that read like network blips.
 - DO: dry-run any import or backup restore before applying. Both write irreversibly across hundreds of tests and runs.
 - WHEN moving between sites: restore in sync-by-key mode (GraphQL ids are re-assigned per site, keys are not), re-authenticate between export and restore because auth holds ONE site at a time, and finish with the Jira instance-migration flow — field ids are reassigned and an old id silently resolves to a different field.

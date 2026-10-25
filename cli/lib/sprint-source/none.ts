@@ -28,7 +28,7 @@
  */
 
 import type { BoardConfig } from './config.ts';
-import type { Bug, SnapshotOptions, Source, SourceSnapshot, TestCase, Ticket } from './types.ts';
+import type { Bug, SnapshotOptions, Source, SourceSnapshot, TestCase, Ticket, UnclassifiedBugRow } from './types.ts';
 
 import { readFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
@@ -150,6 +150,8 @@ export function createNoneSource(config: BoardConfig, options: NoneSourceOptions
         };
       }
 
+      // The board's own bug links (`bugKeys`) are read even when no tracked ticket lists them.
+      const asked = new Set(snapshotOptions.bugKeys ?? []);
       const bugs: Record<string, Bug> = {};
       for (const [id, row] of Object.entries(bugRows)) {
         if (!isMapping(row)) { throw new TicketsFileError(file, `bugs.${id}: expected a mapping`); }
@@ -158,7 +160,7 @@ export function createNoneSource(config: BoardConfig, options: NoneSourceOptions
         const status = text(row.status);
         if (title === null || status === null) { throw new TicketsFileError(file, `bugs.${id}: title and status are required`); }
         const owners = Object.values(tickets).filter(t => t.bugs.includes(id)).map(t => t.id);
-        if (wanted && owners.length === 0) { continue; }
+        if (wanted && owners.length === 0 && !asked.has(id)) { continue; }
         bugs[id] = {
           id,
           title,
@@ -186,18 +188,59 @@ export function createNoneSource(config: BoardConfig, options: NoneSourceOptions
       const snapshot: SourceSnapshot = {
         source: 'none',
         syncedAt: now.toISOString(),
-        searched: { tickets: Object.keys(tickets).length, tests: testIds.size, bugs: Object.keys(bugs).length },
+        searched: { tickets: Object.keys(tickets).length, tests: testIds.size, bugs: new Set([...Object.keys(bugs), ...asked]).size },
         tickets,
         bugs,
       };
+      if (snapshotOptions.bugKeys) { snapshot.missing = { bugs: [...asked].filter(id => !(id in bugs)) }; }
       if (snapshotOptions.discover) {
         const untracked = Object.entries(ticketRows)
           .filter(([id]) => wanted !== null && !wanted.has(id))
           .map(([id, row]) => {
             const r = row as Mapping;
-            return { id, title: text(r.title) ?? id, status: text(r.status) ?? '', qaOwner: text(r.qa) };
+            const status = text(r.status) ?? '';
+            // A row the board does not track never fails the discover read: it is listed unclassified, named.
+            try {
+              return { id, title: text(r.title) ?? id, status, statusKey: status, bucket: classifyTicket(config.statusMap, id, status), qaOwner: text(r.qa) };
+            }
+            catch (err) {
+              return { id, title: text(r.title) ?? id, status, statusKey: status, bucket: null, unclassified: (err as Error).message, qaOwner: text(r.qa) };
+            }
           });
         snapshot.discover = { at: now.toISOString(), sprintRows: Object.keys(ticketRows).length, untracked };
+
+        // The file IS the sprint: every row under bugs: is one of the sprint's own bug rows.
+        const sprintBugs: Bug[] = [];
+        const unclassifiedBugs: UnclassifiedBugRow[] = [];
+        for (const [id, row] of Object.entries(bugRows)) {
+          const r = row as Mapping;
+          const status = text(r.status) ?? '';
+          try {
+            sprintBugs.push(bugs[id] ?? {
+              id,
+              title: text(r.title) ?? id,
+              status,
+              statusKey: status,
+              bucket: classifyBug(config.statusMap, id, status),
+              priority: text(r.priority),
+              type: text(r.type) ?? 'Bug',
+              sprint: text(r.sprint) ?? fileSprint,
+              module: text(r.module),
+              developer: text(r.developer),
+              qaOwner: text(r.qa),
+              createdAt: text(r.created),
+              updatedAt: text(r.updated),
+              link: text(r.link),
+              tickets: Object.values(tickets).filter(t => t.bugs.includes(id)).map(t => t.id),
+            });
+          }
+          catch (err) {
+            // A bug row in a status no bucket lists is named, never counted as open.
+            unclassifiedBugs.push({ id, status, reason: (err as Error).message });
+          }
+        }
+        snapshot.discover.bugs = sprintBugs;
+        if (unclassifiedBugs.length > 0) { snapshot.discover.unclassifiedBugs = unclassifiedBugs; }
       }
       return snapshot;
     },

@@ -72,7 +72,10 @@
       "Skill(bug-screenshot-annotation)",
       "Skill(framework-development)",
       "Skill(judgment-day)",
-      "Skill(pr-review-lead)"
+      "Skill(pr-review-lead)",
+      "Skill(sprint-conductor)",
+      "Skill(exploratory-testing)",
+      "Skill(evidence-artifact)"
     ],
     "deny": [
       "Bash(rm -rf *)",

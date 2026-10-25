@@ -111,7 +111,12 @@
     "browser:profiles": "bun scripts/browser-profiles.ts",
     "shared:check": "bun scripts/shared-check.ts",
     "sync": "bun cli/update-boilerplate.ts",
-    "board:check": "bun scripts/board-check.ts"
+    "board:check": "bun scripts/board-check.ts",
+    "board": "bun run cli/sprint-board/index.ts",
+    "board:up": "bun run cli/sprint-board/index.ts serve --open --sync-every 10 --discover",
+    "context:coverage": "bun scripts/context-coverage.ts",
+    "evidence": "bun cli/evidence-page/index.ts",
+    "xray:payload": "bun tests/utils/xrayResults.ts"
   },
   "dependencies": {
     "@clack/prompts": "1.4.0",

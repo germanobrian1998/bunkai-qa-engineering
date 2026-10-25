@@ -35,9 +35,11 @@ A FAIL found during deep exploration is NOT automatically a Critical bug and doe
 | **Blocking** | smoke down, env down, data corruption / integrity loss, security-exploitable (auth bypass, cross-tenant read/write, RLS `VULNERABLE`) | **STOP the pass immediately.** Surface to the orchestrator/user, do not continue deep exploration. |
 | **Non-blocking** | cosmetic, minor validation gap, edge-case on a non-critical TC, a security/auth/framework-default finding pending recalibration | **Log it and CONTINUE the pass.** Record in `test-session-memory.md` Findings, mark the TC FAILED, finish the remaining TCs, and surface all non-blocking findings together at Stage 2 close. |
 
+**Before a finding becomes a bug proposal**, a data-integrity, money or security finding (or any whose mechanism is still a hypothesis) runs the refute mandate of `../../agentic-qa-core/references/adversarial-verification.md`: a verifier tries to explain it away, the row's own invariant is checked, and the competing hypotheses are executed side by side.
+
 Severity is assigned per `reporting-templates.md` §1.4 (a FAIL is not auto-Critical), and security/auth/framework-default findings are recalibrated at Stage 3 per `reporting-templates.md` §5.0 — so do not pre-file a Critical bug from inside the pass. The point of finishing the pass is full coverage: one non-blocking finding should not abort the other TCs.
 
-**Visual/positional findings — annotate before filing.** If a confirmed finding is visual or positional — overlapping elements, misalignment, a wrong date/offset on a chart axis, anything a raw screenshot needs a paragraph to explain — load the `bug-screenshot-annotation` skill to produce a marked-up capture (circles, arrows, callouts, corner badge) before the Stage 3 filing loop. Skip it for purely textual findings (an error message, a wrong number in a field) where the raw capture already reads clearly. The annotated PNG becomes the lead evidence in the bug report and the Evidence Handoff.
+**Visual/positional findings — annotate before filing.** If a confirmed finding is visual or positional — overlapping elements, misalignment, a wrong date/offset on a chart axis, anything a raw screenshot needs a paragraph to explain — load the `bug-screenshot-annotation` skill to produce a marked-up capture (circles, arrows, callouts, corner badge) before the Stage 3 filing loop. Skip it for purely textual findings (an error message, a wrong number in a field) where the raw capture already reads clearly. The annotated PNG becomes the lead evidence in the bug report and the first defect image of the bug's evidence pack, so it leads the evidence page the Evidence Handoff links.
 
 ---
 
@@ -56,6 +58,8 @@ Deep-dive the UI on `{{WEB_URL}}` via `[AUTOMATION_TOOL]`. Goal: validate ACs, d
 | Console + Network | `[AUTOMATION_TOOL]` | Observe errors / requests |
 
 Before any `[AUTOMATION_TOOL]` call, capture with an explicit destination path resolving to the ticket's `evidence/` folder — never repoint the shared `.playwright/cli.config.json` `outputDir` (see `agentic-qa-core/references/evidence-conventions.md` §1 Bucket B and §5). Screenshots still need the full path in `--filename` because `outputDir` does not apply to `.png`.
+
+**Evidence pack.** When the ticket will get an evidence page, record each observed case in the evidence pack beside the screenshots as you go, with marks placed from the element's real box (`getBoundingClientRect` through `eval`), never by eye: the `evidence-artifact` skill, `references/workflow.md` §2.
 
 **Session and login.** One named session per ticket (`-s=<KEY>`), in memory. The app's login comes from the role's state file, never from a login typed inside the exploration session: `open`, then `state-load <repo>/.auth/<env>-<role>.json`, then `goto`. Two roles = two sessions (`-s=<KEY>-admin`, `-s=<KEY>-member`). Missing file or a login page after `goto` → produce the file first (suite setup, or the one-off login recipe). Before the first session of the project, check `testing.browser.pair_mode` in `.agents/project.yaml` (`null` = ask once). `close` every session before reporting, and prove it with `playwright-cli list`. Canon: `agentic-qa-core/references/browser-sessions.md`.
 

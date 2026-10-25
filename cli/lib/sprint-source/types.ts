@@ -94,7 +94,22 @@ export interface UntrackedRow {
   id: string
   title: string
   status: string
+  /** Classified exactly like a tracked ticket's, so the board can tell which untracked rows are in test. */
+  statusKey: string
+  /**
+   * `null` when `board.statuses` (or the catalog) does not know the row's status: the row is
+   * listed as unclassified with `unclassified` saying why, and the discover read does not fail.
+   * A TRACKED ticket in such a status still fails the snapshot.
+   */
+  bucket: TicketBucket | null
+  unclassified?: string
   qaOwner: string | null
+}
+
+export interface UnclassifiedBugRow {
+  id: string
+  status: string
+  reason: string
 }
 
 export interface SourceSnapshot {
@@ -109,7 +124,24 @@ export interface SourceSnapshot {
   tickets: Record<string, Ticket>
   bugs: Record<string, Bug>
   /** Sprint rows the board does not track yet; only when `discover` was asked for. */
-  discover?: { at: string, sprintRows: number, untracked: UntrackedRow[] }
+  discover?: {
+    at: string
+    sprintRows: number
+    untracked: UntrackedRow[]
+    /**
+     * The sprint's own bug rows (the Bugs view's second source), whatever they link to.
+     * Absent when the source has no bug query (a jira source whose `board.jql` yields no
+     * `board.bug_jql`): the view then says "not checked", never zero.
+     */
+    bugs?: Bug[]
+    /** Bug rows in a status no bug bucket lists, or not of a bug work type: named, never counted (not in `bugs`). */
+    unclassifiedBugs?: UnclassifiedBugRow[]
+  }
+  /**
+   * Ids asked for in `bugKeys` that the source could not find: named, and still counted in
+   * `searched.bugs`, so a bug the board links is never silently left open.
+   */
+  missing?: { bugs: string[] }
 }
 
 export interface SnapshotOptions {
@@ -119,6 +151,11 @@ export interface SnapshotOptions {
   keys?: readonly string[]
   /** Also list the sprint rows that are not in `keys`. */
   discover?: boolean
+  /**
+   * Bugs the board links to its tickets, read too whatever the tracker links: their status
+   * reaches `bugs` and they count in `searched.bugs`; an id not found lands in `missing.bugs`.
+   */
+  bugKeys?: readonly string[]
 }
 
 export interface Source {

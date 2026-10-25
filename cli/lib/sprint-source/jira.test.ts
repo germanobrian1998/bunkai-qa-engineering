@@ -27,6 +27,8 @@ const catalogs: Catalogs = {
 };
 const NOW = new Date('2026-01-14T16:00:00Z');
 const SPRINT_JQL = 'project = ACME AND sprint in openSprints() AND issuetype = Story';
+/** The sprint's own bug rows: `board.jql` with its issuetype clause swapped (derived `board.bug_jql`). */
+const BUG_JQL = 'project = ACME AND sprint in openSprints() AND issuetype in ("Bug")';
 const EMPTY = { isLast: true, issues: [] };
 
 function config(tmsCli: string, overrides: Record<string, unknown> = {}, withCatalogs: Catalogs = catalogs): BoardConfig {
@@ -63,6 +65,7 @@ function replay(jqlOverrides: Record<string, unknown> = {}): Transport & { calls
       if (jql.startsWith('key in (ACME-11, ACME-12')) { return recorded('jira-search-tests.json') as T; }
       if (jql.startsWith('key in (ACME-41, ACME-42, ACME-43)')) { return recorded('jira-search-executions.json') as T; }
       if (jql.startsWith('key in (ACME-21)')) { return recorded('jira-search-bugs.json') as T; }
+      if (jql === BUG_JQL) { return recorded('jira-search-sprint-bugs.json') as T; }
       throw new Error(`unexpected jql ${jql}`);
     },
     async xray<T>(query: string, variables: Record<string, unknown>): Promise<T> {
@@ -154,7 +157,50 @@ describe('jira-native source', () => {
   test('keys narrow the query and discover lists sprint rows the board does not track', async () => {
     const transport = replay({ [SPRINT_JQL]: recorded('jira-search-sprint.json') });
     const snapshot = await createJiraNativeSource(config('acli'), transport).snapshot({ now: NOW, keys: ['ACME-1', 'ACME-2'], discover: true });
-    expect(snapshot.discover).toEqual({ at: NOW.toISOString(), sprintRows: 3, untracked: [{ id: 'ACME-3', title: 'Search suggests spelling fixes', status: 'To Do', qaOwner: 'Rowan QA' }] });
+    const { bugs: _bugs, unclassifiedBugs: _unclassified, ...discover } = snapshot.discover!;
+    expect(discover).toEqual({ at: NOW.toISOString(), sprintRows: 3, untracked: [{ id: 'ACME-3', title: 'Search suggests spelling fixes', status: 'To Do', statusKey: 'to_do', bucket: 'not_ready', qaOwner: 'Rowan QA' }] });
+  });
+
+  test('discover reads the sprint\'s own bug rows; a row in an unmapped status is named, never counted', async () => {
+    const transport = replay({ [SPRINT_JQL]: recorded('jira-search-sprint.json') });
+    const snapshot = await createJiraNativeSource(config('acli'), transport).snapshot({ now: NOW, keys: ['ACME-1', 'ACME-2'], discover: true });
+    expect(transport.calls).toContain(`jira ${BUG_JQL}`);
+    expect(snapshot.discover?.bugs?.map(b => `${b.id}:${b.bucket}`)).toEqual(['ACME-21:open', 'ACME-7022:open', 'ACME-7024:open']);
+    expect(snapshot.discover?.bugs?.find(b => b.id === 'ACME-21')?.tickets).toEqual(snapshot.bugs['ACME-21'].tickets);
+    expect(snapshot.discover?.bugs?.find(b => b.id === 'ACME-7022')).toMatchObject({ createdAt: '2026-01-15T09:00:00.000Z', tickets: [] });
+    // Jira's offset time, read as UTC: the board's sprint window compares ISO strings
+    expect(snapshot.discover?.bugs?.find(b => b.id === 'ACME-7024')).toMatchObject({ createdAt: '2026-01-16T01:30:00.000Z', updatedAt: '2026-01-16T01:40:00.000Z' });
+    expect(snapshot.discover?.unclassifiedBugs).toMatchObject([{ id: 'ACME-7023', status: 'Triage' }]);
+    expect(snapshot.discover?.unclassifiedBugs?.[0].reason).toContain('Triage');
+  });
+
+  test('board.bug_jql overrides the derived query; a non-bug row it returns is named, never a bug', async () => {
+    const own = 'project = ACME AND sprint = 7 AND type = Bug';
+    const stories = recorded('jira-search-sprint.json');
+    const transport = replay({ [SPRINT_JQL]: stories, [own]: stories });
+    const snapshot = await createJiraNativeSource({ ...config('acli'), bugJql: own }, transport).snapshot({ now: NOW, keys: ['ACME-1', 'ACME-2'], discover: true });
+    expect(transport.calls).toContain(`jira ${own}`);
+    expect(transport.calls).not.toContain(`jira ${BUG_JQL}`);
+    expect(snapshot.discover?.bugs).toEqual([]);
+    expect(snapshot.discover?.unclassifiedBugs?.[0].reason).toContain('is not a bug work type');
+  });
+
+  test('bug ids the board links are read with the linked ones; one Jira does not return is named and counted', async () => {
+    const transport = replay({ 'key in (ACME-21, ACME-7099) ORDER BY key': recorded('jira-search-bugs.json') });
+    const snapshot = await createJiraNativeSource(config('acli'), transport).snapshot({ now: NOW, keys: ['ACME-1', 'ACME-2'], bugKeys: ['acme-7099', 'ACME-21'] });
+    expect(snapshot.bugs['ACME-21']).toMatchObject({ bucket: 'open' });
+    expect(snapshot.missing).toEqual({ bugs: ['ACME-7099'] });
+    expect(snapshot.searched.bugs).toBe(2);
+    expect(transport.calls).toContain('jira key in (ACME-21, ACME-7099) ORDER BY key');
+  });
+
+  test('an untracked sprint row in a status the catalog does not know is listed unclassified, not fatal', async () => {
+    const sprint = structuredClone(recorded('jira-search-sprint.json')) as { issues: Array<{ key: string, fields: { status: { name: string } } }> };
+    sprint.issues.find(i => i.key === 'ACME-3')!.fields.status.name = 'Parked';
+    const transport = replay({ [SPRINT_JQL]: sprint });
+    const snapshot = await createJiraNativeSource(config('acli'), transport).snapshot({ now: NOW, keys: ['ACME-1', 'ACME-2'], discover: true });
+    expect(snapshot.discover?.untracked).toMatchObject([{ id: 'ACME-3', status: 'Parked', bucket: null }]);
+    expect(snapshot.discover?.untracked[0].unclassified).toContain('Parked');
   });
 
   test('an empty sprint is all zeros, never an error', async () => {
@@ -216,6 +262,14 @@ describe('jira-xray source', () => {
     expect(outcomes(snapshot.tickets['ACME-2'].tests)).toEqual([['ACME-14', 'FAILED', 'FAILED'], ['ACME-13', 'NOT RUN', 'TODO']]);
     expect(transport.calls).toContain('xray plan {"issueId":"1051","limit":100,"start":0}');
     expect(transport.calls).toContain('xray runs {"testIssueIds":["1011","1012","1014","1013"],"testExecIssueIds":["1041","1042","1043"],"limit":100,"start":0}');
+  });
+
+  test('board-linked bug ids go through the same read (missing ones named, counted)', async () => {
+    const transport = replay({ 'key in (ACME-21, ACME-7098) ORDER BY key': recorded('jira-search-bugs.json') });
+    const snapshot = await createJiraXraySource(config('bun xray'), transport).snapshot({ now: NOW, bugKeys: ['ACME-7098'] });
+    expect(Object.keys(snapshot.bugs)).toEqual(['ACME-21']);
+    expect(snapshot.missing).toEqual({ bugs: ['ACME-7098'] });
+    expect(snapshot.searched.bugs).toBe(2);
   });
 
   test('a ticket with no linked execution reads every test as NOT RUN with no raw status', async () => {

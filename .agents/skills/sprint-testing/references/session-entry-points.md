@@ -188,7 +188,7 @@ These provide business flows, journeys and feature inventory, API contracts + au
 
 The context hierarchy is: Project (system-wide) -> Epic/Module (feature area like Orders, Dashboard — module = Epic, 1:1) -> Story (individual ticket).
 
-Derive `<EPIC_KEY>` from the ticket's parent epic and `<EPIC_SLUG>` from the epic/module field — kebab-case (e.g. "Monthly Statement Improvements" -> `monthly-statement`). The module folder is `epics/EPIC-<EPIC_KEY>-<EPIC_SLUG>/`.
+Derive `<EPIC_KEY>` from the ticket's parent epic and `<EPIC_SLUG>` from the epic/module field — kebab-case (e.g. "Checkout Improvements" -> `checkout`). The module folder is `epics/EPIC-<EPIC_KEY>-<EPIC_SLUG>/`.
 
 **Jira owns the module context.** It lives in the Epic `description`, under a `## Module Context (QA)` heading, and `bun run jira:sync-issues` splits that section out into `module-context.md`. There is no dedicated custom field on purpose: `description` exists on every Jira instance, so this works on a project that never provisions a single custom field.
 
@@ -223,6 +223,8 @@ bun run jira:sync-issues get <EPIC_KEY>          # read the synced epic.md
 # 2. Materialize it back as module-context.md
 bun run jira:sync-issues get <EPIC_KEY>
 ```
+
+**A fleet worker does not publish.** In fleet mode (`fleet-conductor.md` §3) the worker keeps the drafted body, or what it learned about an existing one, under a `## Module Learnings (candidate)` heading in its own `test-session-memory.md`, and the conductor publishes it at the issue close (`fleet-conductor.md` §10 "Module learnings"): several workers replacing one Epic section race, and the last writer erases the others.
 
 If a `## Module Context (QA)` section already exists in the description, REPLACE that section only and leave the rest untouched. Module context is REUSABLE — the next ticket in the same module reads it from Jira and skips exploration, on any machine, not just the one that explored.
 
