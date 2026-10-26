@@ -212,7 +212,7 @@ git_strategy:
     hotfix_policy: n/a # branch-off-prod-backmerge | via-integration | none | n/a
   policy: # how strictly protected branches are guarded (set by Strategy Setup Q4; defaults are safe)
     direct_push_to_protected: allowed # forbidden | confirm | allowed. `allowed`: solo-main personal repo, the push credential is on the ruleset bypass list.
-    admin_bypass: false # true only when the push credential is on the host ruleset's bypass list. While false, a "Bypassed rule violations" line from the remote is a real finding, not noise.
+    admin_bypass: true # true only when the push credential is on the host ruleset's bypass list. While false, a "Bypassed rule violations" line from the remote is a real finding, not noise.
     require_pr_reviews: 0 # required approving reviews on a protected branch. Reconcile against the host with `bun run git:policy verify`.
     # Host divergences that are ACCEPTED, not drift. Each `field` names a `git:policy verify`
     # finding verbatim (`<branch>.<policy_field>`); verify moves matching findings from DRIFT
@@ -223,6 +223,8 @@ git_strategy:
         reason: 'Personal solo-main repo, no second reviewer'
       - field: main.require_code_owner_review
         reason: 'Host flag is inert without a CODEOWNERS file; solo repo, no code owners to assign'
+      - field: admin_bypass
+        reason: 'Personal repo: the bypass actor is a User, which verify does not count as admin bypass'
   branch_prefixes:
     precedence: [feat, fix, refactor, test, docs, chore]
     naming_with_key: '{prefix}/{ISSUE-KEY}-{kebab-slug}'
