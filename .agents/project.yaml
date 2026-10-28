@@ -65,7 +65,7 @@ testing:
     # false = dedicated sessions by default; pair testing only on explicit request,
     #         after one confirmation. Unattended runs never pair, whatever the value.
     # Read directly by skills (not a {{VAR}} token).
-    pair_mode: null
+    pair_mode: false
 
 # Host harnesses this project uses (ADR-0012), any of: claude, opencode, codex.
 # Every compatibility gate (agents:compat:check, setup:doctor, the installer, `bun run up`)
