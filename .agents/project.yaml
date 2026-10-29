@@ -195,32 +195,34 @@ board:
 # updater (bootstrapOnly), so each project keeps its own. Filled by git-flow-master, NOT by
 # `agents:setup`. These leaves are read directly (not {{VAR}} template vars) → skipped by vars:check.
 git_strategy:
-  strategy: solo-main # DEFAULT, not a decision — see meta.strategy_source. One of: solo-main | main-integration | enterprise | trunk-based | gitflow | github-flow | gitlab-flow | sdet
+  strategy: sdet # One of: solo-main | main-integration | enterprise | trunk-based | gitflow | github-flow | gitlab-flow | sdet
   description: >
-    TODO: describe this project's branching strategy in prose — which branches are
-    long-lived, how work reaches the release branch, and any operational note the AI
-    needs before it runs a git command. Filled by the git-flow-master Strategy Setup
-    questionnaire, or by hand.
+    This project uses the `sdet` (SDET Gitflow) flow. `main` holds confirmed, regression-ready
+    tests. Each test suite runs on an ephemeral integration trunk `test/<module>-suite` (created
+    off `main`, deleted after the suite merges). Ticket branches `test/{KEY}-*` and Plus
+    Branches (`docs/*`, `chore/*`, `fix/*`) branch off the trunk and merge back with `--no-ff`;
+    one final PR promotes the suite to `main`. Solo maintainer: PRs are self-merged (0 reviews)
+    and the admin credential is on the ruleset bypass list, so a "Bypassed rule violations"
+    remote line is expected. Full runbook:
+    .agents/skills/git-flow-master/references/sdet-integration-trunk.md
   branches:
     production: main # release / default branch
-    integration: null # long-lived integration branch name (e.g. staging), or null
-    ephemeral_pattern: null # on-demand trunk pattern (e.g. "test/<module>-suite" for sdet), or null
-  protected: [main] # branches that are never force-pushed and never rewritten (AGENTS.md Critical Rule #6). Add the integration branch here too when the strategy has one.
+    integration: null # the trunk is ephemeral, not a fixed long-lived branch
+    ephemeral_pattern: 'test/<module>-suite' # per-suite trunk, created off main on demand
+  protected: [main] # branches that are never force-pushed and never rewritten (AGENTS.md Critical Rule #6).
   decisions: # captured by the Strategy Setup questionnaire (Q1/Q2/Q3)
-    promote_method: n/a # ff-only | merge-commit | squash | n/a
-    feature_merge: n/a # merge-commit | squash | rebase-merge | n/a
-    hotfix_policy: n/a # branch-off-prod-backmerge | via-integration | none | n/a
+    promote_method: n/a # no production deploy
+    feature_merge: merge-commit # FIXED for sdet: ticket/Plus -> trunk is always --no-ff, never squash
+    hotfix_policy: n/a
   policy: # how strictly protected branches are guarded (set by Strategy Setup Q4; defaults are safe)
-    direct_push_to_protected: allowed # forbidden | confirm | allowed. `allowed`: solo-main personal repo, the push credential is on the ruleset bypass list.
+    direct_push_to_protected: confirm # forbidden | confirm | allowed. sdet: main is reached by the final suite PR; any direct push asks first.
     admin_bypass: true # true only when the push credential is on the host ruleset's bypass list. While false, a "Bypassed rule violations" line from the remote is a real finding, not noise.
-    require_pr_reviews: 0 # required approving reviews on a protected branch. Reconcile against the host with `bun run git:policy verify`.
+    require_pr_reviews: 0 # solo maintainer: trunk PRs and the final trunk -> main PR are self-merged. Reconcile against the host with `bun run git:policy verify`.
     # Host divergences that are ACCEPTED, not drift. Each `field` names a `git:policy verify`
     # finding verbatim (`<branch>.<policy_field>`); verify moves matching findings from DRIFT
     # to ACCEPTED (exit 0) and warns when an entry no longer matches anything (stale entry).
     # `apply` preserves the host's side for accepted fields instead of deriving its own rule.
     accepted_divergences:
-      - field: main.direct_push_to_protected
-        reason: 'Personal solo-main repo, no second reviewer'
       - field: main.require_code_owner_review
         reason: 'Host flag is inert without a CODEOWNERS file; solo repo, no code owners to assign'
       - field: admin_bypass
@@ -231,8 +233,8 @@ git_strategy:
     naming_without_key: '{prefix}/{kebab-slug}'
   meta:
     setup_version: 1
-    created: null # YYYY-MM-DD stamped by Strategy Setup
-    policy_verified: 2026-10-01 # YYYY-MM-DD of the last `bun run git:policy verify`. null = never reconciled against the host
+    created: 2026-10-29 # YYYY-MM-DD stamped by Strategy Setup
+    policy_verified: 2026-10-29 # YYYY-MM-DD of the last `bun run git:policy verify`. null = never reconciled against the host
     policy_source: accepted # verified | accepted | declared. `verified` = host matches the yaml exactly; `accepted` = every divergence is formally listed in policy.accepted_divergences (stamped by `git:policy verify --stamp`); `declared` = never reconciled, or an unaccepted drift is open.
     # Did anyone actually CHOOSE this strategy, or is it just the shipped default?
     # `strategy:` above is never null, so its value alone cannot answer that. Strategy
