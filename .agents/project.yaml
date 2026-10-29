@@ -208,7 +208,7 @@ git_strategy:
   branches:
     production: main # release / default branch
     integration: null # the trunk is ephemeral, not a fixed long-lived branch
-    ephemeral_pattern: 'test/<module>-suite' # per-suite trunk, created off main on demand
+    ephemeral_pattern: test/<module>-suite # per-suite trunk, created off main on demand
   protected: [main] # branches that are never force-pushed and never rewritten (AGENTS.md Critical Rule #6).
   decisions: # captured by the Strategy Setup questionnaire (Q1/Q2/Q3)
     promote_method: n/a # no production deploy
