@@ -22,7 +22,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import pc from 'picocolors';
 import { checkAgentCompatibility, repairAgentSurfaces, SHADOWING_COMMANDS_BACKUP_DIR, SKILLS_ALIAS_DEFERRED_MARKER } from './lib/agent-compatibility.ts';
-import { applyInsertions, planInsertions, projectDelta, SCHEMA_FILE, SCHEMA_SOURCE } from './lib/agents-schema.ts';
+import { applyInsertions, changedDefaults, describeChangedDefault, planInsertions, projectDelta, SCHEMA_FILE, SCHEMA_SOURCE } from './lib/agents-schema.ts';
 import { declaredHarnesses, isUnderAny, unusedHarnessPaths } from './lib/harness-selection.ts';
 import * as tui from './lib/tui';
 import { startUpdaterUi } from './lib/ui/updater-run.ts';
@@ -992,14 +992,17 @@ function makeKataManifestHook(sink: ReportSink): (summary: RunSummary) => Promis
 // the same drift problem and a much richer shape, and giving it this treatment
 // is a follow-up with its own wildcards, not a freebie.
 
-/** Upstream's version, for the `NEW in <release>` marker. See `markRelease`. */
-function upstreamRelease(templateDir: string): string | null {
-  try {
-    const raw = fs.readFileSync(path.join(templateDir, 'package.json'), 'utf8');
-    const version = (JSON.parse(raw) as { version?: string }).version;
-    return typeof version === 'string' && version !== '' ? version : null;
-  }
-  catch { return null; }
+/**
+ * The methodology values this project changed from upstream's default, listed
+ * and never written (owner decision 2026-11-02). Identity and `GENERIC_RULES`
+ * leaves are excluded by `changedDefaults`; the insert-only promise holds.
+ */
+function reportChangedDefaults(consumer: string, schema: string, sink: ReportSink): void {
+  const { changed, error } = changedDefaults(consumer, schema);
+  if (error !== null || changed.length === 0) { return; }
+  sink.warn(`Tu \`${SCHEMA_SOURCE}\` tiene ${changed.length} valor(es) de metodología distinto(s) del default de upstream. No se modifica nada:`);
+  for (const change of changed) { sink.step(`  ${describeChangedDefault(change)}`); }
+  sink.step(`Si alguno no fue deliberado, copia el valor de \`${SCHEMA_FILE}\`, donde cada clave está documentada.`);
 }
 
 export async function backfillProjectYamlFromSchema(
@@ -1027,9 +1030,8 @@ export async function backfillProjectYamlFromSchema(
     sink.warn(`No se pudo comparar \`${SCHEMA_SOURCE}\` contra el schema: ${delta.error}`);
     return;
   }
+  reportChangedDefaults(consumer, schema, sink);
   if (delta.gaps.length === 0) { return; }
-
-  const release = upstreamRelease(templateDir);
 
   // Non-interactive (`--auto`, headless, an agent run): a WHOLE missing block is
   // inserted, copied from the schema with its values (blank or default), because nothing of
@@ -1065,7 +1067,7 @@ export async function backfillProjectYamlFromSchema(
     // children come with it, and asking for each would be the per-key
     // prompting this design rejected.
     const targets = gap.wholeBlock ? [gap.block] : gap.paths;
-    const plan = planInsertions(current, schema, targets, release);
+    const plan = planInsertions(current, schema, targets);
     const result = applyInsertions(current, plan);
     if (result.error) {
       sink.warn(`No se insertó \`${gap.block}\`: ${result.error}`);
@@ -1086,7 +1088,7 @@ export async function backfillProjectYamlFromSchema(
     return;
   }
   sink.step(`Insertadas ${applied.length} clave(s) en \`${SCHEMA_SOURCE}\`: ${applied.join(', ')}.`);
-  sink.step(`Cada una lleva un comentario \`# NEW in ${release ?? '?'}\`: \`unset\` si quedó sin valor, \`upstream default\` si trae el valor por defecto de upstream. Revísalas con \`git diff ${SCHEMA_SOURCE}\`.`);
+  sink.step(`Solo valores, sin comentarios: cada clave está documentada en \`${SCHEMA_FILE}\`. Revísalas con \`git diff ${SCHEMA_SOURCE}\`.`);
 }
 
 // --- METHODOLOGY YAML BLOCK BACK-FILL (qa_assignee, subtask — afterApply hooks) ---
