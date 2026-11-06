@@ -1,45 +1,63 @@
 {
   "schemaVersion": 7,
   "templateRepo": "upex-galaxy/agentic-qa-boilerplate",
-  "templateCommit": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
+  "templateCommit": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
   "perComponentCommit": {
-    "skills": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "agent-compatibility": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "codex-config": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "scripts": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "docs": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "cli": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "vscode": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "husky": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "agents-docs": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "tooling": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "config-core": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "env-template": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "env-schema": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "worktree-include": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "orca-config": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "agent-root-config": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "playwright-cli-config": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "instructions": "c4da78696d312310faeb3a7149f5b6625a3c1d19",
-    "tests-utils": "c4da78696d312310faeb3a7149f5b6625a3c1d19"
+    "skills": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "agent-compatibility": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "codex-config": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "scripts": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "docs": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "cli": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "vscode": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "husky": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "agents-docs": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "tooling": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "config-core": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "env-template": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "env-schema": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "worktree-include": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "orca-config": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "agent-root-config": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "playwright-cli-config": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "instructions": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "tests-utils": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "pi-adapter": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9",
+    "pi-config": "21afc18a10d3e3823c6a98e4b389acb8b612c3d9"
   },
   "syncedComponents": [],
   "ignoreFileSync": {
     ".gitignore": {
-      "lastSyncedSha": "7183abee2cd4bb8bb878b7d33249bde1ec093da1",
+      "lastSyncedSha": "b36c54ec990a6664d5492897138d797e6a44f892",
       "appendedLines": [
         ".playwright/profiles/",
         "storage-state-*.json",
         ".playwright-cli/",
         "!.env.provider.schema",
         "!.context/sprint/",
-        ".pi/"
+        ".pi/",
+        ".pi/*",
+        "!.pi/mcp.json",
+        "!.pi/settings.json",
+        "!.pi/SYSTEM.md",
+        "!.pi/APPEND_SYSTEM.md",
+        "!.pi/extensions/",
+        "!.pi/skills/",
+        "!.pi/prompts/",
+        "!.pi/themes/"
       ]
     },
     ".prettierignore": {
-      "lastSyncedSha": "893958aeb470beed8157c045986f103849a2248d",
+      "lastSyncedSha": "a4d3bb7e47a1f6c25853369a5f130adaef6f18b3",
       "appendedLines": [
-        ".pi/"
+        ".pi/",
+        ".pi/*",
+        "!.pi/mcp.json",
+        "!.pi/settings.json",
+        "!.pi/extensions/",
+        "!.pi/skills/",
+        "!.pi/prompts/",
+        "!.pi/themes/"
       ]
     }
   },
@@ -98,6 +116,6 @@
     }
   },
   "cliVersion": "8.5",
-  "lastSyncedAt": "2026-11-05T21:41:11.827Z",
+  "lastSyncedAt": "2026-11-06T21:47:29.167Z",
   "variableSystemVersion": 1
 }

@@ -250,3 +250,14 @@ __pycache__/
 
 # ----- 2026-11-05 (sync) -----
 .pi/
+
+# ----- 2026-11-06 (sync) -----
+.pi/*
+!.pi/mcp.json
+!.pi/settings.json
+!.pi/SYSTEM.md
+!.pi/APPEND_SYSTEM.md
+!.pi/extensions/
+!.pi/skills/
+!.pi/prompts/
+!.pi/themes/
