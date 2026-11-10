@@ -34,8 +34,9 @@ Make the KATA framework Bunkai-specific so `/test-automation` passes its readine
 - 2026-11-10: Phases 0-2 done; plan approved ("sigue la fase 3"). Branch created.
 - 2026-11-10: T3 committed `70c413d` (was `226ffb0` before split) (`--no-verify`, hook gates run by hand: types, skills, eslint, prettier, vars:env, vars:schema). Review assess: risk medium, `review_due: false`, reason `under_budget` (71 lines, pending in slice).
 - 2026-11-10: review on main..4c22a00 failed `lens_context_budget_exceeded` (generated openapi-types.ts). Unpushed branch re-split with `reset --soft main`: `8fb1704` generated types (+ example bridge), `70c413d` T3, then T4 facades. Review base for the slice = `8fb1704`.
+- 2026-11-10: native review lineage `review-9959d91101d2edf3` on `8fb1704..794de95` (267 lines, risk high, auth hot path): APPROVED and acknowledged. 12 advisory findings, non-blocking. Fixed R4 (role vars no longer `@required=forEnv(staging)`). Carried to T5: R3 tokenEndpoint intercept unverified until ui-setup runs; legacy `TokenResponse` removal. Noted: single `dbhub`/`openapi` server for both envs is intended (only one server is declared; earlier per-env names resolved to nothing). Reviewed boundary advances to `794de95`.
 - Engram mirror: PENDING (auto mode could not review `mem_save`: a hook changes its input).
 
 ## Next step
 
-T3.
+T5 (Phase 5: auth components + setups; find Jira Test keys for the ATCs first).
