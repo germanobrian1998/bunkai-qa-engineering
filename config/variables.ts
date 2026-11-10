@@ -159,7 +159,7 @@ export const config = {
   // Authentication config (Bunkai API v1 endpoints - relative to apiUrl)
   auth: {
     loginEndpoint: '/v1/auth/signin',
-    tokenEndpoint: '/auth/login', // Endpoint to intercept for token (used by page.waitForResponse)
+    tokenEndpoint: '/v1/auth/signin', // Endpoint to intercept for token (used by page.waitForResponse)
     meEndpoint: '/v1/me',
     tokenLifetimeSeconds: 86400, // 24 hours (1 day)
     // Storage paths for authenticated sessions
