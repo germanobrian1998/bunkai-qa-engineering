@@ -13,9 +13,10 @@
  */
 
 import type { ApiState } from '@data/types';
-import type { TokenResponse } from '@schemas/auth.types';
+import type { SigninResponse } from '@schemas/auth.types';
 
-import { writeFileSync } from 'node:fs';
+import { statSync, writeFileSync } from 'node:fs';
+import { expect } from '@playwright/test';
 import { test as setup } from '@TestFixture';
 import { attachRequestResponseToAllure } from '@utils/allure';
 import { config } from '@variables';
@@ -29,9 +30,9 @@ const apiStateFile = config.auth.apiStatePath;
  * 1. Navigates to login page (via LoginPage.goto())
  * 2. Sets up response interception BEFORE triggering login
  * 3. Uses LoginPage.loginSuccessfully() ATC (triggers login + token fetch)
- * 4. Captures JWT token from intercepted response
+ * 4. Captures PAT from intercepted response
  * 5. Saves storageState (cookies) for UI tests
- * 6. Saves api-state (token) for API integration
+ * 6. Saves api-state (PAT) for API integration
  */
 setup('UI Setup: authenticate via UI', async ({ ui, page }) => {
   console.log('[UI Setup] Starting UI authentication...');
@@ -47,7 +48,7 @@ setup('UI Setup: authenticate via UI', async ({ ui, page }) => {
   };
 
   // Set up response interception BEFORE triggering login
-  // The login UI calls /api/auth/login after successful NextAuth sign-in
+  // The login form POSTs /api/v1/auth/signin on the 'Sign in' click
   const tokenPromise = page.waitForResponse(
     resp => resp.url().includes(config.auth.tokenEndpoint)
       && resp.request().method() === 'POST'
@@ -55,26 +56,26 @@ setup('UI Setup: authenticate via UI', async ({ ui, page }) => {
     { timeout: 30000 },
   );
 
-  // Use LoginPage ATC - triggers NextAuth sign-in + token fetch
+  // Use LoginPage ATC - triggers signin, which also mints the PAT
   await ui.login.loginSuccessfully(credentials);
   console.log('[UI Setup] UI login successful');
 
   // Capture JWT token from intercepted response
   console.log('[UI Setup] Intercepting token from login response...');
   const response = await tokenPromise;
-  const tokenData = (await response.json()) as TokenResponse;
+  const tokenData = (await response.json()) as SigninResponse;
 
   // Attach to Allure for debugging
   await attachRequestResponseToAllure({
     url: response.url(),
     method: 'POST',
-    responseBody: tokenData,
+    responseBody: { ...tokenData, session: '***', pat: '***' },
     requestBody: { email: credentials.email, password: '***' },
   });
 
   // Verify token was obtained
-  if (!tokenData?.access_token) {
-    throw new Error('Token response missing access_token');
+  if (!tokenData?.pat?.token) {
+    throw new Error('Signin response missing pat.token');
   }
 
   console.log('[UI Setup] Token intercepted successfully');
@@ -85,15 +86,17 @@ setup('UI Setup: authenticate via UI', async ({ ui, page }) => {
 
   // Save the token for API calls within E2E tests
   const apiState: ApiState = {
-    token: tokenData.access_token,
-    tokenType: tokenData.token_type,
-    expiresIn: tokenData.expires_in,
-    refreshToken: tokenData.refresh_token ?? null,
+    token: tokenData.pat.token,
+    tokenType: 'Bearer',
+    expiresIn: Math.max(0, (tokenData.session.expires_at ?? 0) - Math.floor(Date.now() / 1000)),
+    refreshToken: tokenData.session.refresh_token ?? null,
     source: 'ui-login',
     createdAt: new Date().toISOString(),
   };
 
   writeFileSync(apiStateFile, JSON.stringify(apiState, null, 2));
+  expect(statSync(storageStateFile).size).toBeGreaterThan(0);
+  expect(statSync(apiStateFile).size).toBeGreaterThan(0);
   console.log(`[UI Setup] API token saved to ${apiStateFile}`);
 
   console.log('[UI Setup] Authentication successful');

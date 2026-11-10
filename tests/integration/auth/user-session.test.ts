@@ -24,8 +24,7 @@ test.describe('UPEX-100: User Session API', { tag: ['@critical'] }, () => {
     expect(userData.user).toBeDefined();
     expect(userData.user.id).toBeDefined();
     expect(userData.user.email).toBeDefined();
-    expect(userData.user.name).toBeDefined();
-    expect(typeof userData.user.name).toBe('string');
+    expect(Array.isArray(userData.workspaces)).toBe(true);
   });
 
   /**
@@ -61,6 +60,6 @@ test.describe('UPEX-100: User Session API', { tag: ['@critical'] }, () => {
 
     // Verify new token was obtained and set
     expect(response.status()).toBe(200);
-    expect(tokenData.access_token).toBeDefined();
+    expect(tokenData.session.access_token).toBeDefined();
   });
 });

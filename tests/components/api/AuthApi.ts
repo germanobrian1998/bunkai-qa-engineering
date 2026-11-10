@@ -7,15 +7,14 @@
  * ATCs follow flow-based design: each ATC is an ACTION + VERIFICATION,
  * not a simple GET. Read-only operations are helpers (no @atc).
  *
- * TODO: Replace 'PROJ' in @atc IDs with your Jira project key (e.g., @atc('UPEX-101'))
- *
  * Endpoints:
- * - POST /api/auth/login - Authenticate and get JWT token
- * - GET /api/auth/me - Get current user info (requires auth)
+ * - POST /api/v1/auth/signin - Sign in; returns Supabase session + a freshly minted PAT
+ * - GET /api/v1/me - Current user, workspaces and auth source (requires Bearer)
  */
 
 import type { APIResponse } from '@playwright/test';
-import type { AuthErrorResponse, LoginPayload, TokenResponse, UserInfoResponse } from '@schemas/auth.types';
+import type { MeResponse, SigninRequest, SigninResponse } from '@schemas/auth.types';
+import type { ErrorEnvelope } from '@schemas/workspace.types';
 import type { TestContextOptions } from '@TestContext';
 
 import { ApiBase } from '@api/ApiBase';
@@ -23,7 +22,7 @@ import { expect } from '@playwright/test';
 import { atc, step } from '@utils/decorators';
 
 // Re-export types for consumers that import from AuthApi
-export type { AuthErrorResponse, LoginPayload, TokenResponse, UserInfoResponse } from '@schemas/auth.types';
+export type { MeResponse, SigninRequest, SigninResponse } from '@schemas/auth.types';
 
 // ============================================
 // Auth API Component
@@ -48,8 +47,8 @@ export class AuthApi extends ApiBase {
    * @returns Tuple with response and user info
    */
   @step
-  async getCurrentUser(): Promise<[APIResponse, UserInfoResponse]> {
-    const [response, body] = await this.apiGET<UserInfoResponse>(this.config.auth.meEndpoint);
+  async getCurrentUser(): Promise<[APIResponse, MeResponse]> {
+    const [response, body] = await this.apiGET<MeResponse>(this.config.auth.meEndpoint);
     return [response, body];
   }
 
@@ -61,38 +60,38 @@ export class AuthApi extends ApiBase {
    * ATC: Authenticate with valid credentials - expects success (200)
    *
    * Complete flow:
-   * 1. POST credentials to /auth/login (ACTION)
-   * 2. GET /auth/me to confirm session is valid (VERIFICATION)
-   * 3. Validate token response and user info
+   * 1. POST credentials to /v1/auth/signin, requesting a 1-day PAT (ACTION)
+   * 2. Validate session + PAT in the response
+   * 3. GET /v1/me with the PAT as Bearer to confirm it is usable (VERIFICATION)
    *
-   * The token is automatically set for subsequent API requests.
+   * The PAT (bk_pat_*) is set as the Bearer token for subsequent API requests.
    *
    * @param credentials - Email and password
-   * @returns Tuple with response, token data, and sent payload
+   * @returns Tuple with response, signin body, and sent payload
    */
-  @atc('PROJ-101')
+  @atc('BK-311')
   async authenticateSuccessfully(
-    credentials: LoginPayload,
-  ): Promise<[APIResponse, TokenResponse, LoginPayload]> {
-    // ACTION: POST login credentials
-    const [response, body, sentPayload] = await this.apiPOST<TokenResponse, LoginPayload>(
+    credentials: Pick<SigninRequest, 'email' | 'password'>,
+  ): Promise<[APIResponse, SigninResponse, SigninRequest]> {
+    // ACTION: POST signin (every signin mints a PAT, so keep it short-lived)
+    const [response, body, sentPayload] = await this.apiPOST<SigninResponse, SigninRequest>(
       this.config.auth.loginEndpoint,
-      credentials,
+      { ...credentials, pat_name: 'kata-api-setup', pat_expires_in_days: 1 },
     );
 
     // Fixed assertions - validates successful authentication
     expect(response.status()).toBe(200);
-    expect(body.access_token).toBeDefined();
-    expect(body.token_type).toBe('Bearer');
-    expect(body.expires_in).toBeGreaterThan(0);
+    expect(typeof body.session.access_token).toBe('string');
+    expect(body.session.access_token.length).toBeGreaterThan(0);
+    expect(typeof body.pat.token).toBe('string');
+    expect(body.pat.token.length).toBeGreaterThan(0);
 
-    // Store token for subsequent requests
-    this.setAuthToken(body.access_token);
+    // Store the PAT as Bearer for subsequent requests
+    this.setAuthToken(body.pat.token);
 
-    // VERIFICATION: Confirm the session is valid via GET /auth/me
+    // VERIFICATION: Confirm the PAT is valid via GET /v1/me
     const [meResponse, meBody] = await this.getCurrentUser();
     expect(meResponse.status()).toBe(200);
-    expect(meBody.user).toBeDefined();
     expect(meBody.user.email).toBe(credentials.email);
 
     return [response, body, sentPayload];
@@ -102,29 +101,29 @@ export class AuthApi extends ApiBase {
    * ATC: Login with invalid credentials - expects error (401)
    *
    * Complete flow:
-   * 1. POST invalid credentials to /auth/login (ACTION)
-   * 2. GET /auth/me to confirm NO session was created (VERIFICATION)
-   * 3. Validate error response and unauthorized access
+   * 1. POST invalid credentials to /v1/auth/signin (ACTION)
+   * 2. Validate 401 + ErrorEnvelope (code 'unauthorized')
+   * 3. GET /v1/me without a token to confirm NO session was created (VERIFICATION)
    *
    * @param credentials - Invalid email or password
-   * @returns Tuple with error response and sent payload
+   * @returns Tuple with error response, error envelope and sent payload
    */
-  @atc('PROJ-102')
+  @atc('BK-312')
   async loginWithInvalidCredentials(
-    credentials: LoginPayload,
-  ): Promise<[APIResponse, AuthErrorResponse, LoginPayload]> {
+    credentials: Pick<SigninRequest, 'email' | 'password'>,
+  ): Promise<[APIResponse, ErrorEnvelope, SigninRequest]> {
     // ACTION: POST invalid credentials
-    const [response, body, sentPayload] = await this.apiPOST<AuthErrorResponse, LoginPayload>(
+    const [response, body, sentPayload] = await this.apiPOST<ErrorEnvelope, SigninRequest>(
       this.config.auth.loginEndpoint,
-      credentials,
+      { ...credentials, pat_expires_in_days: 1 },
     );
 
-    // Fixed assertions - validates error response (UPEX Dojo returns 401)
+    // Fixed assertions - uniform 401 that never leaks whether the email exists
     expect(response.status()).toBe(401);
     expect(response.ok()).toBe(false);
-    expect(body.error).toBeDefined();
+    expect(body.error.code).toBe('unauthorized');
 
-    // VERIFICATION: Confirm no session was created via GET /auth/me → 401
+    // VERIFICATION: Confirm no session was created via GET /v1/me -> 401
     const savedToken = this.authToken;
     this.clearAuthToken();
     const [meResponse] = await this.getCurrentUser();

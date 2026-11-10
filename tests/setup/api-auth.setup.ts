@@ -10,7 +10,8 @@
 
 import type { ApiState } from '@data/types';
 
-import { writeFileSync } from 'node:fs';
+import { statSync, writeFileSync } from 'node:fs';
+import { expect } from '@playwright/test';
 import { test as setup } from '@TestFixture';
 import { attachRequestResponseToAllure } from '@utils/allure';
 import { config } from '@variables';
@@ -27,7 +28,7 @@ setup('API Setup: authenticate via API', async ({ api }) => {
   console.log('[API Setup] Starting API authentication...');
   console.log(`[API Setup] Target: ${config.apiUrl}${config.auth.loginEndpoint}`);
 
-  // Use AuthApi ATC (UPEX Dojo uses 'email' field)
+  // Use AuthApi ATC
   const credentials = {
     email: config.testUser.email,
     password: config.testUser.password,
@@ -38,24 +39,24 @@ setup('API Setup: authenticate via API', async ({ api }) => {
   await attachRequestResponseToAllure({
     url: response.url(),
     method: 'POST',
-    responseBody: tokenData,
+    responseBody: { ...tokenData, session: '***', pat: '***' },
     requestBody: { email: credentials.email, password: '***' },
   });
 
   console.log('[API Setup] Authentication successful');
-  console.log(`[API Setup] Token type: ${tokenData.token_type}`);
-  console.log(`[API Setup] Expires in: ${tokenData.expires_in} seconds`);
+  console.log(`[API Setup] PAT expires at: ${tokenData.pat.expires_at}`);
 
-  // Save token to file for use by integration tests
+  // Save the PAT (Bearer credential for the API) for use by integration tests
   const apiState: ApiState = {
-    token: tokenData.access_token,
-    tokenType: tokenData.token_type,
-    expiresIn: tokenData.expires_in,
-    refreshToken: tokenData.refresh_token ?? null,
+    token: tokenData.pat.token,
+    tokenType: 'Bearer',
+    expiresIn: Math.max(0, (tokenData.session.expires_at ?? 0) - Math.floor(Date.now() / 1000)),
+    refreshToken: tokenData.session.refresh_token ?? null,
     source: 'api-login',
     createdAt: new Date().toISOString(),
   };
 
   writeFileSync(apiStateFile, JSON.stringify(apiState, null, 2));
+  expect(statSync(apiStateFile).size).toBeGreaterThan(0);
   console.log(`[API Setup] Token saved to ${apiStateFile}`);
 });

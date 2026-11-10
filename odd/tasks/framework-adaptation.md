@@ -22,7 +22,8 @@ Make the KATA framework Bunkai-specific so `/test-automation` passes its readine
   - Evidence 2026-11-10: `vars:env:check` exit 0, `vars:schema:check` exit 0 (50 items), `test:env:check` exit 0, `types:check` exit 0. Role vars in `.env.example` kept commented: `vars:env:check` rejects uncommented non-manifest keys (ORPHAN_KEY).
 - [x] T4 Phase 4: `api:sync` from staging; `auth.types.ts`, `workspace.types.ts`, `index.ts`. verify: `types:check`. Route: delegated writer (3 non-trivial files).
   - Evidence 2026-11-10: `api:sync` 110 endpoints, `openapi-types.ts` 14,671 lines (generated, excluded from line budget). `types:check` exit 0, `lint:check` exit 0, no `@openapi` in `tests/components/`. Legacy auth types kept `@deprecated` until T5. `example.types.ts` bridged to local `any` aliases (real spec has no example schemas) until T6 deletes it. Spec gap: no list-members endpoint.
-- [ ] T5 Phase 5: AuthApi, LoginPage, setups; Jira Test keys for ATCs. verify: api-setup, ui-setup, `api:login staging`.
+- [x] T5 Phase 5: AuthApi, LoginPage, setups; Jira Test keys for ATCs. verify: api-setup, ui-setup, `api:login staging`. Route: delegated writer (5 non-trivial files).
+  - Evidence 2026-11-10 (re-run by orchestrator): `types:check` 0, `lint:check` 0, `kata:manifest:check` up to date (4 components, 8 ATCs); `TEST_ENV=staging` api-setup + ui-setup PASSED (signin intercept works, R3 closed); `.auth/api-state.json` + `.auth/user.json` non-empty; curl `/v1/me` with `API_TOKEN_USER_STAGING` = 200. ATC ids from existing BK-166 Tests: BK-311/312 (AuthApi), BK-313/314 (LoginPage). Legacy auth types removed. Invalid-credential ATCs (BK-312/314) not run yet. `user-session.test.ts` edited only to compile; rewrite in T6.
 - [ ] T6 Phase 6: WorkspaceApi, fixtures, data, smoke `@critical`, delete examples. verify: smoke passes.
 - [ ] T7 Phase 7: `kata:manifest`, `allurerc.mjs`, CI secrets block. verify: `kata:manifest:check`.
 - [ ] T7b Fix `vars:check` (10 Jira catalog refs in `shift-left-testing`). Cause (jira:check 2026-11-10): Jira lacks fields `ai_effort`, `development_token_usage`, `quality_token_usage`; `story.refined` transition absent from `jira-required.yaml` + `jira-workflows.json`. Needs Jira admin. Until fixed, branch commits use `--no-verify` (user decision 2026-11-10) with the hook gates run by hand. verify: `vars:check` exit 0.
@@ -39,4 +40,4 @@ Make the KATA framework Bunkai-specific so `/test-automation` passes its readine
 
 ## Next step
 
-T5 (Phase 5: auth components + setups; find Jira Test keys for the ATCs first).
+T6 (Phase 6: WorkspaceApi, fixtures, data, smoke `@critical`, delete examples, review reference specs).

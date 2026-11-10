@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-10-25T16:58:25.812Z",
+  "generatedAt": "2026-11-10T21:13:39.588Z",
   "components": {
     "api": [
       {
@@ -9,14 +9,14 @@
         "relativePath": "tests/components/api/AuthApi.ts",
         "atcs": [
           {
-            "id": "PROJ-101",
+            "id": "BK-311",
             "method": "authenticateSuccessfully",
-            "line": 73
+            "line": 72
           },
           {
-            "id": "PROJ-102",
+            "id": "BK-312",
             "method": "loginWithInvalidCredentials",
-            "line": 112
+            "line": 111
           }
         ]
       },
@@ -62,12 +62,12 @@
         "relativePath": "tests/components/ui/LoginPage.ts",
         "atcs": [
           {
-            "id": "PROJ-111",
+            "id": "BK-313",
             "method": "loginSuccessfully",
-            "line": 84
+            "line": 83
           },
           {
-            "id": "PROJ-112",
+            "id": "BK-314",
             "method": "loginWithInvalidCredentials",
             "line": 101
           }
