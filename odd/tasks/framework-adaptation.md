@@ -31,7 +31,8 @@ Make the KATA framework Bunkai-specific so `/test-automation` passes its readine
 - [ ] T7b Fix `vars:check` (10 Jira catalog refs in `shift-left-testing`). Cause (jira:check 2026-11-10): Jira lacks fields `ai_effort`, `development_token_usage`, `quality_token_usage`; `story.refined` transition absent from `jira-required.yaml` + `jira-workflows.json`. Needs Jira admin. Detail: (1) create custom fields `AI Effort` (select: low, medium, high), `Development Token Usage (K)` (number), `Quality Token Usage (K)` (number), then `bun run jira:sync-fields --force`; (2) Story workflow has no `shift_left_qa -> ready_for_dev` transition (`refined` in the upstream shift-left skill); live options: add one in Jira, or map to the global `Ready For Dev` (id 24) by declaring `refined` in `jira-required.yaml` + `bun run jira:sync-workflows`. Until fixed, branch commits use `--no-verify` (user decision 2026-11-10) with the hook gates run by hand. verify: `vars:check` exit 0.
 - [ ] T8 Phase 8: full gate (13 steps). BLOCKED only by T7b.
   - Evidence 2026-11-10: 11 of 13 green. 1 types 0; 2 lint 0; 3 `vars:check` 1 (T7b, 10 Jira catalog refs); 4 vars:env 0; 5 vars:schema 0; 6 harness:env 0; 7 kata:manifest 0; 8 api-setup pass; 9 ui-setup pass; 10 `api:login staging` 0; 11 smoke run 1: 3 `@critical` passed; 12 smoke run 2: 3 passed, setups re-ran = N/A by decision (user, 2026-11-10: option A, per-run mint, no staleness check; CI starts fresh every run); 13 `repo:check` 1 at its `vars:check` step; every later step of the chain run alone exits 0 (vars:schema, skills, instructions, skills:registry, docs, shared, agents:compat, agents:schema, kata:manifest, vars:env, board, git:policy verify).
-- [ ] T9 Phase 9: genericness table, `agent-project.md`, ADR-0009/0010 revision, plan COMPLETED.
+- [x] T9 Phase 9: genericness table, `agent-project.md`, ADR-0009/0010 revision, plan COMPLETED. Route: delegated writer (3 files).
+  - Evidence 2026-11-10: genericness signals all ADAPTED except `vars:check` (T7b); `agent-project.md` gains 5 headings (auth, test users, OpenAPI, first entity, gaps) and the stale signup risk row is fixed; ADR-0009/0010 revised in place (were Proposed; adr-doctrine A2 forbids rewriting only Accepted) and Accepted; plan `Status: COMPLETED (with open gap T7b)`. `instructions:check` 0, `docs:check` 0.
 
 ## Progress / evidence
 
@@ -45,4 +46,4 @@ Make the KATA framework Bunkai-specific so `/test-automation` passes its readine
 
 ## Next step
 
-T9 (Phase 9: close). T8 turns green when T7b lands (Jira admin).
+T7b (Jira admin: 3 custom fields + Story `refined` transition), then re-run T8; then the user merges PR #1 and `/test-automation` is unblocked.
