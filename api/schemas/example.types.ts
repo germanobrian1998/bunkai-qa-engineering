@@ -23,7 +23,12 @@
  * 3. Custom Types — types NOT in the spec (error shapes, test helpers, etc.)
  */
 
-import type { components, paths } from '@openapi';
+// TEMPORARY BRIDGE (framework adaptation, Phase 4): the real OpenAPI types no longer
+// contain the fictional example schemas. These aliases keep the example scaffolds
+// compiling exactly as they did against the stub (`any`). Deleted in Phase 6.
+/* eslint-disable ts/no-explicit-any */
+interface components { schemas: Record<string, any> }
+type paths = Record<string, any>;
 
 // ============================================================================
 // Schema Types (from components.schemas)
