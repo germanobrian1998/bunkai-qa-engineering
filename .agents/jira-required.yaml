@@ -446,6 +446,10 @@ work_types:
         { from: backlog, to: estimation, description: Story sized for planning poker }
       estimate:
         { from: shift_left_qa, to: estimation, description: 'After shift-left QA, send to sizing' }
+      refined:
+        from: shift_left_qa
+        to: ready_for_dev
+        description: Shift-left refinement done; story handed to dev (mapped to the global Ready For Dev transition on this site)
       estimated_and_ready_to_work:
         { from: estimation, to: ready_for_dev, description: Sized and ready for dev pickup }
       start_working:
