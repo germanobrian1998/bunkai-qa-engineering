@@ -24,7 +24,8 @@ Make the KATA framework Bunkai-specific so `/test-automation` passes its readine
   - Evidence 2026-11-10: `api:sync` 110 endpoints, `openapi-types.ts` 14,671 lines (generated, excluded from line budget). `types:check` exit 0, `lint:check` exit 0, no `@openapi` in `tests/components/`. Legacy auth types kept `@deprecated` until T5. `example.types.ts` bridged to local `any` aliases (real spec has no example schemas) until T6 deletes it. Spec gap: no list-members endpoint.
 - [x] T5 Phase 5: AuthApi, LoginPage, setups; Jira Test keys for ATCs. verify: api-setup, ui-setup, `api:login staging`. Route: delegated writer (5 non-trivial files).
   - Evidence 2026-11-10 (re-run by orchestrator): `types:check` 0, `lint:check` 0, `kata:manifest:check` up to date (4 components, 8 ATCs); `TEST_ENV=staging` api-setup + ui-setup PASSED (signin intercept works, R3 closed); `.auth/api-state.json` + `.auth/user.json` non-empty; curl `/v1/me` with `API_TOKEN_USER_STAGING` = 200. ATC ids from existing BK-166 Tests: BK-311/312 (AuthApi), BK-313/314 (LoginPage). Legacy auth types removed. Invalid-credential ATCs (BK-312/314) not run yet. `user-session.test.ts` edited only to compile; rewrite in T6.
-- [ ] T6 Phase 6: WorkspaceApi, fixtures, data, smoke `@critical`, delete examples. verify: smoke passes.
+- [x] T6 Phase 6: WorkspaceApi, fixtures, data, smoke `@critical`, delete examples. verify: smoke passes. Route: delegated writer (8+ files).
+  - Evidence 2026-11-10 (re-run by orchestrator): `types:check` 0, `lint:check` 0, `kata:manifest:check` up to date, 0 `Example` in manifest (3 components, 4 ATCs). Staging integration+e2e: 7 specs passed, 0 failed (BK-166 x6 incl. BK-312 wrong password + unknown email, BK-314 wrong password; BK-4 workspace read). `test:smoke`: 2 `@critical` passed. WorkspaceApi = read helpers only (no new `@atc`). Workspace smoke story key BK-4 (`STORY-BK-4` story.md lists GET /workspaces/{id}). Found: unknown email in UI goes to the signup step (check-email `exists:false`), so BK-314 covers wrong password only; /onboarding renders AppSidebar (carried item closed). Open for T8: setups re-run on every invocation (Playwright dependency projects), so "session reuse" signal fails by design of per-run mint.
 - [ ] T7 Phase 7: `kata:manifest`, `allurerc.mjs`, CI secrets block. verify: `kata:manifest:check`.
 - [ ] T7b Fix `vars:check` (10 Jira catalog refs in `shift-left-testing`). Cause (jira:check 2026-11-10): Jira lacks fields `ai_effort`, `development_token_usage`, `quality_token_usage`; `story.refined` transition absent from `jira-required.yaml` + `jira-workflows.json`. Needs Jira admin. Until fixed, branch commits use `--no-verify` (user decision 2026-11-10) with the hook gates run by hand. verify: `vars:check` exit 0.
 - [ ] T8 Phase 8: full gate (13 steps).
@@ -41,4 +42,4 @@ Make the KATA framework Bunkai-specific so `/test-automation` passes its readine
 
 ## Next step
 
-T6 (Phase 6: WorkspaceApi, fixtures, data, smoke `@critical`, delete examples, review reference specs).
+T7 (Phase 7: allurerc name, CI secrets block, manifest) + T7b (Jira catalog gap).

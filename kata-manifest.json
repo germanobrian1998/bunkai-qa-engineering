@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-10T21:13:39.588Z",
+  "generatedAt": "2026-11-10T21:34:18.659Z",
   "components": {
     "api": [
       {
@@ -21,41 +21,13 @@
         ]
       },
       {
-        "name": "ExampleApi",
-        "file": "ExampleApi.ts",
-        "relativePath": "tests/components/api/ExampleApi.ts",
-        "atcs": [
-          {
-            "id": "PROJ-121",
-            "method": "createResourceSuccessfully",
-            "line": 57
-          },
-          {
-            "id": "PROJ-122",
-            "method": "createResourceWithInvalidData",
-            "line": 88
-          }
-        ]
+        "name": "WorkspaceApi",
+        "file": "WorkspaceApi.ts",
+        "relativePath": "tests/components/api/WorkspaceApi.ts",
+        "atcs": []
       }
     ],
     "ui": [
-      {
-        "name": "ExamplePage",
-        "file": "ExamplePage.ts",
-        "relativePath": "tests/components/ui/ExamplePage.ts",
-        "atcs": [
-          {
-            "id": "PROJ-131",
-            "method": "submitFormWithValidData",
-            "line": 99
-          },
-          {
-            "id": "PROJ-132",
-            "method": "submitFormWithInvalidEmail",
-            "line": 122
-          }
-        ]
-      },
       {
         "name": "LoginPage",
         "file": "LoginPage.ts",
@@ -75,23 +47,12 @@
       }
     ]
   },
-  "steps": [
-    {
-      "name": "ExampleSteps",
-      "file": "ExampleSteps.ts",
-      "relativePath": "tests/components/steps/ExampleSteps.ts",
-      "methods": [
-        "authenticateUser",
-        "createTestResource",
-        "navigateAsAuthenticatedUser"
-      ]
-    }
-  ],
+  "steps": [],
   "summary": {
-    "totalComponents": 4,
-    "totalATCs": 8,
+    "totalComponents": 3,
+    "totalATCs": 4,
     "apiComponents": 2,
-    "uiComponents": 2,
-    "stepsModules": 1
+    "uiComponents": 1,
+    "stepsModules": 0
   }
 }

@@ -9,7 +9,7 @@
  *   - Import directo: import { DataFactory } from '@DataFactory'
  */
 
-import type { TestBooking, TestCredentials, TestHotel, TestUser } from '@data/types';
+import type { TestCredentials, TestUser, TestWorkspace } from '@data/types';
 
 import { faker } from '@faker-js/faker';
 
@@ -75,33 +75,19 @@ export class DataFactory {
   }
 
   // ============================================
-  // PROJECT-SPECIFIC (example structure)
+  // PROJECT-SPECIFIC
   // ============================================
 
   /**
-   * Genera datos de Hotel para testing
-   * TODO: Expandir cuando se necesite
+   * Genera nombre + slug únicos de Workspace.
+   * El slug cumple ^[a-z0-9][a-z0-9-]{1,38}[a-z0-9]$ (minúsculas, dígitos y guiones).
+   * @param overrides - Propiedades a sobreescribir
    */
-  static createHotel(overrides?: Partial<TestHotel>): TestHotel {
+  static createWorkspace(overrides?: Partial<TestWorkspace>): TestWorkspace {
+    const id = this.createTestId('kata').toLowerCase();
     return {
-      name: `Test Hotel ${faker.location.city()}`,
-      organizationId: faker.number.int({ min: 1, max: 100 }),
-      invoiceCap: faker.number.int({ min: 1000, max: 50000 }),
-      ...overrides,
-    };
-  }
-
-  /**
-   * Genera datos de Booking para testing
-   * TODO: Expandir cuando se necesite
-   */
-  static createBooking(overrides?: Partial<TestBooking>): TestBooking {
-    return {
-      confirmationNumber: `CONF-${faker.string.alphanumeric(8).toUpperCase()}`,
-      hotelId: faker.number.int({ min: 1, max: 1000 }),
-      stayValue: faker.number.float({ min: 100, max: 5000, fractionDigits: 2 }),
-      checkInDate: faker.date.future().toISOString().split('T')[0],
-      emailHash: faker.string.alphanumeric(32),
+      name: `KATA Workspace ${id}`,
+      slug: id,
       ...overrides,
     };
   }

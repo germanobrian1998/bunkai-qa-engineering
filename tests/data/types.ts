@@ -26,21 +26,12 @@ export interface TestCredentials {
 }
 
 // ============================================
-// Project-Specific Types (example structure)
+// Project-Specific Types
 // ============================================
 
-export interface TestHotel {
+export interface TestWorkspace {
   name: string
-  organizationId?: number
-  invoiceCap?: number
-}
-
-export interface TestBooking {
-  confirmationNumber: string
-  hotelId: number
-  stayValue: number
-  checkInDate: string
-  emailHash?: string
+  slug: string
 }
 
 // ============================================
