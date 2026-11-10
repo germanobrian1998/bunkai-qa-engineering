@@ -91,7 +91,7 @@ Assessment Date: 2026-10-02 · Assessed commit: `main` @ `e88512e`
 | Risk | Severity | Evidence (path only) | Mitigation |
 |------|----------|----------------------|------------|
 | No automated tests in the product | HIGH | target `package.json`, `app/`, `lib/` | This repo's KATA suite is the safety net; prioritize auth, tenancy (RLS) and ATC save in the MTP |
-| Public signup endpoint: assessed commit created pre-confirmed users and minted a PAT; later spec requires an email OTP before any session or PAT (re-verified 2026-11-10) | HIGH | `app/api/v1/auth/signup/route.ts` | Test abuse cases (open registration, OTP rate limit, scope defaults); tests never sign up (see `## Auth strategy in tests`) |
+| Public signup endpoint: assessed commit created pre-confirmed users and minted a PAT; later spec requires an email OTP before any session or PAT | HIGH | `app/api/v1/auth/signup/route.ts` | Test abuse cases (open registration, OTP rate limit, scope defaults); tests never sign up (see `## Auth strategy in tests`) |
 | No CI pipeline: gates are local-only | MEDIUM | target repo root (no `.github/`) | Run this repo's regression on deploy; recommend CI to the product team |
 | Tenant isolation rests entirely on RLS policies and SECURITY DEFINER helpers | MEDIUM | `supabase/migrations/0005_rls_helpers.sql`, `supabase/migrations/0006_bootstrap_workspace.sql` | Cross-tenant negative tests per role (viewer / member / admin / owner) |
 | Supabase env key names differ between `.env.example` and the runtime validator | MEDIUM | `lib/env.ts`, target `.env.example` | Confirm deployed key names before environment setup |
