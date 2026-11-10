@@ -4,7 +4,7 @@
 - Branch: `chore/framework-adaptation` (off `main`, strategy `sdet` Plus Branch, PR to `main`)
 - Approved plan: `.context/reports/test-framework-adaptation-plan.md` (gitignored report; approved 2026-11-10)
 - TDD: off (no project/session TDD config; source: none). Checks per phase: the workflow's own verify commands.
-- Delivery strategy: `ask-on-risk`. Forecast ~900 authored changed lines (large share is deletions of `Example*` + generated `api/openapi-types.ts` excluded).
+- Delivery strategy: `ask-on-risk`. Delivery decision (user, 2026-11-10): single PR #1 (`chore/framework-adaptation` -> `main`), kept as draft and fed one push per phase; merged by the user only after T8 (full gate) passes. Forecast ~900 authored changed lines (large share is deletions of `Example*` + generated `api/openapi-types.ts` excluded).
 
 ## Objective
 
@@ -36,6 +36,7 @@ Make the KATA framework Bunkai-specific so `/test-automation` passes its readine
 - 2026-11-10: T3 committed `70c413d` (was `226ffb0` before split) (`--no-verify`, hook gates run by hand: types, skills, eslint, prettier, vars:env, vars:schema). Review assess: risk medium, `review_due: false`, reason `under_budget` (71 lines, pending in slice).
 - 2026-11-10: review on main..4c22a00 failed `lens_context_budget_exceeded` (generated openapi-types.ts). Unpushed branch re-split with `reset --soft main`: `8fb1704` generated types (+ example bridge), `70c413d` T3, then T4 facades. Review base for the slice = `8fb1704`.
 - 2026-11-10: native review lineage `review-9959d91101d2edf3` on `8fb1704..794de95` (267 lines, risk high, auth hot path): APPROVED and acknowledged. 12 advisory findings, non-blocking. Fixed R4 (role vars no longer `@required=forEnv(staging)`). Carried to T5: R3 tokenEndpoint intercept unverified until ui-setup runs; legacy `TokenResponse` removal. Noted: single `dbhub`/`openapi` server for both envs is intended (only one server is declared; earlier per-env names resolved to nothing). Reviewed boundary advances to `794de95`.
+- 2026-11-10: review lineage `review-b3f4ecf4eaf33351` on `9607517..b842eb3` (305 lines, high): APPROVED, acknowledged, 12 advisory findings. Fixed: ApiState `expiresIn` now from `pat.expires_at`, `refreshToken: null` (R2/R3/R4 mismatch). Carried to T6: run BK-312/BK-314 (invalid creds; two-step form may stop at Continue for unknown email), onboarding redirect without sidebar, PAT accumulation per run (bounded by 1-day expiry). Reviewed boundary advances to `b842eb3`.
 - Engram mirror: PENDING (auto mode could not review `mem_save`: a hook changes its input).
 
 ## Next step

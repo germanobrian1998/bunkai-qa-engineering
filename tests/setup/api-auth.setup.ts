@@ -50,8 +50,11 @@ setup('API Setup: authenticate via API', async ({ api }) => {
   const apiState: ApiState = {
     token: tokenData.pat.token,
     tokenType: 'Bearer',
-    expiresIn: Math.max(0, (tokenData.session.expires_at ?? 0) - Math.floor(Date.now() / 1000)),
-    refreshToken: tokenData.session.refresh_token ?? null,
+    // Lifetime and refresh describe the PAT, not the Supabase session: a PAT is never refreshed.
+    expiresIn: tokenData.pat.expires_at
+      ? Math.max(0, Math.floor((Date.parse(tokenData.pat.expires_at) - Date.now()) / 1000))
+      : config.auth.tokenLifetimeSeconds,
+    refreshToken: null,
     source: 'api-login',
     createdAt: new Date().toISOString(),
   };
