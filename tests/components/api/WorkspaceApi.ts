@@ -5,7 +5,7 @@
  * Currently exposes read-only helpers; write ATCs (create, update, remove
  * member) are added by /test-automation with their own Jira Test keys.
  *
- * Endpoints:
+ * Endpoints (paths are relative to config.apiUrl, which already ends in /api):
  * - GET /api/v1/workspaces - Workspaces the caller belongs to (Bearer atc:read)
  * - GET /api/v1/workspaces/{id} - A single workspace (Bearer atc:read)
  */

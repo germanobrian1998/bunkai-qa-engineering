@@ -19,6 +19,7 @@ import { statSync, writeFileSync } from 'node:fs';
 import { expect } from '@playwright/test';
 import { test as setup } from '@TestFixture';
 import { attachRequestResponseToAllure } from '@utils/allure';
+import { patLifetimeSeconds } from '@utils/patLifetime';
 import { config } from '@variables';
 
 const storageStateFile = config.auth.storageStatePath;
@@ -89,9 +90,7 @@ setup('UI Setup: authenticate via UI', async ({ ui, page }) => {
     token: tokenData.pat.token,
     tokenType: 'Bearer',
     // Lifetime and refresh describe the PAT, not the Supabase session: a PAT is never refreshed.
-    expiresIn: tokenData.pat.expires_at
-      ? Math.max(0, Math.floor((Date.parse(tokenData.pat.expires_at) - Date.now()) / 1000))
-      : config.auth.tokenLifetimeSeconds,
+    expiresIn: patLifetimeSeconds(tokenData.pat.expires_at, config.auth.tokenLifetimeSeconds),
     refreshToken: null,
     source: 'ui-login',
     createdAt: new Date().toISOString(),

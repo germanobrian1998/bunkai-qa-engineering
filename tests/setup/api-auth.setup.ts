@@ -14,6 +14,7 @@ import { statSync, writeFileSync } from 'node:fs';
 import { expect } from '@playwright/test';
 import { test as setup } from '@TestFixture';
 import { attachRequestResponseToAllure } from '@utils/allure';
+import { patLifetimeSeconds } from '@utils/patLifetime';
 import { config } from '@variables';
 
 const apiStateFile = config.auth.apiStatePath;
@@ -51,9 +52,7 @@ setup('API Setup: authenticate via API', async ({ api }) => {
     token: tokenData.pat.token,
     tokenType: 'Bearer',
     // Lifetime and refresh describe the PAT, not the Supabase session: a PAT is never refreshed.
-    expiresIn: tokenData.pat.expires_at
-      ? Math.max(0, Math.floor((Date.parse(tokenData.pat.expires_at) - Date.now()) / 1000))
-      : config.auth.tokenLifetimeSeconds,
+    expiresIn: patLifetimeSeconds(tokenData.pat.expires_at, config.auth.tokenLifetimeSeconds),
     refreshToken: null,
     source: 'api-login',
     createdAt: new Date().toISOString(),
