@@ -14,7 +14,7 @@
 
 import { describe, expect, test } from 'bun:test';
 
-import { asSyncedCatalog, slugUsedAsIdentifier } from './lint-vars.ts';
+import { asSyncedCatalog, optionCheckApplies, slugUsedAsIdentifier } from './lint-vars.ts';
 
 describe('slugUsedAsIdentifier', () => {
   // The three shapes that are real consumption. `scripts/sync-jira-issues.ts`
@@ -71,5 +71,24 @@ describe('asSyncedCatalog', () => {
   test('a populated catalog is returned unchanged', () => {
     const catalog = { severity: { id: 'customfield_1', options: { minor: '1' } } };
     expect(asSyncedCatalog(catalog)).toBe(catalog);
+  });
+});
+
+describe('optionCheckApplies', () => {
+  const catalog = { severity: { id: 'customfield_1', options: { minor: '1' } } };
+
+  // A declared field the instance does not provision is absent from the synced
+  // catalog. Skills then write its `fallback:` (a structured comment), so its
+  // option references say nothing about the catalog and must not be ERRORs.
+  test('a field absent from the synced catalog is skipped', () => {
+    expect(optionCheckApplies(catalog, 'ai_effort')).toBe(false);
+  });
+
+  test('a field present in the catalog is checked', () => {
+    expect(optionCheckApplies(catalog, 'severity')).toBe(true);
+  });
+
+  test('no catalog means no option check', () => {
+    expect(optionCheckApplies(null, 'severity')).toBe(false);
   });
 });

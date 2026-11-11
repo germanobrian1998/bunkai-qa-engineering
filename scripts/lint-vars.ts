@@ -893,6 +893,17 @@ export function asSyncedCatalog<T extends object>(catalog: T | null): T | null {
   return catalog !== null && Object.keys(catalog).length === 0 ? null : catalog;
 }
 
+/**
+ * Whether `{{jira.<slug>.<option>}}` can be checked against the synced catalog.
+ * A declared field the instance does not provision is absent from the catalog:
+ * skills then write its `fallback:` instead, so the option reference says
+ * nothing about the catalog. Treating it as an UNKNOWN option ERROR refused
+ * every commit on an instance without that field (e.g. `ai_effort`).
+ */
+export function optionCheckApplies(catalog: object | null, slug: string): boolean {
+  return catalog !== null && Object.hasOwn(catalog, slug);
+}
+
 function main(): void {
   const declared = loadDeclaredVariables(PROJECT_YAML);
   const manifest = loadManifestSlugs(JIRA_REQUIRED_YAML);
@@ -984,7 +995,7 @@ function main(): void {
       continue;
     }
     if (!hit.option) { continue; }
-    if (catalog === null) { continue; }
+    if (catalog === null || !optionCheckApplies(catalog, hit.slug)) { continue; }
     const entry = catalog[hit.slug];
     const opts = (entry?.options ?? {}) as Record<string, unknown>;
     if (!hit.child) {
