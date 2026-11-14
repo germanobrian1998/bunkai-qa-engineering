@@ -25,6 +25,8 @@ export interface RequestOptions {
   headers?: Record<string, string>
   params?: Record<string, string>
   timeout?: number
+  /** Object keys whose values are masked in the Allure attachments (secrets such as `token`) */
+  redactKeys?: string[]
 }
 
 // ============================================
@@ -201,6 +203,7 @@ export class ApiBase extends TestContext {
       method: 'POST',
       responseBody: body,
       requestBody: data,
+      redactKeys: options.redactKeys,
     });
 
     return [response, body, data];
