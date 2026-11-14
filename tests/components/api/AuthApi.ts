@@ -52,6 +52,28 @@ export class AuthApi extends ApiBase {
     return [response, body];
   }
 
+  /**
+   * Helper: Sign in to open a cookie session on this request context.
+   *
+   * Unlike authenticateSuccessfully this does NOT set the PAT as Bearer: the
+   * caller keeps the cookie session (storageState) and the Supabase access
+   * token. Setup-only; every signin mints a 1-day PAT as a side effect.
+   *
+   * @returns Tuple with response and signin body
+   */
+  @step
+  async signInForSession(
+    credentials: Pick<SigninRequest, 'email' | 'password'>,
+  ): Promise<[APIResponse, SigninResponse]> {
+    const [response, body] = await this.apiPOST<SigninResponse, SigninRequest>(
+      this.config.auth.loginEndpoint,
+      { ...credentials, pat_name: 'kata-role-session', pat_expires_in_days: 1 },
+    );
+    expect(response.status()).toBe(200);
+    expect(body.session.access_token.length).toBeGreaterThan(0);
+    return [response, body];
+  }
+
   // ============================================
   // ATCs - Complete Test Cases (ACTION + VERIFICATION)
   // ============================================

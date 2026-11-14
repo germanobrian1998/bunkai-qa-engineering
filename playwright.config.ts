@@ -126,6 +126,16 @@ export default defineConfig({
       dependencies: ['global-setup'],
     },
 
+    // Role sessions: one cookie storageState per workspace role
+    // (.auth/role-<role>.json). Opt-in: a project or spec that needs role
+    // sessions declares `dependencies: ['role-sessions-setup']`.
+    {
+      name: 'role-sessions-setup',
+      testMatch: /role-sessions\.setup\.ts/,
+      testDir: './tests/setup',
+      dependencies: ['global-setup'],
+    },
+
     // ============================================
     // E2E Tests - UI + API with authenticated session
     // ============================================
