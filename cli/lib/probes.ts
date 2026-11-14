@@ -27,6 +27,7 @@ export interface CmdResult {
 export function runCmd(cmd: string, args: string[], opts: { timeoutMs?: number, cwd?: string } = {}): CmdResult {
   const r = spawnSync(cmd, args, { cwd: opts.cwd, encoding: 'utf8', timeout: opts.timeoutMs ?? 3000, stdio: ['ignore', 'pipe', 'pipe'] });
 
+  // eslint-disable-next-line ts/no-unnecessary-type-assertion -- tsc (bun check) needs the ErrnoException cast; typed lint resolves a different type
   const err = r.error as NodeJS.ErrnoException | undefined;
   return {
     ok: !err && r.status === 0,

@@ -815,7 +815,7 @@ function childEnv(drop: (name: string) => boolean, add: Record<string, string> =
     if (!drop(k)) { env[k] = v; }
   }
 
-  return { ...env, ...add } as NodeJS.ProcessEnv;
+  return { ...env, ...add };
 }
 
 // ============================================================================
