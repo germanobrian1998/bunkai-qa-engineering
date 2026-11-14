@@ -17,9 +17,13 @@ const baseURL = config.baseUrl;
 // Specs that need role sessions (BK-572). Owned by the *-roles projects only.
 const ROLE_SPECS = '**/workspace/members/**';
 
-// Gate: the role projects (role-sessions-setup, *-roles) are active ONLY on staging;
-// elsewhere they keep their names but select no tests and depend on nothing.
-const rolesEnabled = env.isStaging;
+// Gate: the role projects (role-sessions-setup, *-roles) are active ONLY on staging
+// AND with all four role accounts set (e.g. CI without the role secrets skips them);
+// otherwise they keep their names but select no tests and depend on nothing.
+const rolesEnabled = config.hasRoleUsers();
+if (env.isStaging && !rolesEnabled) {
+  console.warn('[playwright.config] Role projects disabled: staging role accounts (STAGING_ADMIN_*, STAGING_MEMBER_*, STAGING_VIEWER_*) are not all set. BK-572 member-removal specs will not run.');
+}
 const NO_TESTS = /\b\B/; // never matches
 const BASE_IGNORE = ['**/module-example/**', ROLE_SPECS];
 const roleMatch = (pattern: string) => (rolesEnabled ? pattern : NO_TESTS);

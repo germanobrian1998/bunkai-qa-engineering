@@ -196,6 +196,18 @@ function readRoleUser(role: WorkspaceRole): { email: string, password: string } 
 }
 
 /**
+ * Whether every workspace role has its credentials set on staging. Never throws:
+ * used by playwright.config.ts to decide if the role projects run at all.
+ */
+function hasRoleUsers(): boolean {
+  if (env.current !== 'staging') { return false; }
+  return workspaceRoles.every((role) => {
+    const user = stagingRoleCredentialsMap[role];
+    return user.email !== '' && user.password !== '';
+  });
+}
+
+/**
  * Supabase data API coordinates (public client values), read at the point of use.
  * Throws a NAMED error when either is empty.
  */
@@ -244,6 +256,9 @@ export const config = {
 
   // Credentials of a workspace role. A method: validated on call, by name.
   roleUser: readRoleUser,
+
+  // True only on staging with all four role accounts set (presence check, never throws).
+  hasRoleUsers,
 
   // Supabase data API (url + anon key). A getter: validated on first read, by name.
   get dataApi(): { url: string, anonKey: string } {
