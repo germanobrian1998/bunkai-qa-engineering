@@ -56,6 +56,14 @@ const {
   LOCAL_USER_PASSWORD, // Used when TEST_ENV=local
   STAGING_USER_EMAIL, // Used when TEST_ENV=staging
   STAGING_USER_PASSWORD, // Used when TEST_ENV=staging
+  STAGING_ADMIN_EMAIL,
+  STAGING_ADMIN_PASSWORD,
+  STAGING_MEMBER_EMAIL,
+  STAGING_MEMBER_PASSWORD,
+  STAGING_VIEWER_EMAIL,
+  STAGING_VIEWER_PASSWORD,
+  STAGING_SUPABASE_URL, // Public client value (data API host), staging only
+  STAGING_SUPABASE_ANON_KEY, // Public client value (anon/publishable key), staging only
 } = process.env;
 
 const userCredentialsMap: Record<Environment, { email: string, password: string }> = {
@@ -76,6 +84,30 @@ const userCredentialsMap: Record<Environment, { email: string, password: string 
 const userCredentialVarNames: Record<Environment, { email: string, password: string }> = {
   local: { email: 'LOCAL_USER_EMAIL', password: 'LOCAL_USER_PASSWORD' },
   staging: { email: 'STAGING_USER_EMAIL', password: 'STAGING_USER_PASSWORD' },
+};
+
+// ============================================
+// Workspace role accounts (multi-role tests)
+// The Owner is the framework pair above; Admin, Member and Viewer are
+// declared in .env.schema. Only staging has role accounts today.
+// ============================================
+
+export type WorkspaceRole = 'owner' | 'admin' | 'member' | 'viewer';
+
+export const workspaceRoles: readonly WorkspaceRole[] = ['owner', 'admin', 'member', 'viewer'];
+
+const roleCredentialVarNames: Record<WorkspaceRole, { email: string, password: string }> = {
+  owner: userCredentialVarNames.staging,
+  admin: { email: 'STAGING_ADMIN_EMAIL', password: 'STAGING_ADMIN_PASSWORD' },
+  member: { email: 'STAGING_MEMBER_EMAIL', password: 'STAGING_MEMBER_PASSWORD' },
+  viewer: { email: 'STAGING_VIEWER_EMAIL', password: 'STAGING_VIEWER_PASSWORD' },
+};
+
+const stagingRoleCredentialsMap: Record<WorkspaceRole, { email: string, password: string }> = {
+  owner: userCredentialsMap.staging,
+  admin: { email: STAGING_ADMIN_EMAIL ?? '', password: STAGING_ADMIN_PASSWORD ?? '' },
+  member: { email: STAGING_MEMBER_EMAIL ?? '', password: STAGING_MEMBER_PASSWORD ?? '' },
+  viewer: { email: STAGING_VIEWER_EMAIL ?? '', password: STAGING_VIEWER_PASSWORD ?? '' },
 };
 
 // ============================================
@@ -147,6 +179,40 @@ function readTestUser(): { email: string, password: string } {
   );
 }
 
+/**
+ * Credentials of one workspace role, read at the point of use.
+ * Throws a NAMED error when the variables are empty or the environment has no role accounts.
+ */
+function readRoleUser(role: WorkspaceRole): { email: string, password: string } {
+  if (env.current !== 'staging') {
+    throw new Error(`Role accounts are only declared for TEST_ENV=staging (current: ${env.current}).`);
+  }
+  const user = stagingRoleCredentialsMap[role];
+  if (user.email !== '' && user.password !== '') { return user; }
+  const names = roleCredentialVarNames[role];
+  const missing = [user.email === '' ? names.email : null, user.password === '' ? names.password : null]
+    .filter((n): n is string => n !== null);
+  throw new Error(`Credentials for role '${role}' are not set: ${missing.join(', ')} (values in .env).`);
+}
+
+/**
+ * Supabase data API coordinates (public client values), read at the point of use.
+ * Throws a NAMED error when either is empty.
+ */
+function readDataApi(): { url: string, anonKey: string } {
+  if (env.current !== 'staging') {
+    throw new Error(`The Supabase data API is only declared for TEST_ENV=staging (current: ${env.current}).`);
+  }
+  const url = STAGING_SUPABASE_URL ?? '';
+  const anonKey = STAGING_SUPABASE_ANON_KEY ?? '';
+  const missing = [url === '' ? 'STAGING_SUPABASE_URL' : null, anonKey === '' ? 'STAGING_SUPABASE_ANON_KEY' : null]
+    .filter((n): n is string => n !== null);
+  if (missing.length > 0) {
+    throw new Error(`Supabase data API config is not set: ${missing.join(', ')} (values in .env).`);
+  }
+  return { url: url.replace(/\/$/, ''), anonKey };
+}
+
 // ============================================
 // Main Configuration Object
 // ============================================
@@ -165,11 +231,23 @@ export const config = {
     // Storage paths for authenticated sessions
     storageStatePath: '.auth/user.json',
     apiStatePath: '.auth/api-state.json',
+    // Per-role cookie sessions written by the role-sessions-setup project
+    roleStatePath: (role: WorkspaceRole): string => `.auth/role-${role}.json`,
+    // Supabase access token of the role (data-API calls only); never inside storageState
+    roleTokenPath: (role: WorkspaceRole): string => `.auth/role-${role}.token.json`,
   },
 
   // Test User (configure in .env). A getter: validated on first read, by name.
   get testUser(): { email: string, password: string } {
     return readTestUser();
+  },
+
+  // Credentials of a workspace role. A method: validated on call, by name.
+  roleUser: readRoleUser,
+
+  // Supabase data API (url + anon key). A getter: validated on first read, by name.
+  get dataApi(): { url: string, anonKey: string } {
+    return readDataApi();
   },
 
   // TMS / Browser / Reporting — synced (config/variables.core.ts)
