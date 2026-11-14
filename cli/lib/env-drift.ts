@@ -94,7 +94,7 @@ export function loadVarlockMetadata(root: string, env: EnvMap = process.env): Va
   const bin = varlockBin(root, env);
   if (bin === null) { return null; }
 
-  const res = spawnSync(bin, ['load', '--format', 'json-full', '--agent'], { cwd: root, env: env as NodeJS.ProcessEnv, encoding: 'utf8' });
+  const res = spawnSync(bin, ['load', '--format', 'json-full', '--agent'], { cwd: root, env, encoding: 'utf8' });
   return typeof res.stdout === 'string' ? parseVarlockMetadata(res.stdout) : null;
 }
 
