@@ -14,6 +14,17 @@ import { config, env } from '@variables';
 // Use values from centralized config (no direct process.env access)
 const baseURL = config.baseUrl;
 
+// Specs that need role sessions (BK-572). Owned by the *-roles projects only.
+const ROLE_SPECS = '**/workspace/members/**';
+
+// Gate: the role projects (role-sessions-setup, *-roles) are active ONLY on staging;
+// elsewhere they keep their names but select no tests and depend on nothing.
+const rolesEnabled = env.isStaging;
+const NO_TESTS = /\b\B/; // never matches
+const BASE_IGNORE = ['**/module-example/**', ROLE_SPECS];
+const roleMatch = (pattern: string) => (rolesEnabled ? pattern : NO_TESTS);
+const roleDeps = (deps: string[]) => (rolesEnabled ? [...deps, 'role-sessions-setup'] : []);
+
 /**
  * See https://playwright.dev/docs/test-configuration
  */
@@ -128,10 +139,12 @@ export default defineConfig({
 
     // Role sessions: one cookie storageState per workspace role
     // (.auth/role-<role>.json). Opt-in: a project or spec that needs role
-    // sessions declares `dependencies: ['role-sessions-setup']`.
+    // sessions declares `dependencies: ['role-sessions-setup']`. The *-roles
+    // projects below own the specs under `workspace/members/` (BK-572) so the
+    // default e2e, integration and smoke projects never sign in four roles.
     {
       name: 'role-sessions-setup',
-      testMatch: /role-sessions\.setup\.ts/,
+      testMatch: rolesEnabled ? /role-sessions\.setup\.ts/ : NO_TESTS,
       testDir: './tests/setup',
       dependencies: ['global-setup'],
     },
@@ -146,7 +159,17 @@ export default defineConfig({
         storageState: config.auth.storageStatePath,
       },
       testMatch: '**/e2e/**/*.test.ts',
+      testIgnore: BASE_IGNORE,
       dependencies: ['ui-setup'],
+    },
+    {
+      name: 'e2e-roles',
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: config.auth.storageStatePath,
+      },
+      testMatch: roleMatch('**/e2e/**/workspace/members/**/*.test.ts'),
+      dependencies: roleDeps(['ui-setup']),
     },
 
     // ============================================
@@ -155,7 +178,14 @@ export default defineConfig({
     {
       name: 'integration',
       testMatch: '**/integration/**/*.test.ts',
+      testIgnore: BASE_IGNORE,
       dependencies: ['api-setup'],
+      use: {},
+    },
+    {
+      name: 'integration-roles',
+      testMatch: roleMatch('**/integration/**/workspace/members/**/*.test.ts'),
+      dependencies: roleDeps(['api-setup']),
       use: {},
     },
 
@@ -179,6 +209,7 @@ export default defineConfig({
       name: 'smoke-ui',
       grep: /@critical/,
       testMatch: '**/e2e/**/*.test.ts',
+      testIgnore: BASE_IGNORE,
       dependencies: ['ui-setup'],
       use: {
         ...devices['Desktop Chrome'],
@@ -189,7 +220,27 @@ export default defineConfig({
       name: 'smoke-api',
       grep: /@critical/,
       testMatch: '**/integration/**/*.test.ts',
+      testIgnore: BASE_IGNORE,
       dependencies: ['api-setup'],
+      use: {},
+    },
+    // Role smoke: @smoke grep (TC6 and TC14 only), only the role-session specs. One
+    // project per surface for the same storageState reason as above.
+    {
+      name: 'smoke-roles-ui',
+      grep: /@smoke/,
+      testMatch: roleMatch('**/e2e/**/workspace/members/**/*.test.ts'),
+      dependencies: roleDeps(['ui-setup']),
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: config.auth.storageStatePath,
+      },
+    },
+    {
+      name: 'smoke-roles-api',
+      grep: /@smoke/,
+      testMatch: roleMatch('**/integration/**/workspace/members/**/*.test.ts'),
+      dependencies: roleDeps(['api-setup']),
       use: {},
     },
 

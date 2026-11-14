@@ -1,8 +1,14 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-14T16:34:47.133Z",
+  "generatedAt": "2026-11-14T21:31:15.456Z",
   "components": {
     "api": [
+      {
+        "name": "ActivityApi",
+        "file": "ActivityApi.ts",
+        "relativePath": "tests/components/api/ActivityApi.ts",
+        "atcs": []
+      },
       {
         "name": "AuthApi",
         "file": "AuthApi.ts",
@@ -11,20 +17,48 @@
           {
             "id": "BK-311",
             "method": "authenticateSuccessfully",
-            "line": 94
+            "line": 154
           },
           {
             "id": "BK-312",
             "method": "loginWithInvalidCredentials",
-            "line": 133
+            "line": 194
           }
         ]
+      },
+      {
+        "name": "BugApi",
+        "file": "BugApi.ts",
+        "relativePath": "tests/components/api/BugApi.ts",
+        "atcs": []
+      },
+      {
+        "name": "InviteApi",
+        "file": "InviteApi.ts",
+        "relativePath": "tests/components/api/InviteApi.ts",
+        "atcs": []
       },
       {
         "name": "WorkspaceApi",
         "file": "WorkspaceApi.ts",
         "relativePath": "tests/components/api/WorkspaceApi.ts",
-        "atcs": []
+        "atcs": [
+          {
+            "id": "BK-1657",
+            "method": "removeMemberSuccessfully",
+            "line": 114
+          },
+          {
+            "id": "BK-1664",
+            "method": "removeOwnerAsAdminRefused",
+            "line": 148
+          },
+          {
+            "id": "BK-1665",
+            "method": "removeMemberRefusedBelowAdmin",
+            "line": 178
+          }
+        ]
       }
     ],
     "ui": [
@@ -44,15 +78,47 @@
             "line": 101
           }
         ]
+      },
+      {
+        "name": "MembersPage",
+        "file": "MembersPage.ts",
+        "relativePath": "tests/components/ui/MembersPage.ts",
+        "atcs": [
+          {
+            "id": "BK-1656",
+            "method": "removeMemberViaConfirmation",
+            "line": 56
+          }
+        ]
       }
     ]
   },
-  "steps": [],
+  "steps": [
+    {
+      "name": "MemberRemovalSteps",
+      "file": "MemberRemovalSteps.ts",
+      "relativePath": "tests/components/steps/MemberRemovalSteps.ts",
+      "methods": [
+        "cleanMemberLeftovers",
+        "discoverFixture",
+        "ensureFixtureHealthy",
+        "openBearerSession",
+        "openRoleSession",
+        "provisionRemovableMember",
+        "readNewActivity",
+        "readmitMember",
+        "releaseLedger",
+        "rosterProblems",
+        "takeSnapshot",
+        "teardown"
+      ]
+    }
+  ],
   "summary": {
-    "totalComponents": 3,
-    "totalATCs": 4,
-    "apiComponents": 2,
-    "uiComponents": 1,
-    "stepsModules": 0
+    "totalComponents": 7,
+    "totalATCs": 8,
+    "apiComponents": 5,
+    "uiComponents": 2,
+    "stepsModules": 1
   }
 }

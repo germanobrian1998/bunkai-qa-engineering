@@ -151,3 +151,53 @@ type LeaveWorkspacePath = paths['/api/v1/workspaces/{id}/membership']['delete'];
 
 /** Successful response (200) */
 export type LeaveWorkspaceResponse = LeaveWorkspacePath['responses']['200']['content']['application/json'];
+
+// ============================================================================
+// Member removal (BK-572): roster, tokens, bugs, activity, notifications
+// ============================================================================
+
+/** A member as listed by the chat roster (the members list with emails) */
+export type ChatMember = components['schemas']['ChatMember'];
+
+/** Successful response (200) of GET /api/v1/workspaces/{id}/chat/roster */
+export type ListMembersResponse = paths['/api/v1/workspaces/{id}/chat/roster']['get']['responses']['200']['content']['application/json'];
+
+/** Body of the 200 answered by DELETE /api/v1/workspaces/{id}/members/{userId} */
+export type WorkspaceMemberRemoveResponse = components['schemas']['WorkspaceMemberRemoveResponse'];
+
+/** Request and response of POST /api/v1/tokens */
+export type CreateTokenBody = components['schemas']['CreateTokenBody'];
+export type CreateTokenResponse = components['schemas']['CreateTokenResponse'];
+
+/** A workspace project as listed by GET /api/v1/workspaces/{id}/recent-projects */
+export type ListProjectsResponse = paths['/api/v1/workspaces/{id}/recent-projects']['get']['responses']['200']['content']['application/json'];
+
+/** Modules of a project (GET /api/v1/projects/{id}/modules) */
+export type ListModulesResponse = paths['/api/v1/projects/{id}/modules']['get']['responses']['200']['content']['application/json'];
+
+/** Bugs of a project (GET /api/v1/projects/{id}/bugs) */
+export type ListProjectBugsResponse = paths['/api/v1/projects/{id}/bugs']['get']['responses']['200']['content']['application/json'];
+
+/** Bug read model returned by GET /api/v1/bugs/{id} and the assign route */
+export type BugDetail = components['schemas']['BugDetail'];
+export type BugAssignBody = components['schemas']['BugAssignBody'];
+
+/** Standalone bug creation (POST /api/v1/bugs, module form) */
+export type CreateBugRequest = paths['/api/v1/bugs']['post']['requestBody']['content']['application/json'];
+export type CreateBugResponse = paths['/api/v1/bugs']['post']['responses']['201']['content']['application/json'];
+
+/** Activity feed page and the two member-removal related items */
+export type ActivityPage = components['schemas']['ActivityPage'];
+export type ActivityItem = components['schemas']['ActivityItem'];
+export type ActivityItemMemberRemoved = components['schemas']['ActivityItemMemberRemoved'];
+export type ActivityItemBugUnassigned = components['schemas']['ActivityItemBugUnassigned'];
+
+/** Successful response (200) of GET /api/v1/workspaces/{id}/notifications */
+export type ListNotificationsResponse = paths['/api/v1/workspaces/{id}/notifications']['get']['responses']['200']['content']['application/json'];
+
+/** Token list of the caller (GET /api/v1/tokens) and one entry */
+export type ListTokensResponse = components['schemas']['ListTokensResponse'];
+export type TokenSummary = components['schemas']['TokenSummary'];
+
+/** A notification as listed by GET /api/v1/workspaces/{id}/notifications */
+export type NotificationItem = components['schemas']['NotificationItem'];
