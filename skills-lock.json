@@ -1,35 +1,40 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "diagram-design": {
       "source": "cathrynlavery/diagram-design",
       "sourceType": "github",
       "skillPath": "skills/diagram-design/SKILL.md",
-      "computedHash": "942cf976f7260e7f6a5b860a3c9890b64556225bb14707e9692576e059642815"
+      "computedHash": "131d0484db90409d4663ba9c7236a7ffd8708cf66abf33a53c746e4e3170abc3",
+      "commit": "f6db0decea96de66b901331a0f79a8d4b147ebae"
     },
     "playwright-best-practices": {
       "source": "currents-dev/playwright-best-practices-skill",
       "sourceType": "github",
       "skillPath": "playwright-best-practices/SKILL.md",
-      "computedHash": "7eb144f734450fee649dc1d209114775ddda07cbf45be84fe969d3d4f3971dce"
+      "computedHash": "111e9d3e9d63dea34814120fb6583c0b28ee45371662801d8e8d8bdf4b05dcb0",
+      "commit": "0b75b5835a87de1fdd202ba965f3bc5a27738fdf"
     },
     "playwright-cli": {
       "source": "microsoft/playwright-cli",
       "sourceType": "github",
       "skillPath": "skills/playwright-cli/SKILL.md",
-      "computedHash": "ffbd59a973d4e2c19c6ecc31254a14497069c362f1d1820b6a6cfbe62de34a73"
+      "computedHash": "d3c50339092b670cdda1ba2bed0bdee1c34247cdf70df475e8b7d83983a39e79",
+      "commit": "b21724888b8100b05ef8dee3a92f2bb03bf4dcde"
     },
     "resend-cli": {
       "source": "resend/resend-skills",
       "sourceType": "github",
       "skillPath": "skills/resend-cli/SKILL.md",
-      "computedHash": "e82822f03b86adbee741f50b51213abc16be70af8a784c7b65667982ad320128"
+      "computedHash": "afd9e0ede1b81507c64eaf2250cf0dd417e49237512aba42b892d9121864b9e1",
+      "commit": "f3e86d84960887bfc6e76e504c642ab6bc748f0c"
     },
     "skill-creator": {
       "source": "anthropics/skills",
       "sourceType": "github",
       "skillPath": "skills/skill-creator/SKILL.md",
-      "computedHash": "5ea13a6d9f0d4bb694405d79acd00cadec0d21bb138c4dd10fcf3c500cb835c2"
+      "computedHash": "2d7f889e6ae93c6c27d699856942c336b5b8644537496987d5571043d059b1dc",
+      "commit": "e4bb5d960d87126ff3b3a8af1a104b7db67560ba"
     }
   }
 }
