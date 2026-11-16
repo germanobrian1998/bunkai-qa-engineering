@@ -42,6 +42,8 @@ export interface AttachRequestResponseArgs {
   responseBody?: unknown
   /** Request payload to attach (optional) */
   requestBody?: unknown
+  /** Object keys whose values are masked (at any depth) in both bodies before attaching */
+  redactKeys?: string[]
 }
 
 // ============================================
@@ -114,6 +116,19 @@ export async function attachJsonToAllure(args: AttachJsonArgs): Promise<void> {
   }
 }
 
+/** Deep copy of a JSON-like value with the values of `keys` replaced by '***'. */
+function redactValues(value: unknown, keys: string[]): unknown {
+  if (Array.isArray(value)) {
+    return value.map(item => redactValues(item, keys));
+  }
+  if (typeof value === 'object' && value !== null) {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, inner]) => [key, keys.includes(key) ? '***' : redactValues(inner, keys)]),
+    );
+  }
+  return value;
+}
+
 /**
  * Attach HTTP request and response bodies to Allure report.
  *
@@ -131,7 +146,9 @@ export async function attachJsonToAllure(args: AttachJsonArgs): Promise<void> {
 export async function attachRequestResponseToAllure(
   args: AttachRequestResponseArgs,
 ): Promise<void> {
-  const { url, method, responseBody, requestBody } = args;
+  const { url, method, redactKeys } = args;
+  const responseBody = redactKeys?.length ? redactValues(args.responseBody, redactKeys) : args.responseBody;
+  const requestBody = redactKeys?.length ? redactValues(args.requestBody, redactKeys) : args.requestBody;
 
   try {
     // Attach response body if exists

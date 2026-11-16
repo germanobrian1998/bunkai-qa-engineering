@@ -16,8 +16,11 @@
 
 import type { TestContextOptions } from '@TestContext';
 
+import { ActivityApi } from '@api/ActivityApi';
 import { ApiBase } from '@api/ApiBase';
 import { AuthApi } from '@api/AuthApi';
+import { BugApi } from '@api/BugApi';
+import { InviteApi } from '@api/InviteApi';
 import { WorkspaceApi } from '@api/WorkspaceApi';
 
 // ============================================
@@ -31,12 +34,24 @@ export class ApiFixture extends ApiBase {
   /** Workspace component - read helpers for the tenant entity */
   readonly workspace: WorkspaceApi;
 
+  /** Invite component - issue and accept invitations (setup helpers) */
+  readonly invite: InviteApi;
+
+  /** Bug component - hold, assign and read Bugs */
+  readonly bug: BugApi;
+
+  /** Activity component - activity feed and notifications inbox reads */
+  readonly activity: ActivityApi;
+
   constructor(options: TestContextOptions) {
     super(options);
 
     // All components receive the same options (same request context)
     this.auth = new AuthApi(options);
     this.workspace = new WorkspaceApi(options);
+    this.invite = new InviteApi(options);
+    this.bug = new BugApi(options);
+    this.activity = new ActivityApi(options);
   }
 
   // ============================================
@@ -51,6 +66,9 @@ export class ApiFixture extends ApiBase {
     super.setAuthToken(token);
     this.auth.setAuthToken(token);
     this.workspace.setAuthToken(token);
+    this.invite.setAuthToken(token);
+    this.bug.setAuthToken(token);
+    this.activity.setAuthToken(token);
   }
 
   /**
@@ -60,5 +78,8 @@ export class ApiFixture extends ApiBase {
     super.clearAuthToken();
     this.auth.clearAuthToken();
     this.workspace.clearAuthToken();
+    this.invite.clearAuthToken();
+    this.bug.clearAuthToken();
+    this.activity.clearAuthToken();
   }
 }
