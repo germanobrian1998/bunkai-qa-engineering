@@ -201,9 +201,9 @@ git_strategy:
     tests. Each test suite runs on an ephemeral integration trunk `test/<module>-suite` (created
     off `main`, deleted after the suite merges). Ticket branches `test/{KEY}-*` and Plus
     Branches (`docs/*`, `chore/*`, `fix/*`) branch off the trunk and merge back with `--no-ff`;
-    one final PR promotes the suite to `main`. Solo maintainer: PRs are self-merged (0 reviews)
-    and the admin credential is on the ruleset bypass list, so a "Bypassed rule violations"
-    remote line is expected. Full runbook:
+    one final PR promotes the suite to `main`. Solo maintainer: PRs are self-merged (0 reviews).
+    The host ruleset does not require a pull request on `main`, so a direct push lands without a
+    bypass; the agent still asks before each one. Full runbook:
     .agents/skills/git-flow-master/references/sdet-integration-trunk.md
   branches:
     production: main # release / default branch
@@ -215,7 +215,7 @@ git_strategy:
     feature_merge: merge-commit # FIXED for sdet: ticket/Plus -> trunk is always --no-ff, never squash
     hotfix_policy: n/a
   policy: # how strictly protected branches are guarded (set by Strategy Setup Q4; defaults are safe)
-    direct_push_to_protected: confirm # forbidden | confirm | allowed. sdet: main is reached by the final suite PR; any direct push asks first.
+    direct_push_to_protected: confirm # forbidden | confirm | allowed. sdet: suites reach main by PR; a direct push is open on the host and the agent asks first.
     admin_bypass: true # true only when the push credential is on the host ruleset's bypass list. While false, a "Bypassed rule violations" line from the remote is a real finding, not noise.
     require_pr_reviews: 0 # solo maintainer: trunk PRs and the final trunk -> main PR are self-merged. Reconcile against the host with `bun run git:policy verify`.
     # Host divergences that are ACCEPTED, not drift. Each `field` names a `git:policy verify`
@@ -223,10 +223,10 @@ git_strategy:
     # to ACCEPTED (exit 0) and warns when an entry no longer matches anything (stale entry).
     # `apply` preserves the host's side for accepted fields instead of deriving its own rule.
     accepted_divergences:
-      - field: main.require_code_owner_review
-        reason: 'Host flag is inert without a CODEOWNERS file; solo repo, no code owners to assign'
       - field: admin_bypass
         reason: 'Personal repo: the bypass actor is a User, which verify does not count as admin bypass'
+      - field: main.direct_push_to_protected
+        reason: 'Host ruleset has no pull_request rule on purpose: direct pushes land without a bypass, the agent still confirms each one'
   branch_prefixes:
     precedence: [feat, fix, refactor, test, docs, chore]
     naming_with_key: '{prefix}/{ISSUE-KEY}-{kebab-slug}'
@@ -234,7 +234,7 @@ git_strategy:
   meta:
     setup_version: 1
     created: 2026-10-29 # YYYY-MM-DD stamped by Strategy Setup
-    policy_verified: 2026-10-29 # YYYY-MM-DD of the last `bun run git:policy verify`. null = never reconciled against the host
+    policy_verified: 2026-11-16 # YYYY-MM-DD of the last `bun run git:policy verify`. null = never reconciled against the host
     policy_source: accepted # verified | accepted | declared. `verified` = host matches the yaml exactly; `accepted` = every divergence is formally listed in policy.accepted_divergences (stamped by `git:policy verify --stamp`); `declared` = never reconciled, or an unaccepted drift is open.
     # Did anyone actually CHOOSE this strategy, or is it just the shipped default?
     # `strategy:` above is never null, so its value alone cannot answer that. Strategy
