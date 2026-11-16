@@ -56,7 +56,7 @@ Plan and dated results: `.context/reports/test-framework-adaptation-plan.md` (lo
 
 - T7b: `bun run vars:check` fails on Jira catalog refs the Jira site does not yet satisfy (missing custom fields, a missing Story workflow transition); the full gate and `bun run repo:check` stop there until a Jira admin fixes the catalogs (`bun run jira:check` names each one). Not a framework defect.
 - The `sdet` double-environment gate needs the local app on `localhost:3000` at a current product branch.
-- CI: role secrets are not wired yet (add them with the first multi-role test); GitHub Pages and the report portal are not enabled.
+- CI: the role secrets are mapped in `regression.yml`, `smoke.yml` and `sanity.yml` (names in their `env:` blocks). The repo is public, so the Allure report ships as the `allure-report-<env>` run artifact, not on GitHub Pages; `scripts/ci/publish-allure-pages.ts` is unused, and the report portal (`PORTAL_URL`) is the private option.
 - Session TTL is not recorded in any repo file.
 
 ## Project Assessment (Phase 1)

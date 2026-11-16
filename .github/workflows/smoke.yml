@@ -182,14 +182,6 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Get Allure History
-        uses: actions/checkout@v4
-        with:
-          ref: gh-pages
-          path: gh-pages
-          fetch-depth: 1
-        continue-on-error: true
-
       - name: Download Smoke Test Artifacts
         uses: actions/download-artifact@v4
         with:
@@ -222,8 +214,11 @@ jobs:
       # Allure 3 generate + publish: same allurerc.mjs as local (Awesome report
       # served directly, trends via historyPath), real retention, latest redirect.
       # PRIVATE portal mode is opt-in: when the PORTAL_URL secret is set, the
-      # report goes to the auth-walled Test Report Portal (R2) INSTEAD of
-      # public GitHub Pages. Runbook: .agents/skills/regression-testing/
+      # report goes to the auth-walled Test Report Portal (R2). Without it the
+      # report is uploaded as the allure-report-<env> run artifact: this repo
+      # is public, so it does not publish a public GitHub Pages site (no
+      # gh-pages branch, no trend history across runs). Runbook:
+      # .agents/skills/regression-testing/
       # references/private-hosting-setup.md
       - name: Build & Publish Allure Report (Allure 3)
         if: steps.check_allure.outputs.has_results == 'true'
@@ -242,13 +237,19 @@ jobs:
               --run "${{ github.run_number }}" \
               --results smoke-artifacts/allure-results
           else
-            bun scripts/ci/publish-allure-pages.ts \
-              --env "${{ env.TEST_ENV }}" --suite smoke \
-              --run "${{ github.run_number }}" \
-              --results smoke-artifacts/allure-results --pages gh-pages --keep 10
+            bunx allure generate smoke-artifacts/allure-results
             echo "## Allure Report" >> $GITHUB_STEP_SUMMARY
-            echo "View the report: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ env.TEST_ENV }}/smoke/" >> $GITHUB_STEP_SUMMARY
+            echo "Download the allure-report-${{ env.TEST_ENV }} artifact of this run." >> $GITHUB_STEP_SUMMARY
           fi
+
+      - name: Upload Allure Report
+        if: steps.check_allure.outputs.has_results == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-report-${{ env.TEST_ENV }}
+          path: allure-report/
+          if-no-files-found: ignore
+          retention-days: 10
 
   # ============================================
   # TODO: Implement Slack notification job
