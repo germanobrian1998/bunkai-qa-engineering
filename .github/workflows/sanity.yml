@@ -66,6 +66,13 @@ env:
   LOCAL_USER_PASSWORD: ${{ secrets.LOCAL_USER_PASSWORD }}
   STAGING_USER_EMAIL: ${{ secrets.STAGING_USER_EMAIL }}
   STAGING_USER_PASSWORD: ${{ secrets.STAGING_USER_PASSWORD }}
+  # Workspace role accounts (BK-572 role projects). Unset = role specs skipped with a warning.
+  STAGING_ADMIN_EMAIL: ${{ secrets.STAGING_ADMIN_EMAIL }}
+  STAGING_ADMIN_PASSWORD: ${{ secrets.STAGING_ADMIN_PASSWORD }}
+  STAGING_MEMBER_EMAIL: ${{ secrets.STAGING_MEMBER_EMAIL }}
+  STAGING_MEMBER_PASSWORD: ${{ secrets.STAGING_MEMBER_PASSWORD }}
+  STAGING_VIEWER_EMAIL: ${{ secrets.STAGING_VIEWER_EMAIL }}
+  STAGING_VIEWER_PASSWORD: ${{ secrets.STAGING_VIEWER_PASSWORD }}
   # TMS write-back (optional, opt-in). Mirrors regression.yml so a project that
   # turns AUTO_SYNC on gets the same behaviour from every suite. This workflow
   # has no separate Xray JUnit-import job, so the sync step below covers both
