@@ -479,6 +479,24 @@ export const USER_LEVEL_SKILLS: ReadonlyArray<CommunitySkill> = [
   // of items (decision / question / report / table) and the user answers in a
   // browser deck, pasting the Result JSON back into the chat (non-blocking).
   { package: 'https://github.com/upex-galaxy/agentic-user-skills', skill: 'mkd' },
+  // Prose pass for anything a person will read (reports, comments, messages).
+  { package: 'https://github.com/upex-galaxy/agentic-user-skills', skill: 'humanizer' },
+  // Structure pass for instructions and skills an agent reads.
+  { package: 'https://github.com/upex-galaxy/agentic-user-skills', skill: 'writing-for-agents' },
+  // Interview in rounds of numbered questions, each with a recommended answer, to stress-test a plan or requirement.
+  { package: 'https://github.com/upex-galaxy/agentic-user-skills', skill: 'grilling' },
+  // Builds and checks the shared domain language and its glossary.
+  { package: 'https://github.com/upex-galaxy/agentic-user-skills', skill: 'domain-modeling' },
+  // Turns open questions into a questionnaire a person can answer once.
+  { package: 'https://github.com/upex-galaxy/agentic-user-skills', skill: 'to-questionnaire' },
+  // End-of-work retrospective that proposes improvements to the agent's environment.
+  { package: 'https://github.com/upex-galaxy/agentic-user-skills', skill: 'retro' },
+  // Decision log format (ts, phase, decision, why, evidence, result) for routines and long workers.
+  { package: 'https://github.com/upex-galaxy/agentic-user-skills', skill: 'show-me-your-work' },
+  // Sizes what a change can break elsewhere (callers, shared helpers, wire formats) for a risk score.
+  { package: 'https://github.com/upex-galaxy/agentic-user-skills', skill: 'blast-radius' },
+  // Diagnosis loop for hard bugs and performance regressions, run before a bug is filed.
+  { package: 'https://github.com/upex-galaxy/agentic-user-skills', skill: 'diagnosing-bugs' },
 ];
 
 // Matches Claude Code ${VAR} and ${VAR:-default} placeholders in .mcp.json.
@@ -814,8 +832,8 @@ function childEnv(drop: (name: string) => boolean, add: Record<string, string> =
   for (const [k, v] of Object.entries(process.env)) {
     if (!drop(k)) { env[k] = v; }
   }
-
-  return { ...env, ...add };
+  // eslint-disable-next-line ts/no-unnecessary-type-assertion -- a host that requires NODE_ENV on ProcessEnv (Next.js) rejects the plain object
+  return { ...env, ...add } as NodeJS.ProcessEnv;
 }
 
 // ============================================================================
