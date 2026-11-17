@@ -1,17 +1,17 @@
 # ADR-0018 — Test login budget under the product's sign-in throttle
 
-- **Status:** Proposed
+- **Status:** Accepted (by the owner, 2026-11-17)
 - **Date:** 2026-11-17
-- **Deciders:** Pending. Drafted by `/project-discovery` (Phase 2 UPDATE, 2026-11-17) for the project owner to accept or reject.
+- **Deciders:** Project owner, 2026-11-17. Drafted by `/project-discovery` (Phase 2 UPDATE, 2026-11-17).
 - **Tags:** auth-in-tests, fixtures, rate-limit, ci
-- **Supersedes:** — (on acceptance: ADR-0009 §Consequences "no OTP rate limit" claim only, wired both ways)
+- **Supersedes:** ADR-0009, for the §Consequences claim that login has no rate limit only. Its hybrid signin, credential kinds and per-run mint stand.
 - **Superseded by:** —
 
 ---
 
 ## Context
 
-This decision was discovered, not made in this session. Nobody has decided it yet: the code already works around the constraint, but no ADR records why.
+This decision was discovered, not made in a session: the code already worked around the constraint, but no ADR recorded why. The project owner confirmed it on 2026-11-17.
 
 Since 2026-11-13 (target commit `97363b95`, BK-1828), the product throttles password sign-in and code confirm (target `lib/auth/rate-limit.ts`, migration `supabase/migrations/0103_auth_rate_limit.sql`):
 
@@ -25,7 +25,7 @@ Per run, the shared setups sign in about six times from one source: the UI setup
 
 ## Decision
 
-Proposed: keep the per-run mint (ADR-0009 point 4) and treat the throttle as a fixed budget the suite must stay under:
+Keep the per-run mint (ADR-0009 point 4) and treat the throttle as a fixed budget the suite must stay under:
 
 1. Every sign-in in shared setup stays sequential and happens once per account per run. No spec signs in on its own except the LoginPage and AuthApi ATCs that test login itself.
 2. A 429 `rate_limited` in a setup is reported as an environment failure (budget exceeded), never as a product failure, and is not retried inside the same window.

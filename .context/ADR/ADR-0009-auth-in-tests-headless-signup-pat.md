@@ -5,7 +5,7 @@
 - **Deciders:** Project owner, in the approved `/test-framework-adaptation` plan (`.context/reports/test-framework-adaptation-plan.md` §2, approved 2026-11-10) and the refresh-rule decision of the same day. Revises the 2026-10-02 `/project-discovery` Proposed draft in place (it was never Accepted).
 - **Tags:** auth-in-tests, fixtures, api, e2e
 - **Supersedes:** —
-- **Superseded by:** —
+- **Superseded by:** ADR-0018, for the §Consequences claim that login has no rate limit only. The hybrid signin, credential kinds and per-run mint stand.
 
 ---
 

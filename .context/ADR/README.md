@@ -70,9 +70,9 @@ Who authors: a human QA architect / lead directly, **or** an AI workflow that de
 | [ADR-0005](./ADR-0005-validation-scope.md) | The framework validates only what it owns | Proposed | ADR-0003 §Decision bullet 3 | — |
 | [ADR-0006](./ADR-0006-forensic-measurements-ledger.md) | Doctrine keeps the why; the measured figures and dates live here | Accepted | — | — |
 | [ADR-0007](./ADR-0007-mtp-in-jira.md) | The Master Test Plan lives in Jira; the local file is a cache | Accepted | ADR-0001 (§Consequences MTP follow-up only) | — |
-| [ADR-0009](./ADR-0009-auth-in-tests-headless-signup-pat.md) | Auth in tests: hybrid signin, PAT as Bearer for API and cookie storageState for UI | Accepted | — | — |
+| [ADR-0009](./ADR-0009-auth-in-tests-headless-signup-pat.md) | Auth in tests: hybrid signin, PAT as Bearer for API and cookie storageState for UI | Accepted | — | ADR-0018 (§Consequences rate-limit claim only) |
 | [ADR-0010](./ADR-0010-test-isolation-user-workspace-under-rls.md) | Test isolation: pre-provisioned role accounts and per-test unique data in the QA workspace, under RLS | Accepted | — | — |
-| [ADR-0018](./ADR-0018-test-login-budget-under-signin-throttle.md) | Test login budget under the product's sign-in throttle | Proposed | — | — |
+| [ADR-0018](./ADR-0018-test-login-budget-under-signin-throttle.md) | Test login budget under the product's sign-in throttle | Accepted | ADR-0009 (§Consequences rate-limit claim only) | — |
 
 > Keep this table in sync whenever an ADR is added or its status changes. It is the fast index every session reads first.
 
