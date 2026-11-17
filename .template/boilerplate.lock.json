@@ -1,29 +1,29 @@
 {
   "schemaVersion": 7,
   "templateRepo": "upex-galaxy/agentic-qa-boilerplate",
-  "templateCommit": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
+  "templateCommit": "e090046b9dc45ab652986fee6227d5a222dc3d57",
   "perComponentCommit": {
-    "skills": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "agent-compatibility": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "codex-config": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "scripts": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "docs": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "cli": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "vscode": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "husky": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "agents-docs": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "tooling": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "config-core": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "env-template": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "env-schema": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "worktree-include": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "orca-config": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "agent-root-config": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "playwright-cli-config": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "instructions": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "tests-utils": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "pi-adapter": "7ae2d8c2828622785da49cd630da6f06a1702c1d",
-    "pi-config": "7ae2d8c2828622785da49cd630da6f06a1702c1d"
+    "skills": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "agent-compatibility": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "codex-config": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "scripts": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "docs": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "cli": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "vscode": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "husky": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "agents-docs": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "tooling": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "config-core": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "env-template": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "env-schema": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "worktree-include": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "orca-config": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "agent-root-config": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "playwright-cli-config": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "instructions": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "tests-utils": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "pi-adapter": "e090046b9dc45ab652986fee6227d5a222dc3d57",
+    "pi-config": "e090046b9dc45ab652986fee6227d5a222dc3d57"
   },
   "syncedComponents": [],
   "ignoreFileSync": {
@@ -64,7 +64,7 @@
   "packageJsonSync": {
     "package.json": {
       "scripts": {
-        "lastSyncedSha": "d5760f95af8a0e9590857254df27b04e42440341",
+        "lastSyncedSha": "c123d71996d984f4dd1bf88a771d7512265575ea",
         "appliedKeys": [
           "worktree:audit",
           "env:set",
@@ -83,27 +83,29 @@
         ]
       },
       "devDependencies": {
-        "lastSyncedSha": "d5760f95af8a0e9590857254df27b04e42440341",
-        "appliedKeys": [],
+        "lastSyncedSha": "c123d71996d984f4dd1bf88a771d7512265575ea",
+        "appliedKeys": [
+          "eslint-plugin-playwright"
+        ],
         "keptKeys": {
           "openapi-typescript": "^7.10.1",
           "typescript": "^5.8.3"
         }
       },
       "dependencies": {
-        "lastSyncedSha": "d5760f95af8a0e9590857254df27b04e42440341",
+        "lastSyncedSha": "c123d71996d984f4dd1bf88a771d7512265575ea",
         "appliedKeys": [],
         "keptKeys": {
           "yaml": "^2.8.2"
         }
       },
       "lint-staged": {
-        "lastSyncedSha": "d5760f95af8a0e9590857254df27b04e42440341",
+        "lastSyncedSha": "c123d71996d984f4dd1bf88a771d7512265575ea",
         "appliedKeys": []
       }
     }
   },
   "cliVersion": "8.5",
-  "lastSyncedAt": "2026-11-17T14:59:25.287Z",
+  "lastSyncedAt": "2026-11-17T21:59:34.581Z",
   "variableSystemVersion": 1
 }
