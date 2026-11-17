@@ -63,47 +63,47 @@ Plan and dated results: `.context/reports/test-framework-adaptation-plan.md` (lo
 
 > Dated assessment of the system under test, written by `/project-discovery` Phase 1. Target: `upex-bunkai-tms` (`.context/project-config.md` → `## Repositories`). Re-run Phase 1 in UPDATE mode to refresh it; the facts below hold for the assessed commit, not for whatever the target holds later.
 
-Assessment Date: 2026-10-02 · Assessed commit: `main` @ `e88512e`
+Assessment Date: 2026-11-17 · Assessed commit: `origin/staging` @ `4ccd8ede` (previous assessment: 2026-10-02, `main` @ `e88512e`)
 
-### Testing Maturity: 0/4
-- State: None. No unit, integration or E2E test files in the product code (`app/`, `components/`, `lib/`, `supabase/`) and no test script in the target `package.json`.
-- Frameworks: none in the target. This repo (Playwright + KATA) is the only automated test surface.
-- Coverage: unknown (no coverage tooling).
-- QA hooks the product already ships: a QA guide route `/qa` (`app/qa/`), headless auth endpoints for test users (`app/api/v1/auth/signup`, `app/api/v1/auth/signin`), Personal Access Tokens (`app/api/v1/tokens`), dedicated DB roles for QA inspection (referenced in `supabase/migrations/0011_split_token_secrets.sql`).
+### Testing Maturity: 2/4
+- State: Moderate. The product now ships co-located `bun:test` suites (`*.test.ts` / `*.test.tsx` next to the code under `app/api/`, `lib/`, `components/`), up from none at the previous assessment. Several are DB-backed integration tests that run the real RLS path with a minted user JWT and skip when the Supabase env is absent (`lib/tests/rls-isolation.test.ts`).
+- Frameworks: `bun test` (target `package.json` scripts `test`, `test:guarded` through `scripts/guard.sh`). No product E2E suite: the `*e2e*` files under the target `scripts/` test the inherited boilerplate tooling, not the product. This repo (Playwright + KATA) remains the only E2E surface.
+- Coverage: unknown (no coverage tooling or threshold).
+- QA hooks the product ships: QA guide route `/qa` (`app/qa/`), headless auth endpoints (`app/api/v1/auth/signup`, `signin`, `confirm`), Personal Access Tokens (`app/api/v1/tokens`), QA inspection DB roles (`supabase/migrations/0085_qa_inspector_role_bootstrap_and_function_grants.sql`).
 
 ### Documentation State: Good
 - README: yes, but it is the inherited boilerplate README, not product documentation.
-- API docs: yes. OpenAPI generated from `route.openapi.ts` files, served at `/api/openapi`, rendered at `/api/docs`.
-- Architecture: yes, intent-level (target `.context/SRS/architecture-specs.md`, `.context/PRD/`, `.context/business/`); migrations carry rationale comments.
+- API docs: yes. OpenAPI generated from `route.openapi.ts` files, served at `/api/openapi`, rendered at `/api/docs`; freshness enforced by the pre-commit and pre-push `openapi:check` gates.
+- Architecture: yes, intent-level (target `.context/SRS/`, `.context/PRD/`, `.context/business/`); migrations carry rationale comments.
 - Setup guide: partial (boilerplate `README.md` / `INSTALLER.md`; product env keys in `lib/env.ts`).
 
 ### Code Quality
 - [x] ESLint: configured (`eslint.config.js`, `@antfu/eslint-config` + Next plugin)
 - [x] Prettier: configured for data / style files only (`.prettierrc`, `format:check`)
 - [x] TypeScript: strict (`tsconfig.json`)
-- [x] Pre-commit hooks: configured (`.husky/pre-commit` runs lint-staged + type check; `.husky/pre-push` runs `repo:check`)
+- [x] Pre-commit hooks: configured (`.husky/pre-commit`: lint-staged, framework gates, conditional `openapi:check`; `.husky/pre-push`: framework gates plus `scripts/openapi-gen.ts --check`)
 
 ### CI/CD Maturity: None
-- No `.github/workflows/` in the target repo. Quality gates run only in local git hooks, which a contributor can skip. Deployment pipeline (Vercel git integration assumed) is unverified: `.context/project-config.md` → `## Discovery Gaps`.
+- Still no `.github/workflows/` in the target repo. The unit and integration suites and every gate run only in local git hooks, which a contributor can skip. Deployment path (Vercel git integration assumed; `vercel.json` declares crons only) is unverified: `.context/project-config.md` → `## Discovery Gaps`.
 
 ### Identified Risks
 
 | Risk | Severity | Evidence (path only) | Mitigation |
 |------|----------|----------------------|------------|
-| No automated tests in the product | HIGH | target `package.json`, `app/`, `lib/` | This repo's KATA suite is the safety net; prioritize auth, tenancy (RLS) and ATC save in the MTP |
-| Public signup endpoint: assessed commit created pre-confirmed users and minted a PAT; later spec requires an email OTP before any session or PAT | HIGH | `app/api/v1/auth/signup/route.ts` | Test abuse cases (open registration, OTP rate limit, scope defaults); tests never sign up (see `## Auth strategy in tests`) |
-| No CI pipeline: gates are local-only | MEDIUM | target repo root (no `.github/`) | Run this repo's regression on deploy; recommend CI to the product team |
-| Tenant isolation rests entirely on RLS policies and SECURITY DEFINER helpers | MEDIUM | `supabase/migrations/0005_rls_helpers.sql`, `supabase/migrations/0006_bootstrap_workspace.sql` | Cross-tenant negative tests per role (viewer / member / admin / owner) |
+| No CI: the product's unit and integration suites run only in skippable local hooks, and no product E2E exists | HIGH | target repo root (no `.github/`), target `package.json` `test` script | This repo's KATA regression is the only enforced gate; run it on every staging deploy; recommend CI to the product team |
+| Tenant isolation rests entirely on RLS policies and SECURITY DEFINER helpers | MEDIUM | `supabase/migrations/0005_rls_helpers.sql`, `supabase/migrations/0118_member_write_paths_locked.sql` | Cross-tenant negative tests per role (viewer / member / admin / owner) |
 | Supabase env key names differ between `.env.example` and the runtime validator | MEDIUM | `lib/env.ts`, target `.env.example` | Confirm deployed key names before environment setup |
 | Destructive two-step migration for auth secrets (expand then drop) | MEDIUM | `supabase/migrations/0011_split_token_secrets.sql`, `supabase/migrations/0012_drop_legacy_token_hashes.sql` | Verify per environment that both steps are applied before testing token / invite / magic-link flows |
-| Placeholder JWT-shaped strings in docs (truncated examples, not live secrets) | LOW | `docs/architectures/supabase-nextjs/auth-tokens.md`, `docs/mcp/mcp-configuration-guide.md` | None needed; listed so a secret scanner hit is not re-investigated |
+| Public signup: fixed since the previous assessment. It now returns `pending_confirmation` and mints the session and PAT only at `/api/v1/auth/confirm` after the email OTP | LOW | `app/api/v1/auth/signup/route.ts` | Keep abuse cases (OTP rate limit, reserved domains, length caps) in regression; tests still never sign up |
+| Masked key-shaped strings in a test fixture (not a live secret) | LOW | `lib/billing/checkout.test.ts` | None needed; listed so a secret-scanner hit is not re-investigated |
+| Placeholder JWT-shaped strings in docs (truncated examples, not live secrets) | LOW | `docs/architectures/supabase-nextjs/auth-tokens.md`, `docs/mcp/mcp-configuration-guide.md` | None needed |
 
 ### Phase Prioritization
 
-- Phase 1: Normal -- product intent docs exist; code scope is small and readable.
-- Phase 2: Normal -- single app, architecture docs exist as intent; verify them against code.
-- Phase 3: Extended -- no CI and an env-key drift: environments and deploy path need human confirmation.
-- Phase 4: Normal -- Jira project `BK` already holds the product backlog.
+- Phase 1: Normal -- UPDATE mode; 43 new migrations add domain terms.
+- Phase 2: Extended -- new external integration surface (workspace Jira connections, automated run submission, storage cleanup).
+- Phase 3: Extended -- still no CI and an env-key drift; a new cron.
+- Phase 4: Normal -- Jira project `BK` holds the product backlog.
 
 ### Blockers
-- [ ] None blocking Phase 2. The two HIGH risks are carried to the MTP seed (`project-context` mode `test-plan`).
+- [ ] None blocking Phase 2. The HIGH risk is carried to the MTP seed (`project-context` mode `test-plan`).

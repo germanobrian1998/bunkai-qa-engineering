@@ -1,8 +1,8 @@
 # Project Configuration
 
 > Project: Bunkai (Jira key `BK`)
-> Generated: 2026-10-02 by `project-discovery` Phase 1 (Project Connection)
-> Discovered from: `upex-bunkai-tms` at `main` commit `e88512e` (read-only snapshot)
+> Generated: 2026-10-02 by `project-discovery` Phase 1 (Project Connection); updated 2026-11-17 (UPDATE mode)
+> Discovered from: `upex-bunkai-tms` at `origin/staging` commit `4ccd8ede` (read-only, via `git show`; the local checkout is not used)
 
 The target repo is built on the same agentic boilerplate as this QA repo (`cli/`, `scripts/`, `.agents/`, `.claude/`, `docs/`, `CONTEXT.md`, `README.md`, `INSTALLER.md` are inherited tooling and describe the boilerplate, not the product). The PRODUCT lives in `app/`, `components/`, `lib/`, `middleware.ts`, `supabase/migrations/`, `public/openapi.json`, `DESIGN.md` and the product docs under `.context/` (`business/`, `PRD/`, `SRS/`) of the target repo.
 
@@ -10,7 +10,7 @@ The target repo is built on the same agentic boilerplate as this QA repo (`cli/`
 
 | Repository | Local path | Remote | Branch | Commit | Purpose |
 |------------|-----------|--------|--------|--------|---------|
-| upex-bunkai-tms | `../upex-bunkai-tms` | `https://github.com/upex-galaxy/upex-bunkai-tms.git` | main | e88512e | Single Next.js app: web UI + REST API (`app/api/v1`) + Supabase schema. Not a monorepo. |
+| upex-bunkai-tms | `../upex-bunkai-tms` | `https://github.com/upex-galaxy/upex-bunkai-tms.git` | staging (remote default `origin/HEAD`) | 4ccd8ede | Single Next.js app: web UI + REST API (`app/api/v1`) + Supabase schema. Not a monorepo. |
 | bunkai-qa-engineering | `.` (this repo) | - | main | - | QA automation framework (KATA + Playwright) and QA context for Bunkai |
 
 Frontend and backend are the same repo (`.agents/project.yaml` → `backend.backend_repo` and `frontend.frontend_repo` both point at `../upex-bunkai-tms`).
@@ -28,7 +28,8 @@ Frontend and backend are the same repo (`.agents/project.yaml` → `backend.back
 - Framework: Next.js Route Handlers under `app/api/v1/**` wrapped by `lib/api/handler.ts` (error envelope, request id, logging); Supabase RPC functions for multi-row writes
 - Language: TypeScript; validation with `zod` `^4`
 - ORM: none. Direct `@supabase/supabase-js` / `@supabase/ssr` queries; hand-maintained types in `lib/types.ts` plus generated `lib/types/supabase.ts`
-- Auth: Supabase Auth (magic link in the UI; email + password and Personal Access Tokens `bk_pat_*` for API callers, `lib/api/middleware/bearer.ts`, `lib/api/pat.ts`)
+- Auth: Supabase Auth (magic link in the UI; email + password and Personal Access Tokens `bk_pat_*` for API callers, `lib/api/middleware/bearer.ts`, `lib/api/pat.ts`); API signup returns `pending_confirmation` and mints the session and PAT only at `/api/v1/auth/confirm` after the email OTP
+- Tests: co-located `bun:test` suites (`*.test.ts` under `app/api/`, `lib/`, `components/`), run by the target `test` / `test:guarded` scripts; some are DB-backed and skip without the Supabase env
 
 ### Database
 - Type: PostgreSQL
@@ -38,7 +39,7 @@ Frontend and backend are the same repo (`.agents/project.yaml` → `backend.back
 
 ### Infrastructure
 - Cloud: Vercel (staging URL in `.agents/project.yaml`; target `.context/PRD/executive-summary.md` names Vercel + GitHub Actions)
-- CI/CD: none found in the target repo (no `.github/` directory at `e88512e`); local git hooks only (`.husky/pre-commit`, `.husky/pre-push`)
+- CI/CD: none found in the target repo (no `.github/` directory at `4ccd8ede`); local git hooks only (`.husky/pre-commit`, `.husky/pre-push`, both with an `openapi:check` freshness gate). `vercel.json` declares two crons (`/api/v1/admin/send-digest`, `/api/v1/admin/storage-cleanup`)
 - Monitoring: none found in code (Sentry / PostHog appear only as planned costs in target `.context/business/business-model.md`)
 - Runtime tooling: Bun (scripts in target `package.json`)
 
@@ -69,7 +70,7 @@ This QA repo (`.env.example`):
 - Atlassian / Xray: `ATLASSIAN_EMAIL`, `ATLASSIAN_API_TOKEN`, `XRAY_CLIENT_ID`, `XRAY_CLIENT_SECRET`, `XRAY_PROJECT_KEY`, `STP_EXECUTION_KEY`, `RTP_KEY`, `AUTO_SYNC`
 - Other: `SLACK_MCP_XOXP_TOKEN`, `SLACK_MCP_REACTION_TOOL`
 
-Target app runtime (`lib/env.ts`, validated at boot): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET` (optional), `NEXT_PUBLIC_APP_URL`. The target `.env.example` declares a different Supabase key set (`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWT_SECRET`, `POSTGRES_*`), see Discovery Gaps.
+Target app runtime (`lib/env.ts`, validated at boot): `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET` (optional), `NEXT_PUBLIC_APP_URL`, `CRON_SECRET`, `RESEND_API_KEY`, `RESEND_DIGEST_FROM_EMAIL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_CLOUD_PRICE_ID`. The target `.env.example` declares a different Supabase key set (`SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWT_SECRET`, `POSTGRES_*`), see Discovery Gaps.
 
 ## Tools and Access
 
@@ -82,7 +83,7 @@ Target app runtime (`lib/env.ts`, validated at boot): `NEXT_PUBLIC_SUPABASE_URL`
 
 ## Access Checklist
 
-- [x] Repository read access (local snapshot of `main` @ `e88512e`)
+- [x] Repository read access (`origin/staging` @ `4ccd8ede`, read with `git show`)
 - [ ] Database access (MCP or direct): not verified in Phase 1
 - [ ] Issue tracker access: verified in Phase 4 (`bun run jira:check`)
 - [ ] Staging environment reachable: not verified in Phase 1
@@ -99,3 +100,4 @@ The following items could not be verified from code and require human confirmati
 - [ ] Database roles `qa_inspector_ro` / `qa_inspector_rw` are referenced by `supabase/migrations/0011_split_token_secrets.sql` but created outside the migrations; their grants per environment are unverified. Source: Supabase project / DBA.
 - [ ] Database and staging reachability from this repo: not exercised in Phase 1 (`.env` `DBHUB_*`, `STAGING_USER_*`).
 - [ ] Team contacts: not collected.
+- [ ] Jira setup check (Phase 4, 2026-11-17): `bun run jira:check` exits 1. Link types all OK. Missing: required fields `ai_effort`, `development_token_usage`, `quality_token_usage`, and the Story transition `refined`. The local catalogs (`.agents/jira-fields.json`, `.agents/jira-workflows.json`) were last synced 2026-10-25, before those requirements were added to `.agents/jira-required.yaml` (2026-11-06 and 2026-11-10), so they may already exist in Jira. Re-sync attempted 2026-11-17: both `bun run jira:sync-fields --force` and `bun run jira:sync-workflows` fail with 403 (custom field contexts and workflows need Jira admin or edit-workflow permission), catalogs left unchanged. Next: a Jira admin runs both syncs (or grants the permission), then `bun run jira:check`; whatever is still missing is created in Jira admin.
