@@ -80,7 +80,7 @@
     "skills:evals": "bun scripts/run-skill-evals.ts",
     "skills:registry:check": "bun scripts/build-skill-registry.ts --check",
     "skills:registry": "bun scripts/build-skill-registry.ts",
-    "test:clean": "rm -rf test-results playwright-report allure-results allure-report reports",
+    "test:clean": "bun scripts/clean.ts --apply",
     "test:debug": "bun --no-env-file scripts/launch.ts --warn bunx --bun playwright test --debug",
     "test:e2e": "bun --no-env-file scripts/launch.ts --warn bunx --bun playwright test --project=e2e --project=e2e-roles",
     "test:env:check": "bun --no-env-file scripts/launch.ts --warn bun config/validateTestEnv.ts",
@@ -116,7 +116,8 @@
     "board:up": "bun run cli/sprint-board/index.ts serve --open --sync-every 10 --discover",
     "context:coverage": "bun scripts/context-coverage.ts",
     "evidence": "bun cli/evidence-page/index.ts",
-    "xray:payload": "bun tests/utils/xrayResults.ts"
+    "xray:payload": "bun tests/utils/xrayResults.ts",
+    "clean": "bun scripts/clean.ts"
   },
   "dependencies": {
     "@clack/prompts": "^1.8.1",
