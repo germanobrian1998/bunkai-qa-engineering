@@ -1262,6 +1262,94 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/atcs/bulk-edit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Bulk-edit tags, Module, layer or priority on up to 200 ATCs
+         * @description Bearer `atc:write` (or cookie session). Changes ONE field on up to 200 ATCs of one Project: `tags` (`op` `add` or `remove`, tags normalised like the editor), `module` (validated per ATC against its own User Story's Module subtree, inclusive; the slug's module segment is regenerated and its suffix kept), `layer` or `priority` (`null` clears it). `status` is an Execution Status set by Runs and is not editable. Each ATC is processed on its own: partial success is the normal shape, a refused ATC never rolls back the others, and the report lists one outcome per ATC. An ATC already holding the target value is `unchanged` (no version bump, no event), checked before the stale check, so repeating a request is safe. `version` per item refuses an ATC edited since the caller loaded it (`stale_version`) instead of overwriting it. Each changed ATC emits its own `atc.updated` event with the distinct chaining Test ids. `dry_run: true` runs the same evaluation with no write and no event.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["AtcBulkEditRequest"];
+                };
+            };
+            responses: {
+                /** @description Per-ATC report (possibly with refusals). */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AtcBulkEditReport"];
+                    };
+                };
+                /** @description Body is not valid JSON. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Not authenticated. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Missing atc:write scope, or not a writer of the Project's workspace (a viewer). */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Project or destination Module not found, archived or in another Project. */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Validation failed: empty selection, more than 200 ATCs, unknown field, bad value. Nothing was written. */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/atcs/search": {
         parameters: {
             query?: never;
@@ -1449,7 +1537,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorEnvelope"];
                     };
                 };
-                /** @description `pat_scopes` contained `workspace:admin`. The scope is schema-valid but rejected after parsing: headless auth has no `workspace_id` to bind an admin token to. Use `POST /api/v1/tokens` instead. See ADR-0005. */
+                /** @description `pat_scopes` contained `workspace:admin`. The scope is schema-valid but rejected after parsing: headless auth has no `workspace_id` to bind an admin token to. Use `POST /api/v1/tokens` instead. It is refused before the code is checked, so the code stays valid and the account stays pending. See ADR-0005. */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1467,8 +1555,17 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorEnvelope"];
                     };
                 };
-                /** @description Rate limited. */
+                /** @description Rate limited (brute-force throttle): more than 10 attempts per 60 s or 60 per hour from one network source, or more than 10 attempts per 15 min on one account, or the auth provider throttled the code check. Carries a `Retry-After` header (seconds) and `error.details.retry_after_seconds`; identical for every submitted address. */
                 429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description The rate-limit store could not be reached (fails closed). */
+                502: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1659,7 +1756,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorEnvelope"];
                     };
                 };
-                /** @description `pat_scopes` contained `workspace:admin`. The scope is schema-valid but rejected after parsing: headless auth has no `workspace_id` to bind an admin token to. Use `POST /api/v1/tokens` instead. See ADR-0005. */
+                /** @description `pat_scopes` contained `workspace:admin`. The scope is schema-valid but rejected after parsing: headless auth has no `workspace_id` to bind an admin token to. Use `POST /api/v1/tokens` instead. It is refused before the password is checked, so no session is created. See ADR-0005. */
                 403: {
                     headers: {
                         [name: string]: unknown;
@@ -1670,6 +1767,24 @@ export interface paths {
                 };
                 /** @description Validation failed. */
                 422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Rate limited (brute-force throttle): more than 10 attempts per 60 s or 60 per hour from one network source, or more than 10 attempts per 15 min on one account. Every attempt counts, successful or not. Carries a `Retry-After` header (seconds) and `error.details.retry_after_seconds`; identical for every submitted address. */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description The rate-limit store could not be reached (fails closed). */
+                502: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -1711,7 +1826,7 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Sign-up accepted; verification code emailed. */
+                /** @description Sign-up accepted; verification code emailed. A concurrent duplicate request for the same address gets the same answer while the account is pending (BK-1831). */
                 202: {
                     headers: {
                         [name: string]: unknown;
@@ -1729,7 +1844,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorEnvelope"];
                     };
                 };
-                /** @description Validation failed. */
+                /** @description Validation failed: an email over 253 characters, an email on a reserved domain (BK-1877), or a password outside the policy. */
                 422: {
                     headers: {
                         [name: string]: unknown;
@@ -1894,7 +2009,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorEnvelope"];
                     };
                 };
-                /** @description Project, module, or run step not found (non-disclosing). */
+                /** @description Project, module, run step or an evidence upload not found (non-disclosing). */
                 404: {
                     headers: {
                         [name: string]: unknown;
@@ -1912,7 +2027,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorEnvelope"];
                     };
                 };
-                /** @description Validation failed (title 5–200 chars, severity P1–P4, evidence links ≤10, module outside project, or the run-linked step is not `failed`). */
+                /** @description Validation failed (title 5–200 chars, severity P1–P4, more than 10 evidence items or 50 MiB of images in total, an invalid `evidence_order`, module outside project, or the run-linked step is not `failed`). */
                 422: {
                     headers: {
                         [name: string]: unknown;
@@ -2021,6 +2136,92 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/bugs/{id}/evidence/{attachmentId}/content": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open an image filed as defect evidence
+         * @description Bearer `atc:read` (or cookie session); any member of the owning Workspace, viewers included (access is Workspace-level). Answers 302 with a `Location` that is a signed URL valid for 60 seconds, `Cache-Control: private, no-store`. There is no anonymous read path and a stored reference alone is never enough. Do not store or log the `Location`. Missing, foreign-Workspace, never-filed and soft-deleted-Workspace evidence all answer the same 404.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Bug id. */
+                    id: string;
+                    attachmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Redirect to the signed URL of the image (60 seconds). */
+                302: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Malformed ids (`bad_request`). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Not authenticated. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Missing atc:read scope (`forbidden`). */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Evidence not found (non-disclosing). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description File storage is temporarily unavailable (`storage_unavailable`). */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/bugs/{id}": {
         parameters: {
             query?: never;
@@ -2097,7 +2298,93 @@ export interface paths {
         delete?: never;
         options?: never;
         head?: never;
-        patch?: never;
+        /**
+         * Correct a defect's title, severity, description and steps
+         * @description Bearer `atc:write` (or cookie session); member+ write access, in any status including closed. `bunkai_correct_bug` (migration 0129) writes only these four fields: status, assignee, evidence, Run, step, ATC and Module never change, and any other key in the body is refused (422). Send at least one field plus `expected_version`. A save whose values equal the current ones (a title differing only by surrounding spaces included) writes nothing and returns `changed: false`. An effective correction bumps `content_version` and emits ONE `bug.corrected` activity entry naming every changed field. A save from an older `content_version` is refused with 409 and `details.current` holds the current defect.
+         */
+        patch: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BugCorrectionBody"];
+                };
+            };
+            responses: {
+                /** @description Saved (or nothing to save). Returns the current defect and whether anything changed. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            bug: components["schemas"]["BugDetail"];
+                            changed: boolean;
+                        };
+                    };
+                };
+                /** @description Malformed id (not a UUID) or malformed JSON body (`bad_request`). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Not authenticated. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Missing atc:write scope, or a workspace member without write access, such as a Viewer (`forbidden`). */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Bug not found, also returned for a caller who is not a member of the bug's workspace (non-disclosing). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description The defect changed since `expected_version` was read (`conflict`, `details.reason: bug_changed`). `details.current` carries the current defect. */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Validation failed: the title or severity breaks the filing rules, a field outside the four is present, or no field was sent. */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
         trace?: never;
     };
     "/api/v1/bugs/{id}/status": {
@@ -2768,6 +3055,162 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/milestones/{id}/archive": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Archive a milestone
+         * @description Bearer `atc:write` (or cookie session). Member-only (role >= member). Hides the Milestone from the default list (`GET /api/v1/projects/{id}/milestones` returns it only with `include_archived=true`) and makes it read-only: edit, attach and detach answer 409 `milestone_archived` until it is restored. Its name stays reserved. Nothing the Milestone groups changes: its Test Plans, their Tests and Runs are untouched, and a Run in progress keeps running. One `milestone.archived` Activity Stream event per real change; archiving an archived Milestone is a 200 with `changed: false` and no event. Non-members receive a non-disclosing 404; a member with only the viewer role receives 403.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description The Milestone to archive. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Archived, or already archived. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MilestoneArchiveResponse"];
+                    };
+                };
+                /** @description Malformed id. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Not authenticated. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Missing atc:write scope, or a viewer of the owning workspace. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Milestone not found (or not visible to the caller). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/milestones/{id}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Restore an archived milestone
+         * @description Bearer `atc:write` (or cookie session). Member-only (role >= member). Puts the Milestone back in the default list exactly as it was: name, target date, description and attached Test Plans. A past target date is kept as it is, never re-validated, and the name cannot collide because an archived Milestone keeps it reserved. One `milestone.restored` Activity Stream event per real change; restoring an active Milestone is a 200 with `changed: false` and no event. Non-members receive a non-disclosing 404; a member with only the viewer role receives 403.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description The Milestone to restore. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Restored, or already active. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MilestoneArchiveResponse"];
+                    };
+                };
+                /** @description Malformed id. */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Not authenticated. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Missing atc:write scope, or a viewer of the owning workspace. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Milestone not found (or not visible to the caller). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{id}/milestones": {
         parameters: {
             query?: never;
@@ -2777,11 +3220,14 @@ export interface paths {
         };
         /**
          * List a project's milestones
-         * @description Lists the project's milestones ordered by target date (ascending), id ascending as the tie-break. Visible to any workspace member; a non-member receives an empty list.
+         * @description Lists the project's milestones ordered by target date (ascending), id ascending as the tie-break. Active milestones only by default; `include_archived=true` adds the archived ones, each carrying a non-null `archived_at`. Visible to any workspace member, viewers included; a non-member receives an empty list.
          */
         get: {
             parameters: {
-                query?: never;
+                query?: {
+                    /** @description BK-1899: `true` adds archived milestones to the list. */
+                    include_archived?: "true" | "false";
+                };
                 header?: never;
                 path: {
                     id: string;
@@ -2884,7 +3330,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorEnvelope"];
                     };
                 };
-                /** @description A milestone with this name already exists in the project. */
+                /** @description A milestone with this name already exists in the project (`milestone_name_taken`), or an archived milestone holds it (`milestone_name_archived`, with `details.archived_name` naming it). */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -2989,7 +3435,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorEnvelope"];
                     };
                 };
-                /** @description A milestone with this name already exists in the project. */
+                /** @description The milestone is archived and read-only until restored (`milestone_archived`), a milestone with this name already exists in the project (`milestone_name_taken`), or an archived milestone holds it (`milestone_name_archived`, with `details.archived_name` naming it). */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -3660,6 +4106,342 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/projects/{id}/bug-evidence": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start an image upload for a defect being filed
+         * @description Bearer `atc:write` (or cookie session); member+ write access in the Project's Workspace. Step 1 of 3: init -> PUT the raw bytes to `upload.url` with `upload.headers` -> `POST .../bug-evidence/{attachmentId}/commit`, then file the defect with `POST /api/v1/bugs` and `evidence_attachment_ids`. Limits (inclusive): PNG, JPEG or WebP only; 10 MiB per file; one budget of 10 items (pasted links and images together) and 50 MiB per defect. Nobody can read an upload until a filing claims it; an upload never claimed is discarded after 3 hours.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header: {
+                    /** @description Required. 8-128 chars, [a-zA-Z0-9_-]. A retry with the same key and payload returns the stored answer and creates no second upload; the same key with a different payload returns 409 `conflict`. The same image attached twice on purpose uses two different keys. */
+                    "Idempotency-Key": string;
+                };
+                path: {
+                    /** @description Project id. */
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["BugEvidenceInitBody"];
+                };
+            };
+            responses: {
+                /** @description Pending upload created. PUT the bytes to `upload`, then commit. */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            attachment: components["schemas"]["BugEvidenceUpload"];
+                            upload: components["schemas"]["BugEvidenceUploadTarget"];
+                        };
+                    };
+                };
+                /** @description Malformed id, malformed JSON, or missing/invalid Idempotency-Key (`bad_request`, `idempotency_key_required`, `idempotency_key_invalid`). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Not authenticated. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Missing atc:write scope, or a viewer (`forbidden`). */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Project not found, or in a Workspace the caller is not a member of (non-disclosing). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description The Idempotency-Key was reused with a different payload or is still in flight (`conflict`). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description The file is larger than 10 MiB (`file_too_large`). Copy: "Images must be 10 MiB or smaller." */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Not PNG, JPEG or WebP (`unsupported_media_type`). Copy: "Only PNG, JPEG or WebP images are accepted." */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Empty file or invalid name (`validation_failed`, reasons `empty_file`, `invalid_filename`), or the draft is full (`attachment_limit_exceeded`, reasons `defect_count`, `defect_bytes`). */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description File storage is temporarily unavailable (`storage_unavailable`). Safe to retry with the same Idempotency-Key. */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}/bug-evidence/{attachmentId}/commit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Finish an image upload for a defect being filed
+         * @description Bearer `atc:write` (or cookie session); the uploader only. Reads what actually arrived in Storage: the size from the object metadata, the type from its first 64 KiB. A file that is not the declared, still PNG, JPEG or WebP image is refused and discarded. Idempotent: an already committed upload answers with the same body. The upload stays invisible until a filing claims it.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project id. */
+                    id: string;
+                    attachmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Committed. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            attachment: components["schemas"]["BugEvidenceUpload"];
+                        };
+                    };
+                };
+                /** @description Malformed ids (`bad_request`). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Not authenticated. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Missing atc:write scope, or no longer a writer (`forbidden`). */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Upload not found under this Project, or not the caller's (non-disclosing). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description The bytes have not arrived yet (`conflict`, reason `upload_missing`), or the 3 hour window lapsed (reason `pending_expired`). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description What arrived is larger than 10 MiB (`file_too_large`). */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description What arrived is empty, not the declared type, or animated (`validation_failed`, reasons `empty_file`, `content_mismatch`, `animated_image`), or the draft is full (`attachment_limit_exceeded`). */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description File storage is temporarily unavailable (`storage_unavailable`). Safe to retry. */
+                503: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/projects/{id}/bug-evidence/{attachmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Discard an image upload that was never filed
+         * @description Bearer `atc:write` (or cookie session); the uploader only. Works on a `pending` or a committed upload that no defect has claimed. Evidence on a filed defect is fixed at filing and cannot be removed (409). The stored object is deleted afterwards on a best-effort basis and retried by the daily cleanup sweep.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    /** @description Project id. */
+                    id: string;
+                    attachmentId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Discarded. */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Malformed ids (`bad_request`). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Not authenticated. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Missing atc:write scope, or no longer a writer (`forbidden`). */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Upload not found under this Project, or not the caller's (non-disclosing). */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description A filed defect already holds this image (`conflict`, reason `evidence_frozen`). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/projects/{id}/bugs/heatmap": {
         parameters: {
             query?: never;
@@ -4187,6 +4969,15 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorEnvelope"];
                     };
                 };
+                /** @description The milestone is archived and keeps its plans until restored (details.reason milestone_archived). */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
             };
         };
         options?: never;
@@ -4269,7 +5060,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorEnvelope"];
                     };
                 };
-                /** @description A selected plan is already attached (details.reason milestone_plan_exists), or the Idempotency-Key was reused with a different body. */
+                /** @description A selected plan is already attached (details.reason milestone_plan_exists), the milestone is archived and read-only until restored (details.reason milestone_archived), or the Idempotency-Key was reused with a different body. */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -9147,6 +9938,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/workspaces/{id}/bugs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List every defect of a workspace, most severe first, with severity and status counts
+         * @description Bearer `atc:read` (or cookie session), the floor every workspace read uses. One row per defect across every Project of the workspace, keyset paginated on `(severity asc, created_at desc, id desc)`. Defects filed against an archived module are neither listed nor counted. Filters AND-compose and travel with the cursor. Runs entirely under the caller's own RLS (the read function is SECURITY INVOKER), so a foreign, nonexistent, or lost-membership workspace id returns the SAME empty `200` an empty workspace does, never an existence echo. A read that FAILS answers 500, never an empty list.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only defects of this Project. */
+                    project_id?: string;
+                    /** @description Comma list of `open`, `in_progress`, `resolved`, `closed`; OR within the list. */
+                    status?: string;
+                    /** @description Comma list of `P1`..`P4`; OR within the list. */
+                    severity?: string;
+                    /** @description Page size, 1..50. Out of range is rejected with 422, never clamped. Does not affect the counts. */
+                    limit?: number;
+                    /** @description The `next_cursor` of a previous response. A malformed token is 400, never a silent first page. */
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of the workspace's defects (possibly empty), the filtered counts and the unfiltered count. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceBugs"];
+                    };
+                };
+                /** @description The workspace id is not a UUID, or the cursor is malformed (`bad_request`). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Not authenticated. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Missing atc:read scope. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description A filter value or `limit` is invalid (`validation_failed`). */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description The defects could not be read (`internal_error`). Deliberately not collapsed into an empty list. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/workspaces/{id}/chat/entities/resolve": {
         parameters: {
             query?: never;
@@ -10932,7 +11820,80 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List a workspace's projects, optionally by exact slug
+         * @description Bearer `atc:read` (or cookie session). Runs entirely under the caller's own RLS, so a foreign, nonexistent or soft-deleted workspace id returns the SAME `200 {"projects": []}` an empty workspace does — never an existence echo. A read that fails answers 500, never an empty list. The Bunkai CLI uses `?slug=` to resolve `--project <slug>`.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Optional exact project slug. When given, the list holds that one project or nothing. */
+                    slug?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The workspace's projects (possibly empty). */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ProjectList"];
+                    };
+                };
+                /** @description The workspace id in the path is not a UUID (`bad_request`). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Not authenticated. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Missing atc:read scope. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description `slug` is present but blank or longer than 100 characters (`validation_failed`, `details.reason = slug_invalid`). */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description The projects could not be read (`internal_error`). Deliberately not collapsed into an empty list. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
         put?: never;
         /**
          * Create a project in a workspace
@@ -11001,7 +11962,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorEnvelope"];
                     };
                 };
-                /** @description Validation failed (including names that map to a reserved slug). */
+                /** @description Validation failed (including names that map to a reserved slug), or the workspace's effective plan has no project room left (`code = project_limit_reached`). The limit refusal carries `details = { reason, resource, plan, limit, used, is_owner, owners[{ user_id, email }] }`, read live on every attempt (so a retry after an upgrade succeeds), and a message that names the owner for a non-owner. Existing projects are never touched. */
                 422: {
                     headers: {
                         [name: string]: unknown;
@@ -11167,7 +12128,7 @@ export interface paths {
                         "application/json": components["schemas"]["ErrorEnvelope"];
                     };
                 };
-                /** @description The workspace is not currently deleted (`not_deleted`). */
+                /** @description The workspace is not currently deleted (`not_deleted`), or its 30-day restore window has closed (`restore_window_closed`, BK-1735). */
                 409: {
                     headers: {
                         [name: string]: unknown;
@@ -11492,6 +12453,105 @@ export interface paths {
         };
         trace?: never;
     };
+    "/api/v1/workspaces/{id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List every Run of a workspace, newest first, with its step counts
+         * @description Bearer `atc:read` (or cookie session), the floor the sibling `/active-runs` read uses. One row per Run across every Project of the workspace, keyset paginated on `(started_at desc, id desc)`. Filters AND-compose and travel with the cursor. Runs entirely under the caller's own RLS (the read function is SECURITY INVOKER), so a foreign, nonexistent, or lost-membership workspace id returns the SAME empty `200` an empty workspace does, never an existence echo. A read that FAILS answers 500, never an empty list.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only Runs of this Project. */
+                    project_id?: string;
+                    /** @description Repeatable. `running` and `aborted` are not filter options; such Runs still appear unfiltered. */
+                    status?: ("passed" | "failed")[];
+                    /** @description Environment name, matched case-insensitively across Projects. */
+                    environment?: string;
+                    /** @description `manual` = executor `human`; `automated` = executor `agent` or `ci`. */
+                    mode?: "manual" | "automated";
+                    /** @description Page size, 1..50. Out of range is rejected with 422, never clamped. Does not affect `workspace_run_count`. */
+                    limit?: number;
+                    /** @description The `next_cursor` of a previous response. A malformed token is 400, never a silent first page. */
+                    cursor?: string;
+                };
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description One page of the workspace's Runs (possibly empty) and the unfiltered count. */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["WorkspaceRuns"];
+                    };
+                };
+                /** @description The workspace id is not a UUID, or the cursor is malformed (`bad_request`). */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Not authenticated. */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description Missing atc:read scope. */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description A filter value or `limit` is invalid (`validation_failed`). */
+                422: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+                /** @description The Runs could not be read (`internal_error`). Deliberately not collapsed into an empty list. */
+                500: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ErrorEnvelope"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -11511,6 +12571,38 @@ export interface components {
                 /** @description Echoed `x-request-id`. Quote this in bug reports. */
                 request_id?: string;
             };
+        };
+        /** @description One image uploaded for a defect that is being filed. Never carries a storage path or a URL, and nobody can read it until a filing claims it. */
+        BugEvidenceUpload: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            project_id: string;
+            /**
+             * Format: uuid
+             * @description The draft (one open filing form) this upload is counted against.
+             */
+            draft_id: string;
+            /**
+             * Format: uuid
+             * @description Null until a filing claims the upload.
+             */
+            bug_id: string | null;
+            position: number | null;
+            /** @description Display only: never used to decide the type or build a path. */
+            filename: string;
+            /** @enum {string} */
+            content_type: "image/png" | "image/jpeg" | "image/webp";
+            /** @description Declared size while `pending`; the size measured in Storage once `committed`. */
+            byte_size: number;
+            /** @enum {string} */
+            status: "pending" | "committed";
+            /** Format: uuid */
+            created_by: string | null;
+            created_at: string;
+            committed_at: string | null;
+            /** @description An upload that no filing claims by this time is discarded (3 hours after init). */
+            expires_at: string | null;
         };
         /** @description Metadata of one image attached to a run step. Never carries a storage path or a URL. */
         RunStepAttachment: {
@@ -11573,7 +12665,7 @@ export interface components {
             /** @description Opaque token for the next (older) page, or null when this is the last page. base64url — echo it back verbatim as `?cursor=`; never construct or parse one. */
             next_cursor: string | null;
         };
-        ActivityItem: components["schemas"]["ActivityItemModuleRenamed"] | components["schemas"]["ActivityItemModuleDescriptionUpdated"] | components["schemas"]["ActivityItemModuleMoved"] | components["schemas"]["ActivityItemModuleArchived"] | components["schemas"]["ActivityItemModuleRestored"] | components["schemas"]["ActivityItemAtcCreated"] | components["schemas"]["ActivityItemAtcUpdated"] | components["schemas"]["ActivityItemAtcArchived"] | components["schemas"]["ActivityItemAtcRestored"] | components["schemas"]["ActivityItemTestCreated"] | components["schemas"]["ActivityItemRunFinished"] | components["schemas"]["ActivityItemRunAborted"] | components["schemas"]["ActivityItemBugAssigned"] | components["schemas"]["ActivityItemBugReassigned"] | components["schemas"]["ActivityItemBugUnassigned"] | components["schemas"]["ActivityItemBugStatusChanged"] | components["schemas"]["ActivityItemMemberRemoved"] | components["schemas"]["ActivityItemJiraConnectionConnected"] | components["schemas"]["ActivityItemJiraConnectionChanged"] | components["schemas"]["ActivityItemJiraConnectionDisconnected"];
+        ActivityItem: components["schemas"]["ActivityItemModuleRenamed"] | components["schemas"]["ActivityItemModuleDescriptionUpdated"] | components["schemas"]["ActivityItemModuleMoved"] | components["schemas"]["ActivityItemModuleArchived"] | components["schemas"]["ActivityItemModuleRestored"] | components["schemas"]["ActivityItemAtcCreated"] | components["schemas"]["ActivityItemAtcUpdated"] | components["schemas"]["ActivityItemAtcArchived"] | components["schemas"]["ActivityItemAtcRestored"] | components["schemas"]["ActivityItemTestCreated"] | components["schemas"]["ActivityItemRunFinished"] | components["schemas"]["ActivityItemRunAborted"] | components["schemas"]["ActivityItemBugAssigned"] | components["schemas"]["ActivityItemBugReassigned"] | components["schemas"]["ActivityItemBugUnassigned"] | components["schemas"]["ActivityItemBugStatusChanged"] | components["schemas"]["ActivityItemMemberRemoved"] | components["schemas"]["ActivityItemJiraConnectionConnected"] | components["schemas"]["ActivityItemJiraConnectionChanged"] | components["schemas"]["ActivityItemJiraConnectionDisconnected"] | components["schemas"]["ActivityItemBugCorrected"] | components["schemas"]["ActivityItemMilestoneArchived"] | components["schemas"]["ActivityItemMilestoneRestored"];
         ActivityItemModuleRenamed: {
             /**
              * Format: uuid
@@ -12101,6 +13193,89 @@ export interface components {
         ActivityPayloadJiraConnectionDisconnected: {
             site_host: string | null;
         };
+        ActivityItemBugCorrected: {
+            /**
+             * Format: uuid
+             * @description activity_log row id — stable React key.
+             */
+            id: string;
+            /** @enum {string} */
+            entity_type: "bug";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "bug.corrected";
+            /** @description Server-rendered, from ACTION_LABELS — never re-derived client-side. */
+            action_label: string;
+            actor: components["schemas"]["ActivityActor"];
+            item: components["schemas"]["ActivityItemLabel"];
+            payload: components["schemas"]["ActivityPayloadBugCorrected"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        ActivityPayloadBugCorrected: {
+            title: string | null;
+            changed_fields: ("description" | "severity" | "steps_to_reproduce" | "title")[];
+            title_change: {
+                from: string;
+                to: string;
+            } | null;
+            severity_change: {
+                /** @enum {string} */
+                from: "P1" | "P2" | "P3" | "P4";
+                /** @enum {string} */
+                to: "P1" | "P2" | "P3" | "P4";
+            } | null;
+        };
+        ActivityItemMilestoneArchived: {
+            /**
+             * Format: uuid
+             * @description activity_log row id — stable React key.
+             */
+            id: string;
+            /** @enum {string} */
+            entity_type: "milestone";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "milestone.archived";
+            /** @description Server-rendered, from ACTION_LABELS — never re-derived client-side. */
+            action_label: string;
+            actor: components["schemas"]["ActivityActor"];
+            item: components["schemas"]["ActivityItemLabel"];
+            payload: components["schemas"]["ActivityPayloadMilestoneArchived"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        ActivityPayloadMilestoneArchived: {
+            name: string | null;
+        };
+        ActivityItemMilestoneRestored: {
+            /**
+             * Format: uuid
+             * @description activity_log row id — stable React key.
+             */
+            id: string;
+            /** @enum {string} */
+            entity_type: "milestone";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            action: "milestone.restored";
+            /** @description Server-rendered, from ACTION_LABELS — never re-derived client-side. */
+            action_label: string;
+            actor: components["schemas"]["ActivityActor"];
+            item: components["schemas"]["ActivityItemLabel"];
+            payload: components["schemas"]["ActivityPayloadMilestoneRestored"];
+            /** Format: date-time */
+            created_at: string;
+        };
+        ActivityPayloadMilestoneRestored: {
+            name: string | null;
+        };
         SendDigestResponse: {
             /** @description Distinct recipients with at least one eligible unread notification. */
             eligible_users: number;
@@ -12112,6 +13287,8 @@ export interface components {
         StorageCleanupResponse: {
             /** @description Pending uploads whose window lapsed, deleted this run (their objects are queued). */
             expired_pending: number;
+            /** @description BK-594 - defect evidence uploads no filing claimed within 3 hours, deleted this run (their objects are queued). */
+            expired_bug_evidence: number;
             /** @description Queued objects removed from Storage this run. */
             deleted: number;
             /** @description Queued objects whose removal failed this run; retried by the next sweep. */
@@ -12272,6 +13449,105 @@ export interface components {
             /** @description Ascending positions the ATC occupies in this Test. */
             positions: number[];
         };
+        AtcBulkEditReport: {
+            dry_run: boolean;
+            /** @enum {string} */
+            field: "tags" | "module" | "layer" | "priority";
+            /** @description Distinct ATCs processed (a repeated id counts once). */
+            requested: number;
+            /** @description With `dry_run`, how many WOULD change. */
+            changed: number;
+            /** @description Already held the target value: a success, no version bump, no event. */
+            unchanged: number;
+            refused: number;
+            outcomes: components["schemas"]["AtcBulkEditOutcome"][];
+        };
+        AtcBulkEditOutcome: {
+            /** Format: uuid */
+            atc_id: string;
+            /** @description The ATC's ID after the call. A Module move regenerates the module segment and keeps the suffix. */
+            slug: string | null;
+            title: string | null;
+            /** @enum {string} */
+            outcome: "changed" | "unchanged" | "refused";
+            /**
+             * @description Set only when `outcome` is `refused`.
+             * @enum {string|null}
+             */
+            reason: "stale_version" | "archived" | "tags_limit_exceeded" | "module_outside_story_subtree" | "slug_conflict" | "not_found" | "write_failed" | null;
+            /** @description The ATC's version after the call (unchanged when it was not written). */
+            version: number | null;
+        };
+        AtcBulkEditRequest: {
+            /** Format: uuid */
+            project_id: string;
+            items: {
+                /** Format: uuid */
+                id: string;
+                /** @default null */
+                version: number | null;
+            }[];
+            /** @default false */
+            dry_run: boolean;
+            /** @enum {string} */
+            field: "tags";
+            change: {
+                /** @enum {string} */
+                op: "add" | "remove";
+                tags: string[];
+            };
+        } | {
+            /** Format: uuid */
+            project_id: string;
+            items: {
+                /** Format: uuid */
+                id: string;
+                /** @default null */
+                version: number | null;
+            }[];
+            /** @default false */
+            dry_run: boolean;
+            /** @enum {string} */
+            field: "module";
+            change: {
+                /** Format: uuid */
+                module_id: string;
+            };
+        } | {
+            /** Format: uuid */
+            project_id: string;
+            items: {
+                /** Format: uuid */
+                id: string;
+                /** @default null */
+                version: number | null;
+            }[];
+            /** @default false */
+            dry_run: boolean;
+            /** @enum {string} */
+            field: "layer";
+            change: {
+                /** @enum {string} */
+                layer: "UI" | "API" | "Unit";
+            };
+        } | {
+            /** Format: uuid */
+            project_id: string;
+            items: {
+                /** Format: uuid */
+                id: string;
+                /** @default null */
+                version: number | null;
+            }[];
+            /** @default false */
+            dry_run: boolean;
+            /** @enum {string} */
+            field: "priority";
+            change: {
+                /** @enum {string|null} */
+                priority: "Critical" | "High" | "Medium" | "Low" | null;
+            };
+        };
         AtcSearchResult: {
             /** Format: uuid */
             id: string;
@@ -12409,9 +13685,11 @@ export interface components {
         SignupBody: {
             /**
              * Format: email
-             * @example qa.user@example.com
+             * @description At most 253 characters, one below the other auth routes: the mail provider refuses 254-character recipients, so the verification code could not be delivered. A longer value is refused with 422 `validation_failed` (issue code `too_big`, maximum 253). A reserved domain that can never receive the code is refused with 422 `validation_failed` (issue code `custom` on `email`): `example.com`, `example.net`, `example.org` and their subdomains, and any address under the TLDs `.example`, `.test`, `.invalid`, `.localhost` or `.local`. Sign-up only: the other auth routes accept these addresses.
+             * @example qa.user@delgri.resend.app
              */
             email: string;
+            /** @description At least 8 characters and at most 72 bytes in UTF-8 (the bcrypt input limit): 72 characters for plain ASCII, fewer when the password carries accents or symbols. A longer value is refused with 422 `validation_failed` (issue code `too_big`, maximum 72). */
             password: string;
         };
         BugDetail: {
@@ -12461,7 +13739,11 @@ export interface components {
             /** Format: date-time */
             updated_at: string;
             module: components["schemas"]["BugDetailModule"];
+            /** @description BK-1835 — the content version, bumped only by an effective correction (PATCH /api/v1/bugs/{id}). Send it back as `expected_version` when correcting; a status or assignee change never bumps it. */
+            content_version: number;
             origin: components["schemas"]["BugOrigin"];
+            /** @description BK-594 — images filed as evidence, ordered by `position` in the combined evidence list. `evidence_urls` fill the remaining positions in their own order. Open one with GET /api/v1/bugs/{id}/evidence/{attachmentId}/content. */
+            evidence_attachments: components["schemas"]["BugEvidenceAttachment"][];
         };
         BugDetailModule: components["schemas"]["BugModule"] & {
             /**
@@ -12487,6 +13769,17 @@ export interface components {
             /** @enum {string|null} */
             atc_layer: "UI" | "API" | "Unit" | null;
         } | null;
+        BugEvidenceAttachment: {
+            /** Format: uuid */
+            id: string;
+            /** @description Place in the combined evidence list (links and images together), 0-based. */
+            position: number;
+            /** @description Display only. */
+            filename: string;
+            /** @enum {string} */
+            content_type: "image/png" | "image/jpeg" | "image/webp";
+            byte_size: number;
+        };
         BugRunLinkedCreateBody: {
             /**
              * Format: uuid
@@ -12500,6 +13793,10 @@ export interface components {
             steps_to_reproduce?: string;
             /** @description Up to 10 evidence links. Each entry must use the `http://` or `https://` scheme — the validator is protocol-restricted, so `ftp://`, `data:`, `file://` and any other scheme are rejected with 422 `validation_failed` even though the value is a well-formed URL. */
             evidence_urls?: string[];
+            /** @description BK-594 — images to attach: the caller's own committed, never-filed uploads in this Project (POST /api/v1/projects/{id}/bug-evidence). Links and images share ONE budget of 10 items, and images 50 MiB in total. Each upload can be filed once; any other id answers 404 `not_found` (reason `evidence_not_found`). */
+            evidence_attachment_ids?: string[];
+            /** @description BK-594 — the 0-based position of each `evidence_attachment_ids` entry in the combined evidence list; the links fill the remaining positions in their own order. Omitted, the images follow the links. */
+            evidence_order?: number[];
         };
         BugStandaloneCreateBody: {
             /** Format: uuid */
@@ -12513,6 +13810,10 @@ export interface components {
             steps_to_reproduce?: string;
             /** @description Up to 10 evidence links. Each entry must use the `http://` or `https://` scheme — the validator is protocol-restricted, so `ftp://`, `data:`, `file://` and any other scheme are rejected with 422 `validation_failed` even though the value is a well-formed URL. */
             evidence_urls?: string[];
+            /** @description BK-594 — images to attach: the caller's own committed, never-filed uploads in this Project (POST /api/v1/projects/{id}/bug-evidence). Links and images share ONE budget of 10 items, and images 50 MiB in total. Each upload can be filed once; any other id answers 404 `not_found` (reason `evidence_not_found`). */
+            evidence_attachment_ids?: string[];
+            /** @description BK-594 — the 0-based position of each `evidence_attachment_ids` entry in the combined evidence list; the links fill the remaining positions in their own order. Omitted, the images follow the links. */
+            evidence_order?: number[];
         };
         BugsListPage: {
             /** @description The page, ordered severity ascending (P1..P4) then created_at desc, id desc (Decision 5). Each item carries a resolved `assignee` (BK-264), the same way GET /api/v1/activity resolves actor display info. */
@@ -12599,6 +13900,18 @@ export interface components {
              * @description The workspace member to assign this bug to, or null to unassign. Must be an active, non-viewer member of the bug's own workspace.
              */
             assignee_user_id: string | null;
+        };
+        BugCorrectionBody: {
+            /** @description The defect's `content_version` as the caller loaded it. */
+            expected_version: number;
+            /** @description Trimmed, then 5 to 200 characters (the filing rule). */
+            title?: string;
+            /** @enum {string} */
+            severity?: "P1" | "P2" | "P3" | "P4";
+            /** @description Trimmed; an empty value clears the description. No explicit size limit, the same as filing. */
+            description?: string;
+            /** @description Stored as typed, the same as filing. */
+            steps_to_reproduce?: string;
         };
         BugStatusTransitionBody: {
             /** @enum {string} */
@@ -12723,6 +14036,26 @@ export interface components {
                 scopes: string[];
             };
         };
+        MilestoneArchiveResponse: {
+            milestone: components["schemas"]["MilestoneArchiveState"];
+        };
+        MilestoneArchiveState: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            /**
+             * Format: date-time
+             * @description When the Milestone was archived. Null once it is active again.
+             */
+            archived_at: string | null;
+            /**
+             * Format: uuid
+             * @description Who archived it. Null once it is active again.
+             */
+            archived_by: string | null;
+            /** @description False when the call changed nothing: the Milestone was already in the state the call asks for. */
+            changed: boolean;
+        };
         MilestoneListResponse: {
             /** @description Ordered by target_date ascending, id ascending. */
             milestones: components["schemas"]["Milestone"][];
@@ -12742,6 +14075,16 @@ export interface components {
             created_by: string | null;
             /** Format: date-time */
             created_at: string;
+            /**
+             * Format: date-time
+             * @description BK-1899: when the Milestone was archived; null while active. Returned by the list; an archived Milestone is read-only and keeps its name reserved.
+             */
+            archived_at?: string | null;
+            /**
+             * Format: uuid
+             * @description BK-1899: who archived it; null while active.
+             */
+            archived_by?: string | null;
         };
         MilestoneCreateResponse: {
             milestone: components["schemas"]["Milestone"];
@@ -12878,6 +14221,33 @@ export interface components {
                 /** Format: date-time */
                 read_at: string | null;
             };
+        };
+        BugEvidenceUploadTarget: {
+            /** @enum {string} */
+            method: "PUT";
+            /** @description Storage signed upload URL for this upload only. Valid for 2 hours. Treat it as a secret. */
+            url: string;
+            /** @description Send exactly these headers with the PUT. The body is the raw file bytes. */
+            headers: {
+                [key: string]: string;
+            };
+            expires_at: string;
+        };
+        BugEvidenceInitBody: {
+            /** @description Display name, 1-255 characters after trimming. */
+            filename: string;
+            /**
+             * @description Declared type. The bytes are checked against it at commit: the content decides, never the name.
+             * @enum {string}
+             */
+            content_type: "image/png" | "image/jpeg" | "image/webp";
+            /** @description Size in bytes, 1 to 10485760 (10 MiB), inclusive. */
+            byte_size: number;
+            /**
+             * Format: uuid
+             * @description A uuid the client keeps for one filing form. At most 10 uploads and 50 MiB are live per draft.
+             */
+            draft_id: string;
         };
         DefectHeatmapReport: {
             /** @enum {string} */
@@ -14062,7 +15432,7 @@ export interface components {
         ActiveRuns: {
             /** @description How many runs are in progress across the WHOLE workspace. Exact, and deliberately NOT capped by `limit` — a workspace with eight running runs reports 8 while returning at most `limit` rows. This is the same predicate (`runs.status = 'running'`) the Home welcome banner counts, so the two numbers on that screen agree by construction. */
             active_count: number;
-            /** @description Ordered by `last_activity_at` descending (id descending as the tie-break), so the first entry is the run to resume. At most `limit` entries. NOTE the two-stage boundary: `started_at` descending decides WHICH runs make the page (that is what the database can order cheaply), and `last_activity_at` orders the page. A run old enough to fall outside `limit` by start date is not pulled back in by recent step activity. When `active_count` exceeds this array's length the remainder is NOT reachable from here — there is no cursor and no workspace-wide runs index; read the missing runs from each project's own run report. */
+            /** @description Ordered by `last_activity_at` descending (id descending as the tie-break), so the first entry is the run to resume. At most `limit` entries. NOTE the two-stage boundary: `started_at` descending decides WHICH runs make the page (that is what the database can order cheaply), and `last_activity_at` orders the page. A run old enough to fall outside `limit` by start date is not pulled back in by recent step activity. When `active_count` exceeds this array's length the remainder is NOT reachable from here (there is no cursor); every run, running ones included, is reachable from the paginated workspace runs index, `GET /api/v1/workspaces/{id}/runs`. */
             runs: components["schemas"]["ActiveRun"][];
         };
         ActiveRun: {
@@ -14242,6 +15612,56 @@ export interface components {
             project_count: number;
             /** @description Age in days of the workspace's oldest run (`now() - min(runs.created_at)`), or `null` when the workspace has no runs. This reports how much of the plan's retention WINDOW is in use — nothing in this product prunes runs, so this figure is never a countdown to deletion. */
             oldest_run_age_days: number | null;
+        };
+        WorkspaceBugs: {
+            /** @description At most `limit` defects, most severe first, then most recently filed. */
+            data: components["schemas"]["WorkspaceBug"][];
+            aggregates: components["schemas"]["BugsAggregates"] & unknown;
+            /** @description Opaque token for the next page with the same filters, or `null` when this page holds the last matching defect. Paging until `null` reaches every defect: there is no cap. */
+            next_cursor: string | null;
+            /** @description Every defect of the workspace the caller can see, unfiltered and exact, defects on archived modules excluded. Not affected by any filter or by `limit`. The sidebar's "Bug Reports" badge shows the same number. */
+            workspace_bug_count: number;
+        };
+        WorkspaceBug: {
+            /**
+             * Format: uuid
+             * @description The defect's id. The record opens at `/projects/{project_slug}/bugs/{id}`.
+             */
+            id: string;
+            /** Format: uuid */
+            workspace_id: string;
+            /** Format: uuid */
+            project_id: string;
+            /** @description URL slug of the defect's Project, unique per workspace. */
+            project_slug: string | null;
+            project_name: string | null;
+            module: components["schemas"]["BugModule"] & unknown;
+            /**
+             * Format: uuid
+             * @description The Run the defect was filed from. `null` for a defect filed manually, and for one whose Run was deleted later.
+             */
+            run_id: string | null;
+            title: string;
+            /**
+             * @description P1 Critical, P2 Major, P3 Minor, P4 Trivial. The primary ordering key, P1 first.
+             * @enum {string}
+             */
+            severity: "P1" | "P2" | "P3" | "P4";
+            /** @enum {string} */
+            status: "open" | "in_progress" | "resolved" | "closed";
+            /** Format: uuid */
+            assignee_user_id: string | null;
+            /** @description The resolved assignee; `email` is null when it cannot be resolved; `null` when unassigned. */
+            assignee: {
+                /** Format: uuid */
+                user_id: string;
+                email: string | null;
+            } | null;
+            /**
+             * Format: date-time
+             * @description When the defect was filed: the second ordering key, newest first, then id descending.
+             */
+            created_at: string;
         };
         ChatEntityCard: {
             /** @enum {string} */
@@ -14584,6 +16004,19 @@ export interface components {
             /** @description Optional Markdown, max 5KB. */
             description?: string;
         };
+        ProjectList: {
+            /** @description Ordered by name. Empty for a workspace with no projects AND for one the caller cannot reach. */
+            projects: components["schemas"]["ProjectSummary"][];
+        };
+        ProjectSummary: {
+            /** Format: uuid */
+            id: string;
+            /** @description URL slug, unique per workspace — the project route is `/projects/{slug}`. */
+            slug: string;
+            name: string;
+            /** Format: date-time */
+            created_at: string;
+        };
         RecentProjects: {
             /** @description Ordered by `last_activity_at` descending, name ascending as the tie-break. At most `limit` entries. */
             projects: components["schemas"]["RecentProject"][];
@@ -14659,6 +16092,57 @@ export interface components {
             /** Format: uuid */
             newActiveWorkspaceId: string | null;
             newActiveWorkspaceName: string | null;
+        };
+        WorkspaceRuns: {
+            /** @description At most `limit` Runs, newest first. */
+            items: components["schemas"]["WorkspaceRun"][];
+            /** @description Opaque token for the next (older) page with the same filters, or `null` when this page holds the oldest matching Run. Paging until `null` reaches every Run: there is no cap. */
+            next_cursor: string | null;
+            /** @description Every Run of the workspace the caller can see, unfiltered and exact. Not affected by any filter or by `limit`. The sidebar's "Test Runs" badge shows the same number. */
+            workspace_run_count: number;
+        };
+        WorkspaceRun: {
+            /**
+             * Format: uuid
+             * @description The Run's id. The Run opens at `/projects/{project_slug}/runs/{id}`.
+             */
+            id: string;
+            /** Format: uuid */
+            project_id: string;
+            /** @description URL slug of the Run's Project, unique per workspace. */
+            project_slug: string | null;
+            project_name: string | null;
+            /** Format: uuid */
+            test_id: string;
+            /** @description The Test title as snapshotted when the Run started, not as it reads today. */
+            test_title: string;
+            /** @description The Project environment the Run targeted. */
+            environment_name: string | null;
+            /**
+             * @description `human` is a Manual Run; `agent` and `ci` are Automated.
+             * @enum {string}
+             */
+            executor_mode: "human" | "agent" | "ci";
+            /**
+             * @description The Run's outcome, or `running` while it is in progress.
+             * @enum {string}
+             */
+            status: "running" | "passed" | "failed" | "aborted";
+            /**
+             * Format: date-time
+             * @description The ordering key: newest first, id descending as the tie-break.
+             */
+            started_at: string;
+            /**
+             * Format: date-time
+             * @description `null` while the Run is running.
+             */
+            finished_at: string | null;
+            /** @description Exact count of this Run's passed steps. */
+            passed_steps: number;
+            failed_steps: number;
+            /** @description Pending and skipped steps are deliberately not reported. */
+            blocked_steps: number;
         };
     };
     responses: never;
