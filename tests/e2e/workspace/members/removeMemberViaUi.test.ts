@@ -42,6 +42,7 @@ test.describe('BK-572: Remove a member from the Members screen', () => {
       try {
         // Fixture guard: one roster GET, self-heals a lone missing Member, else "fixture broken"
         await steps.ensureFixtureHealthy(fx);
+        // eslint-disable-next-line playwright/no-skipped-test -- data guard: skips only when the fixture Member has no second workspace
         test.skip(fx.secondWorkspaceId === null, 'the Member has no second workspace to prove the other workspace is untouched');
         const secondWorkspaceId = fx.secondWorkspaceId as string;
 

@@ -68,6 +68,13 @@ export class LoginPage extends UiBase {
     await this.page.goto(this.buildUrl('/login'));
   }
 
+  @step
+  async verifySessionRestored(): Promise<void> {
+    await this.page.goto(this.buildUrl('/projects'));
+    await expect(this.page).toHaveURL(/\/projects/);
+    await expect(this.page.getByTestId('sidebar-search')).toBeVisible();
+  }
+
   // ============================================
   // ATCs - Complete Test Cases
   // ============================================

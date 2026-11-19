@@ -7,7 +7,7 @@
  * Project: integration (depends on api-setup)
  */
 
-import { faker } from '@faker-js/faker';
+import { DataFactory } from '@DataFactory';
 import { config, expect, test } from '@TestFixture';
 
 test.describe('BK-166: Authentication API', () => {
@@ -33,17 +33,11 @@ test.describe('BK-166: Authentication API', () => {
 
   test('BK-166: should reject sign in when the password is wrong', async ({ api }) => {
     // Runs ATC BK-312: asserts 401 + 'unauthorized' envelope and no session created
-    await api.auth.loginWithInvalidCredentials({
-      email: config.testUser.email,
-      password: faker.internet.password({ length: 16 }),
-    });
+    await api.auth.loginWithInvalidCredentials(DataFactory.createCredentials({ email: config.testUser.email }));
   });
 
   test('BK-166: should reject sign in when the email is unknown', async ({ api }) => {
     // Same uniform 401: the API never reveals whether the email exists
-    await api.auth.loginWithInvalidCredentials({
-      email: faker.internet.email({ provider: 'example.com' }),
-      password: faker.internet.password({ length: 16 }),
-    });
+    await api.auth.loginWithInvalidCredentials(DataFactory.createCredentials());
   });
 });
