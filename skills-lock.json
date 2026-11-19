@@ -5,8 +5,8 @@
       "source": "cathrynlavery/diagram-design",
       "sourceType": "github",
       "skillPath": "skills/diagram-design/SKILL.md",
-      "computedHash": "131d0484db90409d4663ba9c7236a7ffd8708cf66abf33a53c746e4e3170abc3",
-      "commit": "f6db0decea96de66b901331a0f79a8d4b147ebae"
+      "computedHash": "09dc4e3efaa22dea09470c0e51d44e98667bd2c3595c1efc2bde8ff5dc43071b",
+      "commit": "d74d8c2d0c78a9e1efd43137f6a9a51182a8b5f0"
     },
     "playwright-best-practices": {
       "source": "currents-dev/playwright-best-practices-skill",
@@ -19,8 +19,8 @@
       "source": "microsoft/playwright-cli",
       "sourceType": "github",
       "skillPath": "skills/playwright-cli/SKILL.md",
-      "computedHash": "d3c50339092b670cdda1ba2bed0bdee1c34247cdf70df475e8b7d83983a39e79",
-      "commit": "b21724888b8100b05ef8dee3a92f2bb03bf4dcde"
+      "computedHash": "54c3f1e47b2566ecc3a2c1515823f77f4609edfe8029351924311dafc0d2ba66",
+      "commit": "c872a33cec77fa03c28fa7c6d1ad99d15d04ce42"
     },
     "resend-cli": {
       "source": "resend/resend-skills",
