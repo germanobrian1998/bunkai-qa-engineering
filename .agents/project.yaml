@@ -337,6 +337,19 @@ updater:
   # by the updater (`readDeclinedHooks` in cli/lib/updater-settings.ts), skipped by vars:check.
   declined_hooks: [] # e.g. ['node "$CLAUDE_PROJECT_DIR/.agents/hooks/doc-contracts.mjs"']
 
+checks:
+  mcp_parity:
+    mode: strict
+    relay: {}
+    unrelayed: {}
+  hooks:
+    scope: full
+  vars_check:
+    skip_paths: []
+  docs_check:
+    include: []
+    exclude: []
+
 # Where SECRET values come from. `local` (the default) = .env / .env.local.
 # A secret manager is the ADVANCED option (ADR-0010): `bun run setup` writes the
 # committed overlay .env.provider.schema (references only, never values).

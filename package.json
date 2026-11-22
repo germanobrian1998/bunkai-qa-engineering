@@ -119,7 +119,8 @@
     "xray:payload": "bun tests/utils/xrayResults.ts",
     "clean": "bun scripts/clean.ts",
     "lint:cached": "eslint --cache --cache-location node_modules/.cache/eslint/.eslintcache .",
-    "oxlint:check": "oxlint -c .oxlintrc.json"
+    "oxlint:check": "oxlint -c .oxlintrc.json",
+    "issues:weekly-digest": "bun scripts/weekly-issue-digest.ts"
   },
   "dependencies": {
     "@clack/prompts": "^1.8.1",

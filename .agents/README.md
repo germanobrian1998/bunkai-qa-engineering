@@ -134,6 +134,31 @@ harnesses: [claude] # e.g. a team on Claude Code only
 - **The boilerplate itself** checks every harness, whatever its own yaml says.
 - Read directly by `cli/lib/harness-selection.ts`, so `vars:check` skips it.
 
+## `checks` (block inside `project.yaml`)
+
+How a project scopes three gates whose shipped rules do not fit an adopted app. Each key is documented in `project.schema.yaml`; the reader is `cli/lib/check-scope.ts`. Absent or empty, every gate behaves exactly as shipped, and the boilerplate itself keeps the defaults.
+
+```yaml
+checks:
+  mcp_parity:
+    mode: local-only # strict (default) | local-only
+    relay:
+      pi: [bun, scripts/mcp-launch.ts] # exact argv prefix; the server id follows it
+    unrelayed:
+      pi: [instance-n8n-mcp] # http servers the relay cannot carry, warned by name
+  vars_check:
+    skip_paths: [.agents/skills/<slug>/**]
+  docs_check:
+    include: []
+    exclude: [docs/todo/**]
+```
+
+- **`mcp_parity`** (`agents:compat:check`): `local-only` treats the canonical `.mcp.json` as a per-machine file a committed `.gitignore` must ignore; `relay` accepts Pi entries that start each stdio server through one tracked launcher instead of copying it; `unrelayed` records the servers that launcher cannot carry (http, disabled, or taking a value from the host), each one warned by name. Under `local-only` a committed host may hold no literal credential in env, headers, the url or args.
+- **`vars_check.skip_paths`**: inside a project-owned folder with its own `{{...}}` syntax, an undeclared bare `{{NAME}}` is ignored; everything else is checked as usual.
+- **`docs_check.include` / `exclude`**: scope the doc pages only. The agent-facing markdown, the roster, the contracts and the `bun run` check of `AGENTS.md` are never scoped.
+- **Fail closed**: a malformed value, a glob that matches nothing, or a skip path over the framework surface fails the gate that owns the key, naming it.
+- **Not a `{{VAR}}` source**: `vars:check` skips the block.
+
 ## `secrets` (block inside `project.yaml`)
 
 Where secret VALUES come from (ADR-0010). `.env` / `.env.local` is the default; a secret manager is the advanced option.
@@ -209,11 +234,6 @@ orchestration:
 | `model_overrides` | *(none, read by path)* | List of `{topics: [...], tier: worker \| conductor \| subagent, model: <id>, effort: <level>}`, e.g. `{topics: [security, migration], tier: worker, model: <full id>, effort: max}`. The conductor matches a brief's topics against it when it picks a model; empty = the tier defaults. Read by path, never as a `{{VAR}}`. |
 | `orchestrator_name` | `{{ORCHESTRATOR_NAME}}` | The orchestration application, as the operator names it. Prose only. |
 | `orchestrator_cli` | `{{ORCHESTRATOR_CLI}}` | The binary on `PATH`. Empty = no orchestrator on this machine: every workflow skill falls back to the pasted-launch-line path and says NOTHING about it. |
-| `message_verb` | `{{MESSAGE_VERB}}` | The command that carries **messages between sessions**. Byte-intact. |
-| `terminal_verb` | `{{TERMINAL_VERB}}` | The command that **drives a terminal**: commands, CLI calls, harness slash-commands, keystrokes. Truncates a long payload silently and keeps only the TAIL. |
-| `orchestrator_skills` | *(none — a list)* | Vendor skills the orchestrator installs at user level, loaded by name by `/agent-orchestration` (which no longer reads this key: it stays for older copies). Referenced by path (`orchestration.orchestrator_skills`), never as a `{{VAR}}`: a list is not a substitutable scalar, same carve-out as `git_strategy.protected`. |
-
-**`message_verb` and `terminal_verb` are NOT interchangeable, and that pair is the point.** The test: if a HUMAN would read it, it does not go through `terminal_verb`; if a shell or a TUI would EXECUTE it, that is what the verb is for. A supervised worker's first prompt is its task spec, so no prompt goes through `terminal_verb`. Full doctrine and measurements: `agent-orchestration`, channel discipline.
 
 **Three tiers, one profile.** A *conductor* is the session the human types into, or a middle conductor another session launched; a *worker* is a session a conductor launched; a *subagent* is a one-shot dispatch inside a turn. `default_model` / `default_effort` are the worker tier, `conductor_*` and `subagent_model` the other two, and `permission_modes` and `model_overrides` are keyed by the same tier names. Every value is a fallback: an explicit user instruction in the conductor session overrides it for that run. `default_model` keeps its name for compatibility, because `bun sync` only inserts keys and never renames one (an old key would be stranded downstream). A downstream project gets the new leaves through an interactive `bun sync`, which offers them and inserts them insert-only; with `--auto` they are listed, not inserted, because the `orchestration:` block already exists there. An existing value is never changed, so a project that had `default_model: ''` keeps it until someone sets it. Decision record: `.context/ADR/ADR-0024-agentic-work-profile-and-permission-posture.md`.
 

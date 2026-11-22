@@ -26,8 +26,8 @@
       "source": "resend/resend-skills",
       "sourceType": "github",
       "skillPath": "skills/resend-cli/SKILL.md",
-      "computedHash": "cf95af6338502594348d7f7d953a3b089dfab57a51594bb265d4eccdc872e65e",
-      "commit": "0b003d3c4c7dcd675d0bd30949aa7c95c2b91d1f"
+      "computedHash": "7bb3b05bb2144a4e73819ec96b7176a8917e2fcbda79cd3abbb11f41b4afaf51",
+      "commit": "063246e39987faebc2608f968ca13a02d994a0d4"
     },
     "skill-creator": {
       "source": "anthropics/skills",
