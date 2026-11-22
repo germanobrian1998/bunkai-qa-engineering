@@ -18,6 +18,7 @@ import type { TestContextOptions } from '@TestContext';
 
 import { LoginPage } from '@ui/LoginPage';
 import { MembersPage } from '@ui/MembersPage';
+import { RunsReportPage } from '@ui/RunsReportPage';
 import { UiBase } from '@ui/UiBase';
 
 // ============================================
@@ -31,11 +32,15 @@ export class UiFixture extends UiBase {
   /** Members page component - workspace members screen and removal */
   readonly members: MembersPage;
 
+  /** Runs report page component - project Runs view and its Mode filter */
+  readonly runsReport: RunsReportPage;
+
   constructor(options: TestContextOptions) {
     super(options);
 
     // All components receive the same options (same page context)
     this.login = new LoginPage(options);
     this.members = new MembersPage(options);
+    this.runsReport = new RunsReportPage(options);
   }
 }

@@ -15,7 +15,7 @@ import { config, env } from '@variables';
 const baseURL = config.baseUrl;
 
 // Specs that need role sessions (BK-572). Owned by the *-roles projects only.
-const ROLE_SPECS = '**/workspace/members/**';
+const ROLE_SPECS = ['**/workspace/members/**', '**/runs/report/**'];
 
 // Gate: the role projects (role-sessions-setup, *-roles) are active ONLY on staging
 // AND with all four role accounts set (e.g. CI without the role secrets skips them);
@@ -25,8 +25,8 @@ if (env.isStaging && !rolesEnabled) {
   console.warn('[playwright.config] Role projects disabled: staging role accounts (STAGING_ADMIN_*, STAGING_MEMBER_*, STAGING_VIEWER_*) are not all set. BK-572 member-removal specs will not run.');
 }
 const NO_TESTS = /\b\B/; // never matches
-const BASE_IGNORE = ['**/module-example/**', ROLE_SPECS];
-const roleMatch = (pattern: string) => (rolesEnabled ? pattern : NO_TESTS);
+const BASE_IGNORE = ['**/module-example/**', ...ROLE_SPECS];
+const roleMatch = (pattern: string | string[]) => (rolesEnabled ? pattern : NO_TESTS);
 const roleDeps = (deps: string[]) => (rolesEnabled ? [...deps, 'role-sessions-setup'] : []);
 
 /**
@@ -172,7 +172,7 @@ export default defineConfig({
         ...devices['Desktop Chrome'],
         storageState: config.auth.storageStatePath,
       },
-      testMatch: roleMatch('**/e2e/**/workspace/members/**/*.test.ts'),
+      testMatch: roleMatch(['**/e2e/**/workspace/members/**/*.test.ts', '**/e2e/**/runs/report/**/*.test.ts']),
       dependencies: roleDeps(['ui-setup']),
     },
 
@@ -188,7 +188,7 @@ export default defineConfig({
     },
     {
       name: 'integration-roles',
-      testMatch: roleMatch('**/integration/**/workspace/members/**/*.test.ts'),
+      testMatch: roleMatch(['**/integration/**/workspace/members/**/*.test.ts', '**/integration/**/runs/report/**/*.test.ts']),
       dependencies: roleDeps(['api-setup']),
       use: {},
     },
@@ -233,7 +233,7 @@ export default defineConfig({
     {
       name: 'smoke-roles-ui',
       grep: /@smoke/,
-      testMatch: roleMatch('**/e2e/**/workspace/members/**/*.test.ts'),
+      testMatch: roleMatch(['**/e2e/**/workspace/members/**/*.test.ts', '**/e2e/**/runs/report/**/*.test.ts']),
       dependencies: roleDeps(['ui-setup']),
       use: {
         ...devices['Desktop Chrome'],
@@ -243,7 +243,7 @@ export default defineConfig({
     {
       name: 'smoke-roles-api',
       grep: /@smoke/,
-      testMatch: roleMatch('**/integration/**/workspace/members/**/*.test.ts'),
+      testMatch: roleMatch(['**/integration/**/workspace/members/**/*.test.ts', '**/integration/**/runs/report/**/*.test.ts']),
       dependencies: roleDeps(['api-setup']),
       use: {},
     },

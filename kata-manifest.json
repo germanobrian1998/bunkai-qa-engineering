@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-19T14:05:11.798Z",
+  "generatedAt": "2026-11-21T18:21:44.743Z",
   "components": {
     "api": [
       {
@@ -39,6 +39,33 @@
         "atcs": []
       },
       {
+        "name": "RunsApi",
+        "file": "RunsApi.ts",
+        "relativePath": "tests/components/api/RunsApi.ts",
+        "atcs": [
+          {
+            "id": "BK-1974",
+            "method": "readReportIsolatedToProject",
+            "line": 45
+          },
+          {
+            "id": "BK-1975",
+            "method": "readReportWithConsistentTotals",
+            "line": 72
+          },
+          {
+            "id": "BK-1982",
+            "method": "readReportWithScopedToken",
+            "line": 94
+          },
+          {
+            "id": "BK-1983",
+            "method": "probeReportParameters",
+            "line": 121
+          }
+        ]
+      },
+      {
         "name": "WorkspaceApi",
         "file": "WorkspaceApi.ts",
         "relativePath": "tests/components/api/WorkspaceApi.ts",
@@ -46,17 +73,17 @@
           {
             "id": "BK-1657",
             "method": "removeMemberSuccessfully",
-            "line": 114
+            "line": 124
           },
           {
             "id": "BK-1664",
             "method": "removeOwnerAsAdminRefused",
-            "line": 148
+            "line": 158
           },
           {
             "id": "BK-1665",
             "method": "removeMemberRefusedBelowAdmin",
-            "line": 178
+            "line": 188
           }
         ]
       }
@@ -90,6 +117,28 @@
             "line": 56
           }
         ]
+      },
+      {
+        "name": "RunsReportPage",
+        "file": "RunsReportPage.ts",
+        "relativePath": "tests/components/ui/RunsReportPage.ts",
+        "atcs": [
+          {
+            "id": "BK-1963",
+            "method": "filterRunsByMode",
+            "line": 104
+          },
+          {
+            "id": "BK-1967",
+            "method": "loadOlderRunsUnderMode",
+            "line": 126
+          },
+          {
+            "id": "BK-1992",
+            "method": "openEmptyProjectUnderMode",
+            "line": 155
+          }
+        ]
       }
     ]
   },
@@ -112,13 +161,26 @@
         "takeSnapshot",
         "teardown"
       ]
+    },
+    {
+      "name": "RunFixtureSteps",
+      "file": "RunFixtureSteps.ts",
+      "relativePath": "tests/components/steps/RunFixtureSteps.ts",
+      "methods": [
+        "assertComposition",
+        "discoverProject",
+        "mintBearer",
+        "openMemberSession",
+        "openOwnerSession",
+        "teardown"
+      ]
     }
   ],
   "summary": {
-    "totalComponents": 7,
-    "totalATCs": 8,
-    "apiComponents": 5,
-    "uiComponents": 2,
-    "stepsModules": 1
+    "totalComponents": 9,
+    "totalATCs": 15,
+    "apiComponents": 6,
+    "uiComponents": 3,
+    "stepsModules": 2
   }
 }

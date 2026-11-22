@@ -90,10 +90,10 @@ export class AuthApi extends ApiBase {
    */
   @step
   async provisionToken(
-    args: { scopes: CreateTokenBody['scopes'], workspaceId?: string, expiresInDays: number },
+    args: { scopes: CreateTokenBody['scopes'], workspaceId?: string, expiresInDays: number, name?: string },
   ): Promise<[APIResponse, CreateTokenResponse, CreateTokenBody]> {
     const payload: CreateTokenBody = {
-      name: 'kata-bk572-fixture',
+      name: args.name ?? 'kata-bk572-fixture',
       scopes: args.scopes,
       expires_in_days: args.expiresInDays,
       ...(args.workspaceId ? { workspace_id: args.workspaceId } : {}),

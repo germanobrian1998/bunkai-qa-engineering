@@ -172,6 +172,9 @@ export type CreateTokenResponse = components['schemas']['CreateTokenResponse'];
 /** A workspace project as listed by GET /api/v1/workspaces/{id}/recent-projects */
 export type ListProjectsResponse = paths['/api/v1/workspaces/{id}/recent-projects']['get']['responses']['200']['content']['application/json'];
 
+/** Projects of a workspace filtered by exact slug (GET /api/v1/workspaces/{id}/projects) */
+export type ListProjectsBySlugResponse = paths['/api/v1/workspaces/{id}/projects']['get']['responses']['200']['content']['application/json'];
+
 /** Modules of a project (GET /api/v1/projects/{id}/modules) */
 export type ListModulesResponse = paths['/api/v1/projects/{id}/modules']['get']['responses']['200']['content']['application/json'];
 

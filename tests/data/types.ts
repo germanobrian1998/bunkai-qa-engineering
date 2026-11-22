@@ -50,3 +50,18 @@ export interface ApiState {
   source: 'ui-login' | 'api-login'
   createdAt: string
 }
+
+// ============================================
+// Run report fixtures (BK-225)
+// ============================================
+
+export type RunExecutor = 'human' | 'agent' | 'ci';
+export type RunOutcome = 'passed' | 'failed' | 'aborted' | 'running';
+export type RunVerdicts = Partial<Record<RunOutcome, number>>;
+export type RunRecipe = Partial<Record<RunExecutor, RunVerdicts>>;
+
+export interface FixtureProject {
+  id: string
+  slug: string
+  workspaceId: string
+}

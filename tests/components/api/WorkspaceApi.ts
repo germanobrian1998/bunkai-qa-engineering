@@ -17,6 +17,7 @@ import type {
   ErrorEnvelope,
   GetWorkspaceResponse,
   ListMembersResponse,
+  ListProjectsBySlugResponse,
   ListProjectsResponse,
   ListWorkspacesResponse,
   WorkspaceMemberRemoveResponse,
@@ -89,6 +90,15 @@ export class WorkspaceApi extends ApiBase {
     const [response, body] = await this.apiGET<ListProjectsResponse>(`/v1/workspaces/${workspaceId}/recent-projects`, {
       params: { limit: '20' },
     });
+    return [response, body];
+  }
+
+  @step
+  async findProjectBySlug(args: { workspaceId: string, slug: string }): Promise<[APIResponse, ListProjectsBySlugResponse]> {
+    const [response, body] = await this.apiGET<ListProjectsBySlugResponse>(
+      `/v1/workspaces/${args.workspaceId}/projects`,
+      { params: { slug: args.slug } },
+    );
     return [response, body];
   }
 
