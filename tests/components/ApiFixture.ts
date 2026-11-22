@@ -20,6 +20,7 @@ import { ActivityApi } from '@api/ActivityApi';
 import { ApiBase } from '@api/ApiBase';
 import { AuthApi } from '@api/AuthApi';
 import { BugApi } from '@api/BugApi';
+import { DisplayNameApi } from '@api/DisplayNameApi';
 import { InviteApi } from '@api/InviteApi';
 import { RunsApi } from '@api/RunsApi';
 import { WorkspaceApi } from '@api/WorkspaceApi';
@@ -47,6 +48,8 @@ export class ApiFixture extends ApiBase {
   /** Runs component - run report ATCs and report reads */
   readonly runs: RunsApi;
 
+  readonly displayName: DisplayNameApi;
+
   constructor(options: TestContextOptions) {
     super(options);
 
@@ -57,6 +60,7 @@ export class ApiFixture extends ApiBase {
     this.bug = new BugApi(options);
     this.activity = new ActivityApi(options);
     this.runs = new RunsApi(options);
+    this.displayName = new DisplayNameApi(options);
   }
 
   // ============================================
@@ -75,6 +79,7 @@ export class ApiFixture extends ApiBase {
     this.bug.setAuthToken(token);
     this.activity.setAuthToken(token);
     this.runs.setAuthToken(token);
+    this.displayName.setAuthToken(token);
   }
 
   /**
@@ -88,5 +93,6 @@ export class ApiFixture extends ApiBase {
     this.bug.clearAuthToken();
     this.activity.clearAuthToken();
     this.runs.clearAuthToken();
+    this.displayName.clearAuthToken();
   }
 }
