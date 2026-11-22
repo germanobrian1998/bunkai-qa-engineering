@@ -31,3 +31,16 @@ export const RUN_FIXTURES = {
     recipe: {},
   },
 } satisfies Record<string, { slug: string, recipe: RunRecipe }>;
+
+export const DISPLAY_NAME_MESSAGES = {
+  empty: 'The display name cannot be empty.',
+  tooLong: 'The name must be at most 80 characters.',
+  saved: 'Your display name was saved.',
+  unauthenticated: 'Authentication required.',
+  patForbidden: 'Personal access tokens cannot change identity details. Use a browser session.',
+} as const;
+
+export const DISPLAY_NAME_VIEWPORTS = {
+  desktop: { width: 1280, height: 800 },
+  mobile: { width: 375, height: 812 },
+} as const;

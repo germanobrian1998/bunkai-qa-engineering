@@ -15,7 +15,7 @@ import { config, env } from '@variables';
 const baseURL = config.baseUrl;
 
 // Specs that need role sessions (BK-572). Owned by the *-roles projects only.
-const ROLE_SPECS = ['**/workspace/members/**', '**/runs/report/**'];
+const ROLE_SPECS = ['**/workspace/members/**', '**/runs/report/**', '**/integration/**/account/display-name/**'];
 
 // Gate: the role projects (role-sessions-setup, *-roles) are active ONLY on staging
 // AND with all four role accounts set (e.g. CI without the role secrets skips them);
@@ -188,7 +188,7 @@ export default defineConfig({
     },
     {
       name: 'integration-roles',
-      testMatch: roleMatch(['**/integration/**/workspace/members/**/*.test.ts', '**/integration/**/runs/report/**/*.test.ts']),
+      testMatch: roleMatch(['**/integration/**/workspace/members/**/*.test.ts', '**/integration/**/runs/report/**/*.test.ts', '**/integration/**/account/display-name/**/*.test.ts']),
       dependencies: roleDeps(['api-setup']),
       use: {},
     },

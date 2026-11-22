@@ -74,6 +74,7 @@ Who authors: a human QA architect / lead directly, **or** an AI workflow that de
 | [ADR-0010](./ADR-0010-test-isolation-user-workspace-under-rls.md) | Test isolation: pre-provisioned role accounts and per-test unique data in the QA workspace, under RLS | Accepted | — | — |
 | [ADR-0018](./ADR-0018-test-login-budget-under-signin-throttle.md) | Test login budget under the product's sign-in throttle | Accepted | ADR-0009 (§Consequences rate-limit claim only) | — |
 | [ADR-0029](./ADR-0029-frozen-run-reporting-fixtures.md) | Frozen discovered fixtures for run-reporting tests | Proposed | ADR-0010 (§Decision 2, run-reporting tests only) | — |
+| [ADR-0030](./ADR-0030-account-state-isolation-by-account.md) | Account-level profile state is isolated by account, with capture and restore | Proposed | ADR-0010 (§Decision, account-level fields only) | — |
 
 > Keep this table in sync whenever an ADR is added or its status changes. It is the fast index every session reads first.
 
