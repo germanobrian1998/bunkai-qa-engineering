@@ -73,6 +73,7 @@ Who authors: a human QA architect / lead directly, **or** an AI workflow that de
 | [ADR-0009](./ADR-0009-auth-in-tests-headless-signup-pat.md) | Auth in tests: hybrid signin, PAT as Bearer for API and cookie storageState for UI | Accepted | — | ADR-0018 (§Consequences rate-limit claim only) |
 | [ADR-0010](./ADR-0010-test-isolation-user-workspace-under-rls.md) | Test isolation: pre-provisioned role accounts and per-test unique data in the QA workspace, under RLS | Accepted | — | — |
 | [ADR-0018](./ADR-0018-test-login-budget-under-signin-throttle.md) | Test login budget under the product's sign-in throttle | Accepted | ADR-0009 (§Consequences rate-limit claim only) | — |
+| [ADR-0029](./ADR-0029-frozen-run-reporting-fixtures.md) | Frozen discovered fixtures for run-reporting tests | Proposed | ADR-0010 (§Decision 2, run-reporting tests only) | — |
 
 > Keep this table in sync whenever an ADR is added or its status changes. It is the fast index every session reads first.
 
