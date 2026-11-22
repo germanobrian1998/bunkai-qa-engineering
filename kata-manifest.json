@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-22T22:13:53.144Z",
+  "generatedAt": "2026-11-22T22:35:04.983Z",
   "components": {
     "api": [
       {
@@ -132,6 +132,28 @@
     ],
     "ui": [
       {
+        "name": "AccountPage",
+        "file": "AccountPage.ts",
+        "relativePath": "tests/components/ui/AccountPage.ts",
+        "atcs": [
+          {
+            "id": "BK-2100",
+            "method": "saveDisplayNameSuccessfully",
+            "line": 98
+          },
+          {
+            "id": "BK-2101",
+            "method": "greetWithSavedName",
+            "line": 116
+          },
+          {
+            "id": "BK-2134",
+            "method": "renderLongDisplayName",
+            "line": 127
+          }
+        ]
+      },
+      {
         "name": "LoginPage",
         "file": "LoginPage.ts",
         "relativePath": "tests/components/ui/LoginPage.ts",
@@ -234,10 +256,10 @@
     }
   ],
   "summary": {
-    "totalComponents": 10,
-    "totalATCs": 22,
+    "totalComponents": 11,
+    "totalATCs": 25,
     "apiComponents": 7,
-    "uiComponents": 3,
+    "uiComponents": 4,
     "stepsModules": 3
   }
 }

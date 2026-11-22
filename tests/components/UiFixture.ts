@@ -16,6 +16,7 @@
 
 import type { TestContextOptions } from '@TestContext';
 
+import { AccountPage } from '@ui/AccountPage';
 import { LoginPage } from '@ui/LoginPage';
 import { MembersPage } from '@ui/MembersPage';
 import { RunsReportPage } from '@ui/RunsReportPage';
@@ -35,6 +36,8 @@ export class UiFixture extends UiBase {
   /** Runs report page component - project Runs view and its Mode filter */
   readonly runsReport: RunsReportPage;
 
+  readonly account: AccountPage;
+
   constructor(options: TestContextOptions) {
     super(options);
 
@@ -42,5 +45,6 @@ export class UiFixture extends UiBase {
     this.login = new LoginPage(options);
     this.members = new MembersPage(options);
     this.runsReport = new RunsReportPage(options);
+    this.account = new AccountPage(options);
   }
 }
