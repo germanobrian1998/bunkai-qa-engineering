@@ -91,6 +91,10 @@ export class DataFactory {
       ...overrides,
     };
   }
+
+  static createDisplayName(): string {
+    return `Kata ${faker.person.lastName()} ${faker.string.alpha({ length: 4, casing: 'mixed' })}`;
+  }
 }
 
 export default DataFactory;

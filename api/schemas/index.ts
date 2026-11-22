@@ -10,6 +10,7 @@
  *   import type { LoginPayload, Booking } from '@schemas';                   // cross-domain
  */
 
+export type * from './account.types';
 export type * from './auth.types';
 export type * from './runs.types';
 export type * from './workspace.types';
