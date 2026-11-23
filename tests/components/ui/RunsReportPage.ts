@@ -3,6 +3,7 @@ import type { RunReportItem, RunReportPage, RunReportTotals } from '@schemas/run
 import type { TestContextOptions } from '@TestContext';
 import type { InterceptedData } from '@ui/UiBase';
 
+import { ACTIVE_WORKSPACE_COOKIE } from '@data/constants';
 import { expect } from '@playwright/test';
 import { UiBase } from '@ui/UiBase';
 import { atc, step } from '@utils/decorators';
@@ -11,7 +12,6 @@ type Mode = 'all' | 'manual' | 'automated';
 type Status = Exclude<RunReportItem['status'], 'running'>;
 type ModeTotal = 'manual' | 'automated';
 
-const ACTIVE_WORKSPACE_COOKIE = 'bk_active_ws';
 const REPORT_REQUEST = /\/runs\/report\?/;
 const EXECUTORS_BY_MODE: Record<Mode, string[]> = { all: [], manual: ['human'], automated: ['agent', 'ci'] };
 const MODE_LABEL: Record<Exclude<Mode, 'all'>, string> = { manual: 'Manual', automated: 'Automated' };

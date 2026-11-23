@@ -58,21 +58,27 @@ export const TEST_LIFECYCLE = {
   characters: { ascii: 'a', accented: 'é', emoji: '😀' },
 } as const;
 
+export const ACTIVE_WORKSPACE_COOKIE = 'bk_active_ws';
+
 export const TEST_LIFECYCLE_FIXTURE = {
-  workspaceName: 'QA Kata BK-596',
-  workspaceSlug: 'qa-kata-bk596',
-  projectNamePrefix: 'kata-bk596',
+  workspaceName: 'QA Kata Test Lifecycle',
+  workspaceSlug: 'qa-kata-test-lifecycle',
+  projectName: 'kata-bk596',
+  moduleName: 'Kata scaffold module',
+  storyTitle: 'Kata scaffold story',
+  criterionTitle: 'Kata scaffold criterion',
+  atcTitle: 'Kata scaffold ATC',
 } as const;
 
 export const TITLE_LENGTH_ROWS = [
-  { label: '199 ASCII characters', endpoint: 'rename', character: TEST_LIFECYCLE.characters.ascii, count: 199, expectedStatus: 200, expectedReason: null },
-  { label: '200 ASCII characters', endpoint: 'rename', character: TEST_LIFECYCLE.characters.ascii, count: 200, expectedStatus: 200, expectedReason: null },
-  { label: '201 ASCII characters', endpoint: 'rename', character: TEST_LIFECYCLE.characters.ascii, count: 201, expectedStatus: 422, expectedReason: TEST_LIFECYCLE.titleTooLongReason },
-  { label: '200 accented characters', endpoint: 'rename', character: TEST_LIFECYCLE.characters.accented, count: 200, expectedStatus: 200, expectedReason: null },
-  { label: '200 emoji', endpoint: 'rename', character: TEST_LIFECYCLE.characters.emoji, count: 200, expectedStatus: 200, expectedReason: null },
-  { label: '201 emoji', endpoint: 'rename', character: TEST_LIFECYCLE.characters.emoji, count: 201, expectedStatus: 422, expectedReason: TEST_LIFECYCLE.titleTooLongReason },
-  { label: '200 emoji', endpoint: 'create', character: TEST_LIFECYCLE.characters.emoji, count: 200, expectedStatus: 201, expectedReason: null },
-  { label: '201 emoji', endpoint: 'create', character: TEST_LIFECYCLE.characters.emoji, count: 201, expectedStatus: 422, expectedReason: TEST_LIFECYCLE.titleTooLongReason },
+  { label: '199 ASCII characters', endpoint: 'rename', character: TEST_LIFECYCLE.characters.ascii, count: 199, expectedStatus: 200, expectedCode: null, expectedReason: null },
+  { label: '200 ASCII characters', endpoint: 'rename', character: TEST_LIFECYCLE.characters.ascii, count: 200, expectedStatus: 200, expectedCode: null, expectedReason: null },
+  { label: '201 ASCII characters', endpoint: 'rename', character: TEST_LIFECYCLE.characters.ascii, count: 201, expectedStatus: 422, expectedCode: 'validation_failed', expectedReason: TEST_LIFECYCLE.titleTooLongReason },
+  { label: '200 accented characters', endpoint: 'rename', character: TEST_LIFECYCLE.characters.accented, count: 200, expectedStatus: 200, expectedCode: null, expectedReason: null },
+  { label: '200 emoji', endpoint: 'rename', character: TEST_LIFECYCLE.characters.emoji, count: 200, expectedStatus: 200, expectedCode: null, expectedReason: null },
+  { label: '201 emoji', endpoint: 'rename', character: TEST_LIFECYCLE.characters.emoji, count: 201, expectedStatus: 422, expectedCode: 'validation_failed', expectedReason: TEST_LIFECYCLE.titleTooLongReason },
+  { label: '200 emoji', endpoint: 'create', character: TEST_LIFECYCLE.characters.emoji, count: 200, expectedStatus: 201, expectedCode: null, expectedReason: null },
+  { label: '201 emoji', endpoint: 'create', character: TEST_LIFECYCLE.characters.emoji, count: 201, expectedStatus: 422, expectedCode: 'validation_failed', expectedReason: TEST_LIFECYCLE.titleTooLongReason },
 ] as const;
 
 export type TitleLengthRow = (typeof TITLE_LENGTH_ROWS)[number];

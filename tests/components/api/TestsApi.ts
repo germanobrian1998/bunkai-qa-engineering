@@ -18,7 +18,7 @@ import { expect } from '@playwright/test';
 import { atc, step } from '@utils/decorators';
 
 export interface RenameTarget { kind: 'rename', testId: string, seedTitle: string, seedVersion: number }
-export interface CreateTarget { kind: 'create', atcId: string, workspaceId: string }
+export interface CreateTarget { kind: 'create', atcId: string, workspaceId: string, onCreated: (testId: string) => void }
 export type TitleWriteBody = RenameTestResponse | CreateTestResponse | ErrorEnvelope;
 
 function hasReason(details: unknown): details is { reason: string } {
@@ -26,14 +26,20 @@ function hasReason(details: unknown): details is { reason: string } {
 }
 
 export class TestsApi extends ApiBase {
-  readonly attemptedCreateTitles: string[] = [];
-
   constructor(options: TestContextOptions) {
     super(options);
   }
 
   private readReason(body: TitleWriteBody): string | null {
     return 'error' in body && hasReason(body.error.details) ? body.error.details.reason : null;
+  }
+
+  private readCode(body: TitleWriteBody): string | null {
+    return 'error' in body ? body.error.code : null;
+  }
+
+  private readChanged(body: TitleWriteBody): boolean | null {
+    return 'changed' in body ? body.changed : null;
   }
 
   private readTitleLength(body: TitleWriteBody): number | null {
@@ -45,13 +51,17 @@ export class TestsApi extends ApiBase {
     return [response, body];
   }
 
-  private async postTitle<TBody>(args: { atcId: string, workspaceId: string, title: string }): Promise<[APIResponse, TBody]> {
-    this.attemptedCreateTitles.push(args.title);
+  private async postTitle<TBody>(args: { target: CreateTarget, title: string }): Promise<[APIResponse, TBody]> {
+    const { target, title } = args;
     const [response, body] = await this.apiPOST<TBody, TestCreateBody>(
       '/v1/tests',
-      { title: args.title, atc_ids: [args.atcId], workspace_id: args.workspaceId },
+      { title, atc_ids: [target.atcId], workspace_id: target.workspaceId },
       { headers: { 'Idempotency-Key': randomUUID() } },
     );
+    const created = response.ok() ? (body as CreateTestResponse).test.id : null;
+    if (created !== null) {
+      target.onCreated(created);
+    }
     return [response, body];
   }
 
@@ -69,16 +79,6 @@ export class TestsApi extends ApiBase {
   @step
   async getTest(testId: string): Promise<[APIResponse, GetTestResponse]> {
     const [response, body] = await this.apiGET<GetTestResponse>(`/v1/tests/${testId}`);
-    expect(response.status()).toBe(200);
-    return [response, body];
-  }
-
-  @step
-  async renameTest(args: { testId: string, title: string }): Promise<[APIResponse, RenameTestResponse]> {
-    const [response, body] = await this.apiPATCH<RenameTestResponse, RenameTestRequest>(
-      `/v1/tests/${args.testId}`,
-      { title: args.title },
-    );
     expect(response.status()).toBe(200);
     return [response, body];
   }
@@ -102,7 +102,7 @@ export class TestsApi extends ApiBase {
     const { target, title } = args;
     const [response, body] = target.kind === 'rename'
       ? await this.patchTitle<ErrorEnvelope>({ testId: target.testId, title })
-      : await this.postTitle<ErrorEnvelope>({ atcId: target.atcId, workspaceId: target.workspaceId, title });
+      : await this.postTitle<ErrorEnvelope>({ target, title });
 
     expect(response.status()).toBe(422);
     expect(body.error.code).toBe('validation_failed');
@@ -120,14 +120,17 @@ export class TestsApi extends ApiBase {
     const { target, row, title } = args;
     const [response, body] = target.kind === 'rename'
       ? await this.patchTitle<TitleWriteBody>({ testId: target.testId, title })
-      : await this.postTitle<TitleWriteBody>({ atcId: target.atcId, workspaceId: target.workspaceId, title });
+      : await this.postTitle<TitleWriteBody>({ target, title });
 
     expect(response.status()).toBe(row.expectedStatus);
+    expect(this.readCode(body)).toBe(row.expectedCode);
     expect(this.readReason(body)).toBe(row.expectedReason);
     expect(this.readTitleLength(body)).toBe(row.expectedStatus === 422 ? null : row.count);
     if (target.kind === 'rename') {
       const [, read] = await this.getTest(target.testId);
+      expect(this.readChanged(body)).toBe(row.expectedStatus === 422 ? null : true);
       expect(read.test.title).toBe(row.expectedStatus === 422 ? target.seedTitle : title);
+      expect(read.test.version).toBe(row.expectedStatus === 422 ? target.seedVersion : target.seedVersion + 1);
     }
     return [response, body];
   }

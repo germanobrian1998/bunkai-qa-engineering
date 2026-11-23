@@ -18,31 +18,36 @@ test.describe('BK-596: Test title validation', () => {
   let seeds: TestSeedSteps;
   let member: TestLifecycleSession;
   let seed: SeededTest;
-  let atcId: string;
 
   test.beforeAll(async ({ playwright }) => {
     steps = new TestLifecycleSteps({ playwright });
     seeds = new TestSeedSteps();
     member = await steps.openMemberArena();
-    seeds.watchCreates({ api: member.api, workspaceId: member.arena.workspaceId });
   });
 
   test.afterAll(async () => {
+    const errors: unknown[] = [];
     try {
       await seeds?.teardown();
     }
+    catch (error) {
+      errors.push(error);
+    }
     finally {
-      await steps?.release();
+      try {
+        await steps?.release();
+      }
+      catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length > 0) {
+      throw new AggregateError(errors, `afterAll failed: ${errors.length} teardown error(s)`);
     }
   });
 
   test.beforeEach(async () => {
-    seed = await seeds.seedTest({ api: member.api, arena: member.arena, atcs: 1 });
-    const [first] = seed.atcIds;
-    if (first === undefined) {
-      throw new Error('fixture broken: the seeded Test chains no ATC');
-    }
-    atcId = first;
+    seed = await seeds.seedTest({ api: member.api, arena: member.arena });
   });
 
   async function renamedIds(): Promise<string[]> {
@@ -72,7 +77,12 @@ test.describe('BK-596: Test title validation', () => {
   }
 
   function createTarget(): CreateTarget {
-    return { kind: 'create', atcId, workspaceId: member.arena.workspaceId };
+    return {
+      kind: 'create',
+      atcId: member.arena.atcId,
+      workspaceId: member.arena.workspaceId,
+      onCreated: testId => seeds.adopt({ api: member.api, testId }),
+    };
   }
 
   test.describe('BK-2156: blank titles', () => {
@@ -117,7 +127,7 @@ test.describe('BK-596: Test title validation', () => {
     }
 
     test(
-      'BK-2156: should show the required-name message and keep the old name when a blank name is submitted in the rename form',
+      'BK-2156: should show the required-name message and send no rename request when a blank name is submitted in the rename form',
       { tag: ['@high', '@regression'] },
       async ({ test: kata }) => {
         await kata.ui.testDetail.goto({
@@ -126,14 +136,10 @@ test.describe('BK-596: Test title validation', () => {
           workspaceId: member.arena.workspaceId,
         });
 
-        await kata.ui.testDetail.expectRenameError({
-          title: blankTitles.empty,
+        await kata.ui.testDetail.expectBlankRenameBlocked({
+          testId: seed.id,
           message: TEST_LIFECYCLE.titleRequiredMessage,
         });
-
-        const [, read] = await member.api.tests.getTest(seed.id);
-        expect(read.test.title).toBe(seed.title);
-        expect(read.test.version).toBe(seed.version);
       },
     );
   });

@@ -9,7 +9,6 @@
  */
 
 import type { RunReportItem } from '@schemas/runs.types';
-import type { CreateAtcRequest } from '@schemas/tests.types';
 
 // ============================================
 // Generic Types
@@ -65,16 +64,14 @@ export interface FixtureProject {
   workspaceId: string
 }
 
-export type CreateAtcPayload = CreateAtcRequest;
-
 export interface TestLifecycleArena {
   workspaceId: string
   project: FixtureProject
+  atcId: string
 }
 
 export interface SeededTest {
   id: string
   title: string
   version: number
-  atcIds: string[]
 }

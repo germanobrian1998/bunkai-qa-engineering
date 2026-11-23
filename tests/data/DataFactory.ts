@@ -9,7 +9,8 @@
  *   - Import directo: import { DataFactory } from '@DataFactory'
  */
 
-import type { CreateAtcPayload, TestCredentials, TestUser, TestWorkspace } from '@data/types';
+import type { TestCredentials, TestUser, TestWorkspace } from '@data/types';
+import type { CreateAtcRequest } from '@schemas/tests.types';
 
 import { faker } from '@faker-js/faker';
 
@@ -104,21 +105,9 @@ export class DataFactory {
     return args.character.repeat(args.count);
   }
 
-  static createModuleName(): string {
-    return `Kata module ${this.createTestId('bk596')}`;
-  }
-
-  static createStoryTitle(): string {
-    return `Kata story ${this.createTestId('bk596')}`;
-  }
-
-  static createCriterionTitle(): string {
-    return `Kata criterion ${this.createTestId('bk596')}`;
-  }
-
-  static createAtcPayload(args: { moduleId: string, userStoryId: string, acceptanceCriterionIds: string[] }): CreateAtcPayload {
+  static createAtcPayload(args: { title: string, moduleId: string, userStoryId: string, acceptanceCriterionIds: string[] }): CreateAtcRequest {
     return {
-      title: `Kata ATC ${this.createTestId('bk596')}`,
+      title: args.title,
       module_id: args.moduleId,
       user_story_id: args.userStoryId,
       acceptance_criterion_ids: args.acceptanceCriterionIds,

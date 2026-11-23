@@ -1,5 +1,5 @@
 import type { APIResponse } from '@playwright/test';
-import type { CreateAtcRequest, CreateAtcResponse } from '@schemas/tests.types';
+import type { CreateAtcRequest, CreateAtcResponse, SearchAtcsResponse } from '@schemas/tests.types';
 import type { TestContextOptions } from '@TestContext';
 
 import { randomUUID } from 'node:crypto';
@@ -21,6 +21,14 @@ export class AtcsApi extends ApiBase {
       { headers: { 'Idempotency-Key': randomUUID() } },
     );
     expect(response.status()).toBe(201);
+    return [response, body];
+  }
+
+  @step
+  async searchAtcs(args: { projectId: string, query: string }): Promise<[APIResponse, SearchAtcsResponse]> {
+    const [response, body] = await this.apiGET<SearchAtcsResponse>('/v1/atcs/search', {
+      params: { project_id: args.projectId, query: args.query, limit: '50' },
+    });
     return [response, body];
   }
 }
