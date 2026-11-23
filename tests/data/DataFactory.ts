@@ -112,6 +112,14 @@ export class DataFactory {
     return `Kata module ${this.createTestId('bk596')}`;
   }
 
+  static createStoryTitle(): string {
+    return `Kata story ${this.createTestId('bk596')}`;
+  }
+
+  static createCriterionTitle(): string {
+    return `Kata criterion ${this.createTestId('bk596')}`;
+  }
+
   static createAtcPayload(args: { moduleId: string, userStoryId: string, acceptanceCriterionIds: string[] }): CreateAtcPayload {
     return {
       title: `Kata ATC ${this.createTestId('bk596')}`,

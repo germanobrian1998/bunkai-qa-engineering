@@ -70,7 +70,6 @@ export type CreateAtcPayload = CreateAtcRequest;
 export interface TestLifecycleArena {
   workspaceId: string
   project: FixtureProject
-  environmentId: string
 }
 
 export interface SeededTest {

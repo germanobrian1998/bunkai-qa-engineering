@@ -50,6 +50,7 @@ export const TEST_LIFECYCLE = {
   versionConflictReason: 'version_conflict',
   titleRequiredReason: 'title_required',
   titleTooLongReason: 'title_too_long',
+  titleRequiredMessage: 'A Test needs a name.',
   maxTitleLength: 200,
   blankTitles: {
     empty: '',
@@ -62,5 +63,7 @@ export const TEST_LIFECYCLE = {
 
 export const TEST_LIFECYCLE_FIXTURE = {
   qaWorkspaceName: 'QA Bunkai',
+  workspaceName: 'QA Kata BK-596',
+  workspaceSlug: 'qa-kata-bk596',
   projectNamePrefix: 'kata-bk596',
 } as const;

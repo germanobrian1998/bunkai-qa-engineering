@@ -18,11 +18,14 @@ import type { TestContextOptions } from '@TestContext';
 
 import { ActivityApi } from '@api/ActivityApi';
 import { ApiBase } from '@api/ApiBase';
+import { AtcsApi } from '@api/AtcsApi';
 import { AuthApi } from '@api/AuthApi';
 import { BugApi } from '@api/BugApi';
 import { DisplayNameApi } from '@api/DisplayNameApi';
 import { InviteApi } from '@api/InviteApi';
 import { RunsApi } from '@api/RunsApi';
+import { StructureApi } from '@api/StructureApi';
+import { TestsApi } from '@api/TestsApi';
 import { WorkspaceApi } from '@api/WorkspaceApi';
 
 // ============================================
@@ -50,6 +53,12 @@ export class ApiFixture extends ApiBase {
 
   readonly displayName: DisplayNameApi;
 
+  readonly tests: TestsApi;
+
+  readonly atcs: AtcsApi;
+
+  readonly structure: StructureApi;
+
   constructor(options: TestContextOptions) {
     super(options);
 
@@ -61,6 +70,9 @@ export class ApiFixture extends ApiBase {
     this.activity = new ActivityApi(options);
     this.runs = new RunsApi(options);
     this.displayName = new DisplayNameApi(options);
+    this.tests = new TestsApi(options);
+    this.atcs = new AtcsApi(options);
+    this.structure = new StructureApi(options);
   }
 
   // ============================================
@@ -80,6 +92,9 @@ export class ApiFixture extends ApiBase {
     this.activity.setAuthToken(token);
     this.runs.setAuthToken(token);
     this.displayName.setAuthToken(token);
+    this.tests.setAuthToken(token);
+    this.atcs.setAuthToken(token);
+    this.structure.setAuthToken(token);
   }
 
   /**
@@ -94,5 +109,8 @@ export class ApiFixture extends ApiBase {
     this.activity.clearAuthToken();
     this.runs.clearAuthToken();
     this.displayName.clearAuthToken();
+    this.tests.clearAuthToken();
+    this.atcs.clearAuthToken();
+    this.structure.clearAuthToken();
   }
 }
