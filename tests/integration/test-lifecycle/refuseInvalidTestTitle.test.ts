@@ -24,6 +24,7 @@ test.describe('BK-596: Test title validation', () => {
     steps = new TestLifecycleSteps({ playwright });
     seeds = new TestSeedSteps();
     member = await steps.openMemberArena();
+    seeds.watchCreates({ api: member.api, workspaceId: member.arena.workspaceId });
   });
 
   test.afterAll(async () => {
@@ -148,14 +149,12 @@ test.describe('BK-596: Test title validation', () => {
           const eventsOf = async (): Promise<string[]> => (row.endpoint === 'rename' ? renamedIds() : createdIds(title));
           const before = await eventsOf();
 
-          const [, body] = await member.api.tests.applyTitleLengthBoundaries({
+          await member.api.tests.applyTitleLengthBoundaries({
             target: row.endpoint === 'rename' ? renameTarget() : createTarget(),
             row,
+            title,
           });
 
-          if (row.endpoint === 'create' && 'test' in body) {
-            seeds.adopt({ api: member.api, testId: body.test.id });
-          }
           expect(newIds({ before, after: await eventsOf() })).toHaveLength(row.expectedStatus === 422 ? 0 : 1);
         },
       );

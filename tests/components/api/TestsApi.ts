@@ -14,7 +14,6 @@ import type { TestContextOptions } from '@TestContext';
 import { randomUUID } from 'node:crypto';
 import { ApiBase } from '@api/ApiBase';
 import { TEST_LIFECYCLE } from '@data/constants';
-import { DataFactory } from '@DataFactory';
 import { expect } from '@playwright/test';
 import { atc, step } from '@utils/decorators';
 
@@ -27,6 +26,8 @@ function hasReason(details: unknown): details is { reason: string } {
 }
 
 export class TestsApi extends ApiBase {
+  readonly attemptedCreateTitles: string[] = [];
+
   constructor(options: TestContextOptions) {
     super(options);
   }
@@ -45,6 +46,7 @@ export class TestsApi extends ApiBase {
   }
 
   private async postTitle<TBody>(args: { atcId: string, workspaceId: string, title: string }): Promise<[APIResponse, TBody]> {
+    this.attemptedCreateTitles.push(args.title);
     const [response, body] = await this.apiPOST<TBody, TestCreateBody>(
       '/v1/tests',
       { title: args.title, atc_ids: [args.atcId], workspace_id: args.workspaceId },
@@ -88,6 +90,7 @@ export class TestsApi extends ApiBase {
     return response;
   }
 
+  @step
   private async expectSeedUntouched(target: RenameTarget): Promise<void> {
     const [, read] = await this.getTest(target.testId);
     expect(read.test.title).toBe(target.seedTitle);
@@ -112,15 +115,13 @@ export class TestsApi extends ApiBase {
 
   @atc('BK-2167')
   async applyTitleLengthBoundaries(
-    args: { target: RenameTarget | CreateTarget, row: TitleLengthRow },
+    args: { target: RenameTarget | CreateTarget, row: TitleLengthRow, title: string },
   ): Promise<[APIResponse, TitleWriteBody]> {
-    const { target, row } = args;
-    const title = DataFactory.createTitleOfLength(row);
+    const { target, row, title } = args;
     const [response, body] = target.kind === 'rename'
       ? await this.patchTitle<TitleWriteBody>({ testId: target.testId, title })
       : await this.postTitle<TitleWriteBody>({ atcId: target.atcId, workspaceId: target.workspaceId, title });
 
-    expect(target.kind).toBe(row.endpoint);
     expect(response.status()).toBe(row.expectedStatus);
     expect(this.readReason(body)).toBe(row.expectedReason);
     expect(this.readTitleLength(body)).toBe(row.expectedStatus === 422 ? null : row.count);

@@ -46,12 +46,9 @@ export const DISPLAY_NAME_VIEWPORTS = {
 } as const;
 
 export const TEST_LIFECYCLE = {
-  archiveReason: 'test_archived',
-  versionConflictReason: 'version_conflict',
   titleRequiredReason: 'title_required',
   titleTooLongReason: 'title_too_long',
   titleRequiredMessage: 'A Test needs a name.',
-  maxTitleLength: 200,
   blankTitles: {
     empty: '',
     spaces: '   ',

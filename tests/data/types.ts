@@ -9,7 +9,7 @@
  */
 
 import type { RunReportItem } from '@schemas/runs.types';
-import type { CreateAtcRequest, RunComparison, WorkspaceRuns } from '@schemas/tests.types';
+import type { CreateAtcRequest } from '@schemas/tests.types';
 
 // ============================================
 // Generic Types
@@ -77,12 +77,4 @@ export interface SeededTest {
   title: string
   version: number
   atcIds: string[]
-  runIds: string[]
-  tag: string | null
-}
-
-export interface RunReadsBaseline {
-  report: RunReportItem[]
-  workspaceRuns: WorkspaceRuns['items']
-  comparisons: Record<string, RunComparison>
 }

@@ -104,10 +104,6 @@ export class DataFactory {
     return args.character.repeat(args.count);
   }
 
-  static createTagName(): string {
-    return `kata-bk596-${faker.string.alphanumeric({ length: 8, casing: 'lower' })}`;
-  }
-
   static createModuleName(): string {
     return `Kata module ${this.createTestId('bk596')}`;
   }
