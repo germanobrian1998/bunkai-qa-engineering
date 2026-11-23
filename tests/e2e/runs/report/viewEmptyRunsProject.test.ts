@@ -15,8 +15,8 @@ test.describe('BK-225: First-use state wins over Mode', () => {
     steps = new RunFixtureSteps({ playwright });
     const owner: OwnerSession = await steps.openOwnerSession();
     member = await steps.openMemberSession(owner);
-    project = await steps.discoverProject({ api: member.api, workspaceId: member.ownWorkspaceId, slug: RUN_FIXTURES.empty.slug });
-    await steps.assertComposition({ api: member.api, project, recipe: RUN_FIXTURES.empty.recipe });
+    project = await steps.discoverProject({ api: member.api, role: 'member', workspaceId: member.ownWorkspaceId, slug: RUN_FIXTURES.empty.slug });
+    await steps.assertComposition({ api: member.api, role: 'member', project, recipe: RUN_FIXTURES.empty.recipe });
   });
 
   test.afterAll(async () => {
@@ -31,7 +31,8 @@ test.describe('BK-225: First-use state wins over Mode', () => {
         await kata.ui.runsReport.openEmptyProjectUnderMode({ slug: project.slug, workspaceId: project.workspaceId, mode });
 
         expect(await kata.ui.runsReport.readTotals()).toEqual({ passed: 0, failed: 0, manual: 0, automated: 0 });
-        const [, report] = await member.api.runs.getReport({ projectId: project.id });
+        const [reportResponse, report] = await member.api.runs.getReport({ projectId: project.id });
+        expect(reportResponse.status(), 'oracle: GET runs/report of empty project as member').toBe(200);
         expect(report.scope).toEqual({ has_runs: false, has_automated: false });
       },
     );

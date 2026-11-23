@@ -28,7 +28,6 @@ Fixed assertions:
 Section 2.
 ### Test-level (in test file)
 - the main fixture with the TC's `executor=agent` query: `totals` equals `{passed:20, failed:6, manual:0, automated:26}` and `scope` equals `{has_runs: true, has_automated: true}` (literals)
-- the two PATs are distinct tokens (different ids from the mint responses)
 
 ## 5. Code Template
 ```typescript

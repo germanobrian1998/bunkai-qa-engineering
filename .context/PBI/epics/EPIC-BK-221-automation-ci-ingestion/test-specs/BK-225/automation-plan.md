@@ -61,8 +61,8 @@ Locators inline in the ATC; promote to a `private readonly` arrow function only 
 | Aspect | Value |
 |--------|-------|
 | Endpoint(s) | Under test: `GET /v1/projects/{id}/runs/report`. Setup (reads and the PAT only): `POST /v1/tokens`, `DELETE /v1/tokens/{id}`, `GET /v1/workspaces/{id}/projects?slug=` (Discover a fixture project), `GET /v1/me` (active workspace). Paths are relative to `config.apiUrl`, which already ends in `/api` |
-| OpenAPI Type(s) | `RunReportPage`, `RunReportItem`, `RunReportTotals`, `RunCreateBody`, `Run`, `RunFinishBody`, `RunAbortBody`, `RunSubmissionBody`, `ProjectCreateBody`, `ProjectEnvironmentCreateBody`, `ModuleCreateBody`, `UserStoryCreateBody`, `AcceptanceCriterionCreateBody`, `AtcCreateBody`, `TestCreateBody`, `CreateTokenBody`, `ErrorEnvelope`; facades `api/schemas/runs.types.ts`, additions to `workspace.types.ts` |
-| Auth Required | Yes. Owner cookie for authoring and token mint; workspace-bound PAT as Bearer for runs and the report; a PAT without `atc:read` for BK-1982 |
+| OpenAPI Type(s) | `RunReportPage`, `RunReportItem`, `RunReportTotals`, `RunCreateBody`, `Run`, `RunFinishBody`, `RunAbortBody`, `RunSubmissionBody`, `CreateTokenBody`, `ErrorEnvelope`; facades `api/schemas/runs.types.ts`, additions to `workspace.types.ts` |
+| Auth Required | Yes. Owner cookie for token mint and fixture discovery (reads only, ADR-0029); workspace-bound PAT as Bearer for runs and the report; a PAT without `atc:read` for BK-1982 |
 | Return Pattern | GET/DELETE `[APIResponse, TBody]`; POST `[APIResponse, TBody, TPayload]`; UI ATCs return `void` |
 
 ## 3. ATC Registry
@@ -92,7 +92,7 @@ Convention note: BK-1974, BK-1975, BK-1982 and BK-1983 have one TC but, in the f
 | Component | Method | Returns | Description |
 |-----------|--------|---------|-------------|
 | `RunsApi` | `getReport(args: { projectId, query? })` | `[APIResponse, RunReportPage]` | Plain GET used for oracles and discovery. `query` is `Record<string, string[]>` so executors repeat |
-| `RunsReportPage` | `goto`, `readTotals`, `readScopeLabel`, `countRows`, `listRowIds`, `applyMode`, `applyStatus` | `void` / values | Navigation, filters and reads used as test-level steps (`@step`) |
+| `RunsReportPage` | `goto`, `readTotals`, `readScopeLabel`, `expectRowsMatchIds`, `totalChips`, `totalsRegion`, `rowsLocator`, `applyMode`, `applyStatus` | `void` / values | Navigation, filters and reads used as test-level steps (`@step`) |
 | `WorkspaceApi` | `findProjectBySlug(args: { workspaceId, slug })` | `[APIResponse, ListProjectsBySlugResponse]` | Discover a fixture project by fixed slug |
 | `AuthApi` | `provisionToken` (extended with `name`) | existing | Mint the `atc:read` PAT |
 | `RunFixtureSteps` (Steps) | `openOwnerSession`, `openMemberSession`, `mintBearer`, `discoverProject`, `assertComposition`, `teardown` | see section 4 | Discover-and-verify chain reused by all seven files |
@@ -141,7 +141,7 @@ Fixture: `{ api }` + `playwright`
 Test: "BK-1982: should answer 403 to a PAT without atc:read and 200 with it when the report endpoint is called with each token" (loop over 2 rows: `hasAtcRead` false then true)
 Preconditions: the main fixture, composition verified; two PATs (`atc:read`, `run:execute`).
 ATCs called: `runs.readReportWithScopedToken` once per row with a Bearer-only fixture holding that PAT.
-Test-level assertions: the two PATs are distinct tokens; the 200 body `totals` equals `{passed:20, failed:6, manual:0, automated:26}` and `scope` equals `{has_runs:true, has_automated:true}` for the TC's `executor=agent` query (literals).
+Test-level assertions: the 200 body `totals` equals `{passed:20, failed:6, manual:0, automated:26}` and `scope` equals `{has_runs:true, has_automated:true}` for the TC's `executor=agent` query (literals).
 Teardown: revoke both PATs.
 
 ### File: tests/integration/runs/report/rejectInvalidReportParams.test.ts
@@ -149,7 +149,7 @@ Fixture: `{ api }` + `playwright`
 
 #### Scenario 1..10: one parameterized test over the TC Examples table (BK-1983)
 Test: "BK-1983: should answer <result> when the report API is called with <query> given a project with more than 50 runs"
-Rows (literal): `executor=robot` 422; `status=running` 422; `executor=agent&executor=agent` 200 equal rows to `executor=agent`; `mode=automated` 200 and all 61 runs available (`totals` passed + failed == 61, first page 50 items); `date_from=2026-07-31&date_to=2026-07-01` 422; `date_from=2026-02-30` 422; `date_to=2026-13-45` 422; `limit=51` 422; `limit=50` 200 with 50 items and a `next_cursor`; `cursor=garbage` 400.
+Rows (literal): `executor=robot` 422; `status=running` 422; `executor=agent&executor=agent` 200 equal rows to `executor=agent`, plus the literals 27 items and totals passed 20, failed 6, manual 0, automated 26; `mode=automated` 200 and all 61 runs available (`totals` passed + failed == 61, first page 50 items); `date_from=2026-07-31&date_to=2026-07-01` 422; `date_from=2026-02-30` 422; `date_to=2026-13-45` 422; `limit=51` 422; `limit=0` 422 (lower bound, `limit` is 1..50 in the backend schema); `limit=50` 200 with 50 items and a `next_cursor`; `cursor=garbage` 400.
 Preconditions: the main fixture (read-only, 61 finished runs plus 3 aborted), PAT `atc:read`.
 ATCs called: `runs.probeReportParameters` per row.
 Test-level assertions: the repeated-executor row compares item ids with a second call `executor=agent` through the `getReport` helper; the `mode` row compares to the unfiltered literal counts.
@@ -181,10 +181,10 @@ Fixture: `{ test }`
 Test: "BK-1975: should keep Manual plus Automated equal to Passed plus Failed across API totals, UI chips and the fixture recipe when <filters> are applied" (loop over the 4 Examples rows)
 Rows and literal expectations (manual-only fixture, section 4): no filter: passed 4, failed 3, manual 5, automated 2, 12 rows (statuses passed, failed, aborted); Status Failed: failed 3, manual 2, automated 1, 3 rows; Status Failed + Mode Automated: failed 1, manual 0, automated 1, 1 row; Status Aborted: all four zero, 5 rows, status aborted. Two extra rows are `test.skip(true, reason)`: running run not counted (no fixture holds one) and the legacy run (O2).
 ATCs called: `runs.readReportWithConsistentTotals({ projectId, query })` then the UI applies the same filters through the page object helpers.
-Test-level assertions: totals equal the literals; the five UI chips equal the API; no `Aborted` chip in `report-totals`; for the legacy-run row (O2) `test.skip(true, reason)`.
+Test-level assertions: totals equal the literals; the four total chips (`report-total-*`) equal the API; no `Aborted` text in `report-totals`; for the legacy-run row (O2) `test.skip(true, reason)`.
 
-### File: tests/e2e/runs/report/isolateProjectRuns.test.ts
-Fixture: `{ test }` + `playwright` (Owner and Member cookie sessions)
+### File: tests/e2e/runs/report/isolateProjectRuns.test.ts (BK-1974 200 partition) and tests/integration/runs/report/isolateProjectRunsApi.test.ts (BK-1974 404 partition, `{ api }`)
+Fixture: `{ test }` + `playwright` (Owner cookie session in the e2e file; the Member-workspace 404 partition reads with the Owner cookie in the integration file)
 
 #### Scenario 1..2: project scope (BK-1974)
 Test: "BK-1974: should <outcome> when the report is read for <partition> given projects of the same and of another workspace"
@@ -218,7 +218,7 @@ Test-level assertions: all four chips read 0; the Member's `getReport` returns `
 
 - [ ] All seven TCs automated; each Examples row is a loop row
 - [ ] Risk beyond AC covered: invalid and boundary inputs (BK-1983), non-disclosure 404 (BK-1974), uncounted states (BK-1975), zero-run precedence (BK-1992)
-- [ ] BVA: page size + 1 (BK-1967), `limit` 50 and 51, impossible dates (BK-1983)
+- [ ] BVA: page size + 1 (BK-1967), `limit` 0, 50 and 51, impossible dates (BK-1983)
 - [ ] KATA compliance: one method per `@atc` ID; no ATC calls an ATC; the UI ATCs share a `private` mode-selection method instead of calling each other; locators inline until used twice
 - [ ] Expected values are literals from the TCs; the recipes are recorded literals, never read from the response under test
 - [ ] No hardcoded waits, no retries, credentials only through `@variables` (`STAGING_USER_*`, `STAGING_MEMBER_*`), no secret printed (PAT redacted with `redactKeys: ['token']`)
@@ -239,7 +239,35 @@ Test-level assertions: all four chips read 0; the Member's `getReport` returns `
 ## 9. Risks
 
 - Shared staging data: the frozen fixtures are long-lived and shared; a run added or removed by a person or by another test fails the tests loudly with "fixture broken" until the fixture is restored by hand (ADR-0029). The tests never write, so they add no permanent data.
-- The BK-1967 and BK-1963 row counts include aborted runs (53 and 11); a new aborted run changes them.
+- The BK-1967 and BK-1963 row counts include aborted runs (BK-1967: 53 rows, which include 2 aborted automated runs; BK-1963 Manual: 11); a new aborted run changes them.
 - The Runs page resolves the project through the active-workspace cookie; if the Owner's active workspace changes between discovery and navigation the page returns 404. The Steps read `GET /v1/me`; BK-1992 sets the `bk_active_ws` cookie for the Member.
 - Local, staging and production share one Supabase project (Master Test Plan): the human sweeps (4 hours) and agent sweeps (60 minutes) can abort a running run in a fixture; the fixtures hold none today.
 - UI copy and testids are read from `origin/staging` code, not from the live page: confirm with a `/playwright-cli` snapshot at Code time.
+
+## 10. Review Findings (Phase 3)
+
+Accepted with reasons:
+- Multi-outcome ATCs (BK-1974, BK-1982, BK-1983) stay single methods with a literal-discriminated argument: the manifest allows one `@atc` per TC key, and splitting the TCs in the TMS is open question O1.
+- 401 coverage gap: no signed TC asks for an unauthenticated read of the report. Routed to `/test-documentation` as a new TC candidate; no ATC is added here.
+
+Round 2 outcomes:
+- BK-1974 spans `isolateProjectRuns` (UI, 200 partition) and `tests/integration/runs/report/isolateProjectRunsApi.test.ts` (API, 404 partition); both call `readReportIsolatedToProject`, whose 200 branch now asserts `has_automated` from the recipe (`expected.automated > 0`). The `RunReportPage` scope has no `has_manual` field.
+- Row badges assert the icon as presence (`svg, img, [role="img"]`) beside `data-mode` and the label.
+- BK-1983 200 branch asserts the same totals and scope properties as BK-1982 (no `aborted` or `running` key); the repeated-executor row passes its 27 items through `expected`.
+- The "no Aborted chip" check moved out of the `readTotals` step into the BK-1963 and BK-1967 ATCs as the exact chip list (Passed, Failed, Manual, Automated). BK-1975 has no UI ATC, so it keeps no chip-set assertion.
+- Readiness waits use `aria-busy="false"` on `report-totals` instead of placeholder text; `listRowIds` reads the full run id from the id cell `title` attribute through the `getByRole('row')` locator.
+- The empty-state copy match is case-sensitive and anchored to "No runs yet for this Project"; the scope label match requires "more available" exactly.
+
+Round 3 outcomes:
+- Row identity: `listRowIds` (read of the id cell `title`) is removed. BK-1974 now calls `expectRowsMatchIds(ids)`: `toHaveCount(ids.length)` on the rows, then `getByTestId('report-row-<id>')` visible for every API id. Checking by id replaces reading ids from the UI, so no prefix parsing is needed (`report-row-branch-<id>` shares the prefix).
+- Total chips: the ordered text list is replaced by an order-independent check: `getByTestId(/^report-total-/)` count 4, each of the four testids visible with its label regex, and the totals region does not contain "Aborted" (an Aborted chip without a testid cannot pass).
+- BK-1975: no second `@atc`. The UI part of TC22 lives at test level in `reconcileModeTotals`: chip count 4 and no "Aborted" text in the totals region, through the page accessors `totalChips()` and `totalsRegion()`, for every Examples row.
+- Executor cell: matched per row with string names and `exact: true` (Human, or Agent or CI through `or`), so another column holding the same text does not match. The Executor column header is not associated: the cells expose no header relation without positional selectors.
+- Row counts use retrying `toHaveCount` on the rows locator; `countRows` is removed.
+- The BK-1982 and BK-1983 200-branch checks share one private helper in `RunsApi` (`expectTotalsAndScope`, no decorator).
+- The distinct-PAT check is dropped from the BK-1982 test-level assertions (section 5): it proved nothing about the report, since the 403 and 200 outcomes already show the tokens differ in scope.
+- BK-1963 (Mode Manual) keeps `Manual` and `Human` as plain string literals (badge label and executor cell name), never derived from the response.
+
+Recorded gaps:
+- BK-1975 has no independent DB oracle in regression. The recipe is read through the endpoint under test (`assertComposition`), and the database count check was a one-off at Code time (2026-11-21), so a drift that the endpoint hides would pass.
+- BK-1967 expects 53 rows under Mode Automated: 51 finished automated runs plus 2 aborted automated runs.

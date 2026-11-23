@@ -8,6 +8,8 @@
  *   api/schemas/{domain}.types.ts → import from '@schemas/{domain}.types'
  */
 
+import type { RunReportItem } from '@schemas/runs.types';
+
 // ============================================
 // Generic Types
 // ============================================
@@ -51,12 +53,8 @@ export interface ApiState {
   createdAt: string
 }
 
-// ============================================
-// Run report fixtures (BK-225)
-// ============================================
-
-export type RunExecutor = 'human' | 'agent' | 'ci';
-export type RunOutcome = 'passed' | 'failed' | 'aborted' | 'running';
+export type RunExecutor = RunReportItem['executor_mode'];
+export type RunOutcome = RunReportItem['status'];
 export type RunVerdicts = Partial<Record<RunOutcome, number>>;
 export type RunRecipe = Partial<Record<RunExecutor, RunVerdicts>>;
 

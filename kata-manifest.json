@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-22T22:35:04.983Z",
+  "generatedAt": "2026-11-23T17:21:24.408Z",
   "components": {
     "api": [
       {
@@ -88,22 +88,22 @@
           {
             "id": "BK-1974",
             "method": "readReportIsolatedToProject",
-            "line": 45
+            "line": 63
           },
           {
             "id": "BK-1975",
             "method": "readReportWithConsistentTotals",
-            "line": 72
+            "line": 90
           },
           {
             "id": "BK-1982",
             "method": "readReportWithScopedToken",
-            "line": 94
+            "line": 112
           },
           {
             "id": "BK-1983",
             "method": "probeReportParameters",
-            "line": 121
+            "line": 138
           }
         ]
       },
@@ -190,17 +190,17 @@
           {
             "id": "BK-1963",
             "method": "filterRunsByMode",
-            "line": 104
+            "line": 132
           },
           {
             "id": "BK-1967",
             "method": "loadOlderRunsUnderMode",
-            "line": 126
+            "line": 156
           },
           {
             "id": "BK-1992",
             "method": "openEmptyProjectUnderMode",
-            "line": 155
+            "line": 184
           }
         ]
       }
@@ -251,6 +251,7 @@
         "mintBearer",
         "openMemberSession",
         "openOwnerSession",
+        "readAllRunIds",
         "teardown"
       ]
     }

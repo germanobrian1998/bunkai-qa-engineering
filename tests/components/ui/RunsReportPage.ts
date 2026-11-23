@@ -1,4 +1,5 @@
-import type { RunReportPage, RunReportTotals } from '@schemas/runs.types';
+import type { Locator } from '@playwright/test';
+import type { RunReportItem, RunReportPage, RunReportTotals } from '@schemas/runs.types';
 import type { TestContextOptions } from '@TestContext';
 import type { InterceptedData } from '@ui/UiBase';
 
@@ -7,14 +8,20 @@ import { UiBase } from '@ui/UiBase';
 import { atc, step } from '@utils/decorators';
 
 type Mode = 'all' | 'manual' | 'automated';
-type Status = 'passed' | 'failed' | 'aborted';
+type Status = Exclude<RunReportItem['status'], 'running'>;
 type ModeTotal = 'manual' | 'automated';
 
 const ACTIVE_WORKSPACE_COOKIE = 'bk_active_ws';
 const REPORT_REQUEST = /\/runs\/report\?/;
 const EXECUTORS_BY_MODE: Record<Mode, string[]> = { all: [], manual: ['human'], automated: ['agent', 'ci'] };
 const MODE_LABEL: Record<Exclude<Mode, 'all'>, string> = { manual: 'Manual', automated: 'Automated' };
-const EXECUTOR_LABEL: Record<Exclude<Mode, 'all'>, RegExp> = { manual: /^Human$/, automated: /^(Agent|CI)$/ };
+const EXECUTOR_LABELS: Record<Exclude<Mode, 'all'>, string[]> = { manual: ['Human'], automated: ['Agent', 'CI'] };
+const TOTAL_CHIPS: { id: string, label: RegExp }[] = [
+  { id: 'passed', label: /^Passed\s*\d+$/ },
+  { id: 'failed', label: /^Failed\s*\d+$/ },
+  { id: 'manual', label: /^Manual\s*\d+$/ },
+  { id: 'automated', label: /^Automated\s*\d+$/ },
+];
 
 export class RunsReportPage extends UiBase {
   constructor(options: TestContextOptions) {
@@ -28,12 +35,16 @@ export class RunsReportPage extends UiBase {
   private readonly loadOlder = () => this.page.getByTestId('report-load-older');
   private readonly totalsGroup = () => this.page.getByTestId('report-totals');
 
-  private async open(args: { slug: string, workspaceId?: string }): Promise<void> {
-    if (args.workspaceId) {
-      await this.page.context().addCookies([{ name: ACTIVE_WORKSPACE_COOKIE, value: args.workspaceId, url: this.baseUrl }]);
-    }
-    await this.page.goto(this.buildUrl(`/projects/${args.slug}/runs`));
-    await expect(this.page.getByTestId('report-filters')).toBeVisible();
+  rowsLocator(): Locator {
+    return this.rows();
+  }
+
+  totalChips(): Locator {
+    return this.page.getByTestId(/^report-total-/);
+  }
+
+  totalsRegion(): Locator {
+    return this.totalsGroup();
   }
 
   private async selectMode(mode: Mode): Promise<InterceptedData<unknown, RunReportPage>> {
@@ -48,19 +59,40 @@ export class RunsReportPage extends UiBase {
       const badge = row.getByTestId('run-mode-badge');
       await expect(badge).toHaveAttribute('data-mode', mode);
       await expect(badge).toHaveText(MODE_LABEL[mode]);
-      await expect(badge.locator('svg')).toHaveCount(1);
+      await expect(badge.locator('svg, img, [role="img"]')).toBeVisible();
     }
+  }
+
+  private async expectTotalChips(): Promise<void> {
+    await expect(this.totalChips()).toHaveCount(TOTAL_CHIPS.length);
+    for (const { id, label } of TOTAL_CHIPS) {
+      await expect(this.page.getByTestId(`report-total-${id}`)).toBeVisible();
+      await expect(this.page.getByTestId(`report-total-${id}`)).toHaveText(label);
+    }
+    await expect(this.totalsGroup()).not.toContainText(/Aborted/);
+  }
+
+  private async waitForReportLoaded(): Promise<void> {
+    await expect(this.totalsGroup()).toHaveAttribute('aria-busy', 'false');
+  }
+
+  private async expectModeChips(expected: { manual: number, automated: number }): Promise<void> {
+    await expect(this.total('manual')).toHaveText(new RegExp(String.raw`^Manual\s*${expected.manual}$`));
+    await expect(this.total('automated')).toHaveText(new RegExp(String.raw`^Automated\s*${expected.automated}$`));
   }
 
   @step
   async goto(args: { slug: string, workspaceId?: string }): Promise<void> {
-    await this.open(args);
+    if (args.workspaceId) {
+      await this.page.context().addCookies([{ name: ACTIVE_WORKSPACE_COOKIE, value: args.workspaceId, url: this.baseUrl }]);
+    }
+    await this.page.goto(this.buildUrl(`/projects/${args.slug}/runs`));
+    await expect(this.page.getByTestId('report-filters')).toBeVisible();
   }
 
   @step
   async readTotals(): Promise<RunReportTotals> {
-    await expect(this.totalsGroup()).not.toContainText('—');
-    await expect(this.totalsGroup()).not.toContainText('Aborted');
+    await this.waitForReportLoaded();
     const read = async (name: ModeTotal | 'passed' | 'failed') => Number.parseInt((await this.total(name).innerText()).replace(/\D+/g, ''), 10);
     return {
       passed: await read('passed'),
@@ -72,20 +104,16 @@ export class RunsReportPage extends UiBase {
 
   @step
   async readScopeLabel(): Promise<string> {
-    await expect(this.totalsGroup()).not.toContainText('Fetching runs');
+    await this.waitForReportLoaded();
     return (await this.page.getByTestId('report-scope-label').innerText()).trim();
   }
 
   @step
-  async countRows(): Promise<number> {
-    return this.rows().count();
-  }
-
-  @step
-  async listRowIds(): Promise<string[]> {
-    return this.page.getByTestId('report-rows').locator('tr[data-testid^="report-row-"]').evaluateAll(
-      elements => elements.map(element => (element.getAttribute('data-testid') ?? '').replace('report-row-', '')),
-    );
+  async expectRowsMatchIds(ids: string[]): Promise<void> {
+    await expect(this.rows()).toHaveCount(ids.length);
+    for (const id of ids) {
+      await expect(this.page.getByTestId(`report-row-${id}`)).toBeVisible();
+    }
   }
 
   @step
@@ -113,7 +141,8 @@ export class RunsReportPage extends UiBase {
     await expect(this.rows()).toHaveCount(expectedRows);
     await this.expectRowBadges(mode);
     for (const row of await this.rows().all()) {
-      await expect(row.locator('td:nth-child(5)')).toHaveText(EXECUTOR_LABEL[mode]);
+      const executorCells = EXECUTOR_LABELS[mode].map(name => row.getByRole('cell', { name, exact: true }));
+      await expect(executorCells.reduce((all, cell) => all.or(cell))).toHaveCount(1);
     }
 
     await expect(this.page.getByTestId('report-executor-human')).toHaveAttribute('aria-pressed', String(mode === 'manual'));
@@ -121,6 +150,7 @@ export class RunsReportPage extends UiBase {
     await expect(this.page.getByTestId('report-executor-ci')).toHaveAttribute('aria-pressed', String(mode === 'automated'));
     await expect(this.modeButton(mode)).toHaveAttribute('aria-pressed', 'true');
     await expect(this.modeGroup()).toHaveAttribute('data-mode-state', mode);
+    await this.expectTotalChips();
   }
 
   @atc('BK-1967')
@@ -131,8 +161,7 @@ export class RunsReportPage extends UiBase {
     const { mode, expected } = args;
     await this.selectMode(mode);
 
-    await expect(this.total('manual')).toHaveText(`Manual ${expected.manual}`);
-    await expect(this.total('automated')).toHaveText(`Automated ${expected.automated}`);
+    await this.expectModeChips(expected);
     await expect(this.rows()).toHaveCount(expected.pageOneRows);
     await expect(this.loadOlder()).toBeVisible();
     await this.expectRowBadges(mode);
@@ -146,21 +175,21 @@ export class RunsReportPage extends UiBase {
     expect(params.get('cursor')?.length).toBeGreaterThan(0);
 
     await expect(this.rows()).toHaveCount(expected.rowsAfterPageTwo);
-    await expect(this.page.locator('[data-testid="run-mode-badge"][data-mode="manual"]')).toHaveCount(0);
+    await this.expectRowBadges(mode);
     await expect(this.loadOlder()).toBeHidden();
-    await expect(this.total('manual')).toHaveText(`Manual ${expected.manual}`);
-    await expect(this.total('automated')).toHaveText(`Automated ${expected.automated}`);
+    await this.expectModeChips(expected);
+    await this.expectTotalChips();
   }
 
   @atc('BK-1992')
   async openEmptyProjectUnderMode(args: { slug: string, workspaceId: string, mode: Mode }): Promise<void> {
     const { slug, workspaceId, mode } = args;
-    await this.open({ slug, workspaceId });
+    await this.goto({ slug, workspaceId });
     if (mode !== 'all') {
       await this.selectMode(mode);
     }
 
-    await expect(this.page.getByTestId('report-empty-no-runs')).toContainText('No runs yet for this Project');
+    await expect(this.page.getByTestId('report-empty-no-runs').getByText(/^\s*No runs yet for this Project\s*$/)).toBeVisible();
     await expect(this.page.getByTestId('report-empty-no-match')).toBeHidden();
     await expect(this.page.getByTestId('report-empty-no-automated')).toBeHidden();
     await expect(this.modeGroup()).toHaveAttribute('data-mode-state', mode);
