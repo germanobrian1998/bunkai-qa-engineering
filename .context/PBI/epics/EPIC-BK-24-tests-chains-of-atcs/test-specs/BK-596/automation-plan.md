@@ -388,9 +388,10 @@ Teardown: `restoreTest`.
 ### PR1 deviations (BK-2156 and BK-2167)
 
 - One ATC per TC id (the `kata:manifest:check` rule): `refuseBlankTitle(target, title)` owns BK-2156 and `applyTitleLengthBoundaries(target, row, title)` owns BK-2167. `target` is a rename-or-create discriminated input; the BK-2167 expectations come from the literal TC28 row table `TITLE_LENGTH_ROWS` in `tests/data/constants.ts`, never from a caller-chosen status.
-- Each test seeds its own Test (per-test seeding), so there is no end-of-run title restore; created Tests are archived in teardown, including any Test an attempted create may have produced even when the ATC threw.
+- Each test seeds its own Test (per-test seeding), so there is no end-of-run title restore; created Tests are archived in teardown, including any Test a create produced even when the ATC threw: the create target's `onCreated` callback records the id from the 2xx response before any assertion runs.
 - "No Test created" on a refused create is proven by the 422 plus no new title-filtered `test.created` activity event, instead of `searchTests`, because a blank title is not searchable.
-- The arena is the Member-owned workspace "QA Kata BK-596" with project `kata-bk596`, created once by `TestLifecycleSteps` and reused.
+- The arena is a workspace owned by the Owner test user, found or created by `TestLifecycleSteps` (name and slug in `TEST_LIFECYCLE_FIXTURE`), with the Member, Viewer and Admin role users invited and accepted into it with their roles and the project `kata-bk596` inside it, so the tests run as a real Member and later slices reuse the Viewer and Admin. Its scaffold (module, user story, acceptance criterion and one ATC) is found or created once by stable name, so a re-run creates none; only the Test is seeded per test.
+- The BK-2156 UI half covers client-side validation only: it asserts the required-name message and that no PATCH to the Test left the page; the server refusal is proven by the API rows.
 - The create-body, `environmentId`, tag and Run baseline items are not built in PR1; later slices add each with its consumer.
 
 ## 6. Implementation Order

@@ -19,25 +19,28 @@ async applyTitleLengthBoundaries(
   const { target, row, title } = args;
   const [response, body] = target.kind === 'rename'
     ? await this.patchTitle<TitleWriteBody>({ testId: target.testId, title })
-    : await this.postTitle<TitleWriteBody>({ atcId: target.atcId, workspaceId: target.workspaceId, title });
+    : await this.postTitle<TitleWriteBody>({ target, title });
   expect(response.status()).toBe(row.expectedStatus);
+  expect(this.readCode(body)).toBe(row.expectedCode);
   expect(this.readReason(body)).toBe(row.expectedReason);
   expect(this.readTitleLength(body)).toBe(row.expectedStatus === 422 ? null : row.count);
   if (target.kind === 'rename') {
     const [, read] = await this.getTest(target.testId);
+    expect(this.readChanged(body)).toBe(row.expectedStatus === 422 ? null : true);
     expect(read.test.title).toBe(row.expectedStatus === 422 ? target.seedTitle : title);
+    expect(read.test.version).toBe(row.expectedStatus === 422 ? target.seedVersion : target.seedVersion + 1);
   }
   return [response, body];
 }
 ```
-`TitleLengthRow` is one entry of the literal TC28 table `TITLE_LENGTH_ROWS` in `tests/data/constants.ts` (`label`, `endpoint`, `character`, `count`, `expectedStatus`, `expectedReason`). The test builds `title` once with `DataFactory.createTitleOfLength` and passes it in.
+`TitleLengthRow` is one entry of the literal TC28 table `TITLE_LENGTH_ROWS` in `tests/data/constants.ts` (`label`, `endpoint`, `character`, `count`, `expectedStatus`, `expectedCode`, `expectedReason`). The test builds `title` once with `DataFactory.createTitleOfLength` and passes it in.
 
 ## 3A. API Details
 `PATCH /api/v1/tests/{id}` (200) and `POST /api/v1/tests` (201); the shared rule counts code points after trim; 422 `title_too_long`.
 
 ## 4. Assertions Split
 ### Fixed (inside ATC)
-Status and reason per row from the table; accepted title has the requested code-point count; the stored title of a renamed Test equals the new title when accepted and the seeded title when refused.
+Status and reason per row from the table; accepted title has the requested code-point count; the stored title of a renamed Test equals the new title when accepted and the seeded title when refused; a rename reports `changed: true` and bumps the version by one when accepted, and leaves the version untouched when refused.
 ### Test-level (in test file)
 One test per table row: new `test.renamed` events (rename) or title-filtered `test.created` events (create) number 1 for an accepted row and 0 for a refused one; any Test an attempted create produced is archived in teardown.
 

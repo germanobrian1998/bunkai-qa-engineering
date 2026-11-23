@@ -17,7 +17,7 @@ async refuseBlankTitle(args: { target: RenameTarget | CreateTarget, title: strin
   const { target, title } = args;
   const [response, body] = target.kind === 'rename'
     ? await this.patchTitle<ErrorEnvelope>({ testId: target.testId, title })
-    : await this.postTitle<ErrorEnvelope>({ atcId: target.atcId, workspaceId: target.workspaceId, title });
+    : await this.postTitle<ErrorEnvelope>({ target, title });
   expect(response.status()).toBe(422);
   expect(body.error.code).toBe('validation_failed');
   expect(this.readReason(body)).toBe(TEST_LIFECYCLE.titleRequiredReason);
@@ -27,7 +27,7 @@ async refuseBlankTitle(args: { target: RenameTarget | CreateTarget, title: strin
   return [response, body];
 }
 ```
-`RenameTarget` is `{ kind: 'rename', testId, seedTitle, seedVersion }` and `CreateTarget` is `{ kind: 'create', atcId, workspaceId }`. One ATC covers both endpoints because every row has the same outcome.
+`RenameTarget` is `{ kind: 'rename', testId, seedTitle, seedVersion }` and `CreateTarget` is `{ kind: 'create', atcId, workspaceId, onCreated }`; `onCreated` receives the id of any Test the create produced, straight from the 2xx response and before any assertion, so the Steps layer can archive it. One ATC covers both endpoints because every row has the same outcome.
 
 ## 3A. API Details
 `PATCH /api/v1/tests/{id}` and `POST /api/v1/tests` (Idempotency-Key required; `workspace_id` in the body for token callers, cookie default is the active workspace). 422 `validation_failed` with `details.reason` `title_required`.
