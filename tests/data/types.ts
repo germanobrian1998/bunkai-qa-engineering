@@ -9,6 +9,7 @@
  */
 
 import type { RunReportItem } from '@schemas/runs.types';
+import type { CreateAtcRequest, RunComparison, WorkspaceRuns } from '@schemas/tests.types';
 
 // ============================================
 // Generic Types
@@ -62,4 +63,27 @@ export interface FixtureProject {
   id: string
   slug: string
   workspaceId: string
+}
+
+export type CreateAtcPayload = CreateAtcRequest;
+
+export interface TestLifecycleArena {
+  workspaceId: string
+  project: FixtureProject
+  environmentId: string
+}
+
+export interface SeededTest {
+  id: string
+  title: string
+  version: number
+  atcIds: string[]
+  runIds: string[]
+  tag: string | null
+}
+
+export interface RunReadsBaseline {
+  report: RunReportItem[]
+  workspaceRuns: WorkspaceRuns['items']
+  comparisons: Record<string, RunComparison>
 }

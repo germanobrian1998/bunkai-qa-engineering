@@ -44,3 +44,23 @@ export const DISPLAY_NAME_VIEWPORTS = {
   desktop: { width: 1280, height: 800 },
   mobile: { width: 375, height: 812 },
 } as const;
+
+export const TEST_LIFECYCLE = {
+  archiveReason: 'test_archived',
+  versionConflictReason: 'version_conflict',
+  titleRequiredReason: 'title_required',
+  titleTooLongReason: 'title_too_long',
+  maxTitleLength: 200,
+  blankTitles: {
+    empty: '',
+    spaces: '   ',
+    tabs: '\t\t',
+    nonBreakingSpaces: '\u00A0\u00A0',
+  },
+  characters: { ascii: 'a', accented: 'é', emoji: '😀' },
+} as const;
+
+export const TEST_LIFECYCLE_FIXTURE = {
+  qaWorkspaceName: 'QA Bunkai',
+  projectNamePrefix: 'kata-bk596',
+} as const;

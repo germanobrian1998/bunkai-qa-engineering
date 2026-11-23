@@ -9,7 +9,7 @@
  *   - Import directo: import { DataFactory } from '@DataFactory'
  */
 
-import type { TestCredentials, TestUser, TestWorkspace } from '@data/types';
+import type { CreateAtcPayload, TestCredentials, TestUser, TestWorkspace } from '@data/types';
 
 import { faker } from '@faker-js/faker';
 
@@ -94,6 +94,36 @@ export class DataFactory {
 
   static createDisplayName(): string {
     return `Kata ${faker.person.lastName()} ${faker.string.alpha({ length: 4, casing: 'mixed' })}`;
+  }
+
+  static createTestTitle(): string {
+    return `Kata Test ${this.createTestId('bk596')}`;
+  }
+
+  static createTitleOfLength(args: { character: string, count: number }): string {
+    return args.character.repeat(args.count);
+  }
+
+  static createTagName(): string {
+    return `kata-bk596-${faker.string.alphanumeric({ length: 8, casing: 'lower' })}`;
+  }
+
+  static createModuleName(): string {
+    return `Kata module ${this.createTestId('bk596')}`;
+  }
+
+  static createAtcPayload(args: { moduleId: string, userStoryId: string, acceptanceCriterionIds: string[] }): CreateAtcPayload {
+    return {
+      title: `Kata ATC ${this.createTestId('bk596')}`,
+      module_id: args.moduleId,
+      user_story_id: args.userStoryId,
+      acceptance_criterion_ids: args.acceptanceCriterionIds,
+      layer: 'API',
+      steps: [
+        { position: 1, content: faker.lorem.sentence() },
+        { position: 2, content: faker.lorem.sentence() },
+      ],
+    };
   }
 }
 
