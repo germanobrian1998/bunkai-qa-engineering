@@ -81,12 +81,12 @@ Reused non-ATC members by composition: `RunFixtureSteps.openMemberSession`, `Run
 | BK-2187 | TestDetailPage | `readRunCountInArchiveDialog` | Archive dialog counts finished Runs only, equals `run_count` and the Run history total, cancel keeps the Test live (param: Run mix) |
 | BK-2146 | TestsApi | `listTagFilterWithoutArchived` | `GET /tests?tag=` no longer lists the archived Test, total drops by one, remaining order unchanged |
 | BK-2153 | TestsApi | `keepRecordsAcrossArchiveAndRestore` | Archive then restore; Test row, Runs, chain steps, plan memberships, tags equal the baseline after each |
-| BK-2156 | TestsApi | `refuseBlankTitle` | 422 `validation_failed`, `details.reason` `title_required` at rename and at create (param: operation, blank class) |
+| BK-2156 | TestsApi | `refuseBlankTitle(target, title)` | 422 `validation_failed`, `details.reason` `title_required` at rename and at create (param: target kind, blank class); the rename target also re-reads the Test and asserts title and version unchanged |
 | BK-2161 | TestsApi | `refuseWriteOnArchivedTest` | 409 `test_archived` on rename, reorder and tags (param: writer) |
 | BK-2163 | TestsApi | `refuseWriteByViewer` | 403 `forbidden` for rename, archive, restore as a viewer (param: action) |
 | BK-2164 | TestsApi | `hideTestFromNonMember` | 404 identical to a missing Test, search returns an empty list (param: Test state) |
 | BK-2165 | TestsApi | `refuseStaleVersionRename` | 409 `version_conflict` naming `current_version` |
-| BK-2167 | TestsApi | `applyTitleLengthRule` | 200 or 201 within 200 characters (code points), 422 `title_too_long` above, at rename and create (param: operation, character, count) |
+| BK-2167 | TestsApi | `applyTitleLengthBoundaries(target, row, title)` | 200 or 201 within 200 characters (code points), 422 `title_too_long` above, at rename and create; the expected status, reason and code-point count come from the literal TC28 row table (`TITLE_LENGTH_ROWS`) |
 | BK-2171 | TestsApi | `archiveAgainKeepsFirstArchive` | 204, `archived_at` and `archived_by` unchanged |
 | BK-2172 | TestsApi | `restoreLiveTestChangesNothing` | 200, `test.changed` false, `archived_at` null, version unchanged |
 | BK-2178 | RunsApi | `holdRunReadsAfterArchive` | Runs report, workspace runs index and run comparison equal their baselines, every page |
@@ -176,10 +176,6 @@ static createTitleOfLength(args: { character: string, count: number }): string {
   return args.character.repeat(args.count);
 }
 
-static createTagName(): string {
-  return `kata-bk596-${faker.string.alphanumeric({ length: 8, casing: 'lower' })}`;
-}
-
 static createModuleName(): string {
   return `Kata module ${this.createTestId('bk596')}`;
 }
@@ -203,11 +199,8 @@ static createAtcPayload(args: { moduleId: string, userStoryId: string, acceptanc
 
 ```typescript
 export const TEST_LIFECYCLE = {
-  archiveReason: 'test_archived',
-  versionConflictReason: 'version_conflict',
   titleRequiredReason: 'title_required',
   titleTooLongReason: 'title_too_long',
-  maxTitleLength: 200,
   blankTitles: {
     empty: '',
     spaces: '   ',
@@ -218,12 +211,13 @@ export const TEST_LIFECYCLE = {
 } as const;
 
 export const TEST_LIFECYCLE_FIXTURE = {
-  qaWorkspaceName: 'QA Bunkai',
+  workspaceName: 'QA Kata BK-596',
+  workspaceSlug: 'qa-kata-bk596',
   projectNamePrefix: 'kata-bk596',
 } as const;
 ```
 
-`types.ts` gains `TestLifecycleArena` (`workspaceId`, `project: FixtureProject`, `environmentId`), `SeededTest` (`id`, `title`, `version`, `atcIds`, `runIds`, `tag`), `RunReadsBaseline`, `CreateAtcPayload`.
+`types.ts` gains `TestLifecycleArena` (`workspaceId`, `project: FixtureProject`), `SeededTest` (`id`, `title`, `version`, `atcIds`), `CreateAtcPayload`.
 
 ## 5. Test Scenarios
 
@@ -302,13 +296,13 @@ Fixture: `{ test: kata }` with Member storage state (UI half for the rename row 
 #### Scenario 1: BK-2156 blank titles (outline, 6 rows)
 Test: "BK-2156: should refuse a blank name with a required-name error (422) and keep the old name given an empty, space, tab or non-breaking-space-only title at rename and create"
 Preconditions: `seedTest({ atcs: 1 })` at known version; one live ATC.
-ATCs called: `member.api.tests.refuseBlankTitle({ operation, ... })`.
+ATCs called: `member.api.tests.refuseBlankTitle({ target, title })`.
 Test-level assertions: rename rows: title and version unchanged, no new `test.renamed` event, UI `expectRenameError` for one rename row; create rows: no new Test with that title in the workspace (`searchTests`).
 
 #### Scenario 2: BK-2167 length rule (outline, 8 rows)
 Test: "BK-2167: should accept 199 and 200 characters, also 200 multi-byte characters, and refuse 201 with a too-long error (422) at rename and create"
 Preconditions: `seedTest({ atcs: 1 })`; one live ATC.
-ATCs called: `member.api.tests.applyTitleLengthRule({ ... })`.
+ATCs called: `member.api.tests.applyTitleLengthBoundaries({ target, row, title })`, one test per `TITLE_LENGTH_ROWS` entry.
 Test-level assertions: accepted rename stores `[...title].length` equal to the count; refused rename leaves the title unchanged and no new `test.renamed` event; created Tests archived in `afterAll`; original title restored.
 
 #### Scenario 3: BK-2165 stale version
@@ -390,6 +384,14 @@ Preconditions: Test with a finished passed Run; open plan holding it, attached t
 ATCs called: `kata.ui.planFigures.expectFiguresUnchangedAfterArchive({ baseline })` after `archiveTest`.
 Test-level assertions: `listPlanTests` of both plans still lists the Test (no membership row added or removed).
 Teardown: `restoreTest`.
+
+### PR1 deviations (BK-2156 and BK-2167)
+
+- One ATC per TC id (the `kata:manifest:check` rule): `refuseBlankTitle(target, title)` owns BK-2156 and `applyTitleLengthBoundaries(target, row, title)` owns BK-2167. `target` is a rename-or-create discriminated input; the BK-2167 expectations come from the literal TC28 row table `TITLE_LENGTH_ROWS` in `tests/data/constants.ts`, never from a caller-chosen status.
+- Each test seeds its own Test (per-test seeding), so there is no end-of-run title restore; created Tests are archived in teardown, including any Test an attempted create may have produced even when the ATC threw.
+- "No Test created" on a refused create is proven by the 422 plus no new title-filtered `test.created` activity event, instead of `searchTests`, because a blank title is not searchable.
+- The arena is the Member-owned workspace "QA Kata BK-596" with project `kata-bk596`, created once by `TestLifecycleSteps` and reused.
+- The create-body, `environmentId`, tag and Run baseline items are not built in PR1; later slices add each with its consumer.
 
 ## 6. Implementation Order
 
