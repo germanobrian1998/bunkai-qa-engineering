@@ -77,11 +77,12 @@ export class ActivityApi extends ApiBase {
 
   @step
   async listTestEvents(
-    args: { workspaceId: string, action: ActivityItem['action'], testId?: string },
+    args: { workspaceId: string, action: ActivityItem['action'], testId?: string, title?: string },
   ): Promise<[APIResponse, ActivityItem[]]> {
     const [response, page] = await this.listActivity(args.workspaceId);
     const items = page.items.filter(item => item.action === args.action
-      && (args.testId === undefined || item.item.entity_id === args.testId));
+      && (args.testId === undefined || item.item.entity_id === args.testId)
+      && (args.title === undefined || (item.action === 'test.created' && item.payload.title === args.title)));
     return [response, items];
   }
 }
