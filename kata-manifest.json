@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-24T21:53:26.820Z",
+  "generatedAt": "2026-11-24T22:15:08.938Z",
   "components": {
     "api": [
       {
@@ -148,12 +148,12 @@
           {
             "id": "BK-2164",
             "method": "hideTestFromNonMember",
-            "line": 241
+            "line": 240
           },
           {
             "id": "BK-2165",
             "method": "refuseStaleVersionRename",
-            "line": 259
+            "line": 258
           },
           {
             "id": "BK-2167",

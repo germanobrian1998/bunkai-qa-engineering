@@ -216,7 +216,7 @@ test.describe('BK-596: Test write guards', () => {
             row,
           });
           const [, viewerPalette] = await viewer.search.searchPalette(seed.title);
-          expect(viewerPalette.data, 'the viewer palette lists a Test of a workspace the caller does not belong to: the palette ignores workspace scope or the archive filter').toEqual([]);
+          expect(viewerPalette.data, 'the palette searched a workspace the viewer cannot see').toEqual([]);
         },
       );
     }

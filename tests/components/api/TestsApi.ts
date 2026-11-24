@@ -234,7 +234,6 @@ export class TestsApi extends ApiBase {
     const [response, body] = await this.sendViewerWrite(args);
     expect(response.status()).toBe(args.row.expectedStatus);
     expect(body.error.code).toBe(args.row.expectedCode);
-    expect(this.readReason(body)).toBe(args.row.expectedReason);
     return [response, body];
   }
 

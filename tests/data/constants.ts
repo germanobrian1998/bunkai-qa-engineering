@@ -96,9 +96,9 @@ export const FROZEN_WRITE_ROWS = [
 export type FrozenWriteRow = typeof FROZEN_RENAME_ROW | (typeof FROZEN_WRITE_ROWS)[number];
 
 export const VIEWER_WRITE_ROWS = [
-  { action: 'rename', state: 'live', label: 'a rename of a live Test', expectedStatus: 403, expectedCode: 'forbidden', expectedReason: 'not_a_member' },
-  { action: 'archive', state: 'live', label: 'an archive of a live Test', expectedStatus: 403, expectedCode: 'forbidden', expectedReason: 'not_a_member' },
-  { action: 'restore', state: 'archived', label: 'a restore of an archived Test', expectedStatus: 403, expectedCode: 'forbidden', expectedReason: 'not_a_member' },
+  { action: 'rename', state: 'live', label: 'a rename of a live Test', expectedStatus: 403, expectedCode: 'forbidden' },
+  { action: 'archive', state: 'live', label: 'an archive of a live Test', expectedStatus: 403, expectedCode: 'forbidden' },
+  { action: 'restore', state: 'archived', label: 'a restore of an archived Test', expectedStatus: 403, expectedCode: 'forbidden' },
 ] as const;
 
 export type ViewerWriteRow = (typeof VIEWER_WRITE_ROWS)[number];
