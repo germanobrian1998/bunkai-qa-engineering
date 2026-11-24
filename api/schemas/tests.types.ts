@@ -31,3 +31,5 @@ export type CreateAcceptanceCriterionResponse = paths['/api/v1/user-stories/{id}
 export type CreateAtcResponse = paths['/api/v1/atcs']['post']['responses']['201']['content']['application/json'];
 
 export type SearchAtcsResponse = paths['/api/v1/atcs/search']['get']['responses']['200']['content']['application/json'];
+
+export type ListModuleTreeResponse = paths['/api/v1/projects/{id}/modules']['get']['responses']['200']['content']['application/json'];

@@ -1,5 +1,4 @@
 import type { CreateTarget, RenameTarget } from '@api/TestsApi';
-import type { SeededTest } from '@data/types';
 import type { TestLifecycleSession } from '@steps/TestLifecycleSteps';
 
 import { TEST_LIFECYCLE, TITLE_LENGTH_ROWS } from '@data/constants';
@@ -17,7 +16,6 @@ test.describe('BK-596: Test title validation', () => {
   let steps: TestLifecycleSteps;
   let seeds: TestSeedSteps;
   let member: TestLifecycleSession;
-  let seed: SeededTest;
 
   test.beforeAll(async ({ playwright }) => {
     steps = new TestLifecycleSteps({ playwright });
@@ -46,34 +44,30 @@ test.describe('BK-596: Test title validation', () => {
     }
   });
 
-  test.beforeEach(async () => {
-    seed = await seeds.seedTest({ api: member.api, arena: member.arena });
-  });
+  async function seedRenameTarget(): Promise<RenameTarget> {
+    const seed = await seeds.seedTest({ api: member.api, arena: member.arena });
+    return { kind: 'rename', testId: seed.id, seedTitle: seed.title, seedVersion: seed.version };
+  }
 
-  async function renamedIds(): Promise<string[]> {
+  async function renamedIds(testId: string): Promise<string[]> {
     const [, items] = await member.api.activity.listTestEvents({
       workspaceId: member.arena.workspaceId,
       action: 'test.renamed',
-      testId: seed.id,
+      testId,
     });
     return items.map(item => item.id);
   }
 
-  async function createdIds(title: string): Promise<string[]> {
+  async function createdIds(): Promise<string[]> {
     const [, items] = await member.api.activity.listTestEvents({
       workspaceId: member.arena.workspaceId,
       action: 'test.created',
-      title,
     });
     return items.map(item => item.id);
   }
 
   function newIds(args: { before: string[], after: string[] }): string[] {
     return args.after.filter(id => !args.before.includes(id));
-  }
-
-  function renameTarget(): RenameTarget {
-    return { kind: 'rename', testId: seed.id, seedTitle: seed.title, seedVersion: seed.version };
   }
 
   function createTarget(): CreateTarget {
@@ -98,11 +92,12 @@ test.describe('BK-596: Test title validation', () => {
         `BK-2156: should refuse a blank name with a required-name error (422) and keep the old name when a rename carries ${row.label}`,
         { tag: ['@high', '@regression'] },
         async () => {
-          const before = await renamedIds();
+          const target = await seedRenameTarget();
+          const before = await renamedIds(target.testId);
 
-          await member.api.tests.refuseBlankTitle({ target: renameTarget(), title: row.title });
+          await member.api.tests.refuseBlankTitle({ target, title: row.title });
 
-          expect(newIds({ before, after: await renamedIds() })).toEqual([]);
+          expect(newIds({ before, after: await renamedIds(target.testId) })).toEqual([]);
         },
       );
     }
@@ -117,11 +112,11 @@ test.describe('BK-596: Test title validation', () => {
         `BK-2156: should refuse a blank name with a required-name error (422) and create no Test when a create carries ${row.label}`,
         { tag: ['@high', '@regression'] },
         async () => {
-          const before = await createdIds(row.title);
+          const before = await createdIds();
 
           await member.api.tests.refuseBlankTitle({ target: createTarget(), title: row.title });
 
-          expect(newIds({ before, after: await createdIds(row.title) })).toEqual([]);
+          expect(newIds({ before, after: await createdIds() })).toEqual([]);
         },
       );
     }
@@ -130,14 +125,15 @@ test.describe('BK-596: Test title validation', () => {
       'BK-2156: should show the required-name message and send no rename request when a blank name is submitted in the rename form',
       { tag: ['@high', '@regression'] },
       async ({ test: kata }) => {
+        const target = await seedRenameTarget();
         await kata.ui.testDetail.goto({
           projectSlug: member.arena.project.slug,
-          testId: seed.id,
+          testId: target.testId,
           workspaceId: member.arena.workspaceId,
         });
 
         await kata.ui.testDetail.expectBlankRenameBlocked({
-          testId: seed.id,
+          testId: target.testId,
           message: TEST_LIFECYCLE.titleRequiredMessage,
         });
       },
@@ -152,14 +148,11 @@ test.describe('BK-596: Test title validation', () => {
         { tag: ['@high', '@regression'] },
         async () => {
           const title = DataFactory.createTitleOfLength(row);
-          const eventsOf = async (): Promise<string[]> => (row.endpoint === 'rename' ? renamedIds() : createdIds(title));
+          const target = row.endpoint === 'rename' ? await seedRenameTarget() : createTarget();
+          const eventsOf = async (): Promise<string[]> => (target.kind === 'rename' ? renamedIds(target.testId) : createdIds());
           const before = await eventsOf();
 
-          await member.api.tests.applyTitleLengthBoundaries({
-            target: row.endpoint === 'rename' ? renameTarget() : createTarget(),
-            row,
-            title,
-          });
+          await member.api.tests.applyTitleLengthBoundaries({ target, row, title });
 
           expect(newIds({ before, after: await eventsOf() })).toHaveLength(row.expectedStatus === 422 ? 0 : 1);
         },

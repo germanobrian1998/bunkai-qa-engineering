@@ -6,6 +6,7 @@ import type {
   CreateModuleResponse,
   CreateUserStoryBody,
   CreateUserStoryResponse,
+  ListModuleTreeResponse,
 } from '@schemas/tests.types';
 import type { TestContextOptions } from '@TestContext';
 
@@ -50,6 +51,12 @@ export class StructureApi extends ApiBase {
       { title: args.title },
     );
     expect(response.status()).toBe(201);
+    return [response, body];
+  }
+
+  @step
+  async listModuleTree(projectId: string): Promise<[APIResponse, ListModuleTreeResponse]> {
+    const [response, body] = await this.apiGET<ListModuleTreeResponse>(`/v1/projects/${projectId}/modules`);
     return [response, body];
   }
 }

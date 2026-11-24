@@ -25,6 +25,10 @@ function hasReason(details: unknown): details is { reason: string } {
   return typeof details === 'object' && details !== null && 'reason' in details && typeof details.reason === 'string';
 }
 
+function hasTest(body: unknown): body is CreateTestResponse {
+  return typeof body === 'object' && body !== null && 'test' in body;
+}
+
 export class TestsApi extends ApiBase {
   constructor(options: TestContextOptions) {
     super(options);
@@ -58,9 +62,8 @@ export class TestsApi extends ApiBase {
       { title, atc_ids: [target.atcId], workspace_id: target.workspaceId },
       { headers: { 'Idempotency-Key': randomUUID() } },
     );
-    const created = response.ok() ? (body as CreateTestResponse).test.id : null;
-    if (created !== null) {
-      target.onCreated(created);
+    if (response.ok() && hasTest(body)) {
+      target.onCreated(body.test.id);
     }
     return [response, body];
   }
@@ -131,6 +134,10 @@ export class TestsApi extends ApiBase {
       expect(this.readChanged(body)).toBe(row.expectedStatus === 422 ? null : true);
       expect(read.test.title).toBe(row.expectedStatus === 422 ? target.seedTitle : title);
       expect(read.test.version).toBe(row.expectedStatus === 422 ? target.seedVersion : target.seedVersion + 1);
+    }
+    else if (hasTest(body)) {
+      const [, read] = await this.getTest(body.test.id);
+      expect([...read.test.title]).toHaveLength(row.count);
     }
     return [response, body];
   }

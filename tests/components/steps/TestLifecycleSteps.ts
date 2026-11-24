@@ -48,7 +48,8 @@ export class TestLifecycleSteps extends TestContext {
 
   private async ensureMemberships(args: { owner: ApiFixture, workspaceId: string }): Promise<void> {
     const { owner, workspaceId } = args;
-    const [, roster] = await owner.workspace.listMembers(workspaceId);
+    const [rosterResponse, roster] = await owner.workspace.listMembers(workspaceId);
+    expect(rosterResponse.status(), `arena discovery: member roster of workspace ${workspaceId}`).toBe(200);
     for (const role of INVITED_ROLES) {
       const email = config.roleUser(role).email.toLowerCase();
       const entry = roster.members.find(member => member.email.toLowerCase() === email);
@@ -91,8 +92,33 @@ export class TestLifecycleSteps extends TestContext {
     return created;
   }
 
+  private async createCriterion(args: { owner: ApiFixture, userStoryId: string }): Promise<string> {
+    const [, body] = await args.owner.structure.createAcceptanceCriterion({
+      userStoryId: args.userStoryId,
+      title: TEST_LIFECYCLE_FIXTURE.criterionTitle,
+    });
+    return body.acceptance_criterion.id;
+  }
+
   private async ensureScaffoldAtc(args: { owner: ApiFixture, project: FixtureProject }): Promise<string> {
     const { owner, project } = args;
+    const [treeResponse, tree] = await owner.structure.listModuleTree(project.id);
+    expect(treeResponse.status(), 'arena discovery: module tree').toBe(200);
+
+    const foundModule = tree.modules.find(item => item.name === TEST_LIFECYCLE_FIXTURE.moduleName);
+    const moduleId = foundModule
+      ? foundModule.id
+      : (await owner.structure.createModule({ projectId: project.id, name: TEST_LIFECYCLE_FIXTURE.moduleName }))[1].module.id;
+
+    const foundStory = tree.user_stories.find(item => item.module_id === moduleId && item.title === TEST_LIFECYCLE_FIXTURE.storyTitle);
+    const storyId = foundStory
+      ? foundStory.id
+      : (await owner.structure.createUserStory({ moduleId, title: TEST_LIFECYCLE_FIXTURE.storyTitle }))[1].user_story.id;
+
+    const foundCriterion = tree.acceptance_criteria.find(item => item.user_story_id === storyId
+      && item.title === TEST_LIFECYCLE_FIXTURE.criterionTitle);
+    const criterionId = foundCriterion ? foundCriterion.id : await this.createCriterion({ owner, userStoryId: storyId });
+
     const title = TEST_LIFECYCLE_FIXTURE.atcTitle;
     const [searchResponse, found] = await owner.atcs.searchAtcs({ projectId: project.id, query: title });
     expect(searchResponse.status(), 'arena discovery: ATC search').toBe(200);
@@ -100,20 +126,11 @@ export class TestLifecycleSteps extends TestContext {
     if (existing) {
       return existing.id;
     }
-    const [, moduleBody] = await owner.structure.createModule({ projectId: project.id, name: TEST_LIFECYCLE_FIXTURE.moduleName });
-    const [, storyBody] = await owner.structure.createUserStory({
-      moduleId: moduleBody.module.id,
-      title: TEST_LIFECYCLE_FIXTURE.storyTitle,
-    });
-    const [, criterionBody] = await owner.structure.createAcceptanceCriterion({
-      userStoryId: storyBody.user_story.id,
-      title: TEST_LIFECYCLE_FIXTURE.criterionTitle,
-    });
     const [, atcBody] = await owner.atcs.createAtc(DataFactory.createAtcPayload({
       title,
-      moduleId: moduleBody.module.id,
-      userStoryId: storyBody.user_story.id,
-      acceptanceCriterionIds: [criterionBody.acceptance_criterion.id],
+      moduleId,
+      userStoryId: storyId,
+      acceptanceCriterionIds: [criterionId],
     }));
     return atcBody.atc.id;
   }
