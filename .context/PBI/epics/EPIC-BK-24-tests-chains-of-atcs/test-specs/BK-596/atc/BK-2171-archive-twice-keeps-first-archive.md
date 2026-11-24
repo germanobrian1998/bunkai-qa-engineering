@@ -13,17 +13,16 @@
 ## 2. ATC Contract
 ```typescript
 @atc('BK-2171')
-async archiveAgainKeepsFirstArchive(args: { testId: string, firstArchive: { archivedAt: string, archivedBy: string } }): Promise<[APIResponse, TestBody]> {
+async archiveAgainKeepsFirstArchive(args: { testId: string, firstArchive: FirstArchive }): Promise<[APIResponse, GetTestResponse]> {
   const [response] = await this.apiDELETE(`/v1/tests/${args.testId}`);
   expect(response.status()).toBe(204);
-  const [readResponse, body] = await this.getTest(args.testId);
-  expect(readResponse.status()).toBe(200);
-  expect(body.test.archived_at).toBe(args.firstArchive.archivedAt);
-  expect(body.test.archived_by).toBe(args.firstArchive.archivedBy);
-  return [readResponse, body];
+  const [readResponse, read] = await this.getTest(args.testId);
+  expect(read.test.archived_at).toBe(args.firstArchive.archivedAt);
+  expect(read.test.archived_by).toBe(args.firstArchive.archivedBy);
+  return [readResponse, read];
 }
 ```
-Called on the Admin's `ApiFixture`; the first archive was made by the Member (helper `archiveTest`).
+`FirstArchive` is `{ archivedAt: string, archivedBy: string }`, exported from `TestsApi.ts`. Called on the Admin's `ApiFixture`; the first archive was made by the Member through `TestSeedSteps.seedInState({ state: 'archived' })`, whose returned Test is the baseline.
 
 ## 3A. API Details
 `DELETE /api/v1/tests/{id}` documented idempotent (first actor and timestamp kept, no new event).
@@ -32,7 +31,7 @@ Called on the Admin's `ApiFixture`; the first archive was made by the Member (he
 ### Fixed (inside ATC)
 204; `archived_at` and `archived_by` equal the first archive (still the member).
 ### Test-level (in test file)
-Exactly one `test.archived` event for the Test (`ActivityApi.listNewTestEvents`); fixture restore in teardown.
+Preconditions that keep the test able to fail: `archived_by` of the seed equals the Member's `GET /me` id and the Admin's id differs, and the first archive wrote exactly one `test.archived` event. After the ATC the `test.archived` event ids for the Test (`ActivityApi.snapshotTestEvents`) equal the ids read before: a second event would add an id. Archive and restore events are in the activity feed allowlist (`test.renamed`, `test.archived`, `test.restored`), so "no second event" is observable.
 
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |
@@ -42,13 +41,13 @@ Exactly one `test.archived` event for the Test (`ActivityApi.listNewTestEvents`)
 Reduction: none.
 
 ## 7. Dependencies
-- QA-workspace arena with the Admin and Member sessions; `TestsApi.archiveTest` as the first archive
-- Components: TestsApi NEW
+- QA-workspace arena (`TestLifecycleSteps.openMemberArena`), Admin session (`openRoleSession({ role: 'admin' })`), `TestSeedSteps.seedInState({ state: 'archived' })` as the first archive by the Member
+- Components: TestsApi, ActivityApi
 
 ## 8. Data Context
 | Precondition | Pattern | Source | Placement | Cleanup |
 |--------------|---------|--------|-----------|---------|
-| Test archived by the Member | Generate | API | test | `restoreTest`, archive in `afterAll` |
+| Test archived by the Member | Generate | API | test | none: the Test ends archived; the shared teardown archives it again (idempotent). The TC's closing restore is dropped because the Test is generated, never a shared fixture |
 
 ## 9. Checklist
 - [ ] archiveAgainKeepsFirstArchive naming
@@ -56,3 +55,9 @@ Reduction: none.
 - [ ] Tuple return
 - [ ] Fixed vs test-level split
 - [ ] Not duplicating an existing ATC
+
+## 10. As built
+
+- Signature `archiveAgainKeepsFirstArchive({ testId, firstArchive })`, returns the read after the second archive. The ATC asserts 204, `archived_at` and `archived_by` equal to the first archive. It cannot tell the Member from the Admin by itself, so the test asserts the seed's `archived_by` is the Member's `GET /me` id and differs from the Admin's before the call.
+- The activity feed lists `test.archived`; the event check compares the full id list for the Test before and after (precondition: exactly one), so both a second event and a missing first event fail.
+- `getTest` asserts 200, so the ATC also proves the Test still resolves.

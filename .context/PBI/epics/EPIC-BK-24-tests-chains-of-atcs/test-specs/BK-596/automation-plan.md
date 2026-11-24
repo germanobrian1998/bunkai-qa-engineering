@@ -79,16 +79,16 @@ Reused non-ATC members by composition: `RunFixtureSteps.openMemberSession`, `Run
 | BK-2158 | RunsApi | `refuseRunFromArchivedTest` | `POST /runs` for an archived Test: 409, `details.reason` `test_archived` |
 | BK-2185 | AtcDetailPage | `expectUsageOfLiveTestsOnly` | ATC detail "used in" omits the archived sibling; count equals live chaining Tests (param: ATC live or archived) |
 | BK-2187 | TestDetailPage | `readRunCountInArchiveDialog` | Archive dialog counts finished Runs only, equals `run_count` and the Run history total, cancel keeps the Test live (param: Run mix) |
-| BK-2146 | TestsApi | `listTagFilterWithoutArchived` | `GET /tests?tag=` no longer lists the archived Test, total drops by one, remaining order unchanged |
-| BK-2153 | TestsApi | `keepRecordsAcrossArchiveAndRestore` | Archive then restore; Test row, Runs, chain steps, plan memberships, tags equal the baseline after each |
+| BK-2146 | TestsApi | `listTagFilterWithoutArchived({ row, tag, testId, baseline })` | `GET /tests?tag=` (all pages) no longer lists the archived Test, count drops by one, remaining order unchanged; remaining count from the literal `TAG_FILTER_ROWS` row |
+| BK-2153 | TestsApi | `keepRecordsAcrossArchiveAndRestore({ testId })` | Archive then restore; Test row, Run ids, chain step ids, plan ids and each plan's member ids, tags equal the baseline after each |
 | BK-2156 | TestsApi | `refuseBlankTitle(target, title)` | 422 `validation_failed`, `details.reason` `title_required` at rename and at create (param: target kind, blank class); the rename target also re-reads the Test and asserts title and version unchanged |
 | BK-2161 | TestsApi | `refuseWriteOnArchivedTest({ testId, row, stepIds })` | 409 `conflict` with `details.reason` `test_archived` on rename, reorder and tags; expectations come from `FROZEN_RENAME_ROW` and `FROZEN_WRITE_ROWS` |
 | BK-2163 | TestsApi | `refuseWriteByViewer({ testId, row })` | 403 `forbidden` (status and `error.code` only; the reason is BK-2091) for rename, archive, restore as a viewer; expectations come from the literal `VIEWER_WRITE_ROWS` table |
 | BK-2164 | TestsApi | `hideTestFromNonMember({ testId, title, projectId, row })` | 404 identical to a missing Test (request id ignored), search answers 200 with an empty list; expectations come from the literal `NON_MEMBER_ROWS` table |
 | BK-2165 | TestsApi | `refuseStaleVersionRename({ testId, staleVersion, currentVersion })` | 409 `conflict`, `details.reason` `version_conflict`, `current_version` = `currentVersion`, the live version read after the tag change |
 | BK-2167 | TestsApi | `applyTitleLengthBoundaries(target, row, title)` | 200 or 201 within 200 characters (code points), 422 `title_too_long` above, at rename and create; the expected status, reason and code-point count come from the literal TC28 row table (`TITLE_LENGTH_ROWS`) |
-| BK-2171 | TestsApi | `archiveAgainKeepsFirstArchive` | 204, `archived_at` and `archived_by` unchanged |
-| BK-2172 | TestsApi | `restoreLiveTestChangesNothing` | 200, `test.changed` false, `archived_at` null, version unchanged |
+| BK-2171 | TestsApi | `archiveAgainKeepsFirstArchive({ testId, firstArchive })` | 204, `archived_at` and `archived_by` unchanged |
+| BK-2172 | TestsApi | `restoreLiveTestChangesNothing({ testId, versionBefore })` | 200, `test.changed` false, `archived_at` null, version unchanged |
 | BK-2178 | RunsApi | `holdRunReadsAfterArchive` | Runs report, workspace runs index and run comparison equal their baselines, every page |
 | BK-2179 | PlanFiguresPage | `expectFiguresUnchangedAfterArchive` | Open plan figures, milestone readiness and closed plan frozen figures equal the baselines |
 
@@ -341,32 +341,32 @@ Fixture: `{ api }` is not used; Steps sessions (no browser)
 
 #### Scenario 1: BK-2171 second archive
 Test: "BK-2171: should answer 204 to a second archive and keep the first archive time and actor with no second event given an already archived Test"
-Preconditions: QA workspace Test archived by the Member; baseline `archived_at`, `archived_by`, event count.
-ATCs called: `admin.api.tests.archiveAgainKeepsFirstArchive({ testId, firstArchive })`.
-Test-level assertions: exactly one `test.archived` event for the Test.
+Preconditions: arena Test archived by the Member through `seedInState({ state: 'archived' })`; its read is the first archive; the Admin session; the `test.archived` event ids of the Test (exactly one).
+ATCs called: `admin.tests.archiveAgainKeepsFirstArchive({ testId, firstArchive })`.
+Test-level assertions: `archived_by` of the seed equals the Member's `GET /me` id and the Admin's id differs; the `test.archived` event ids equal the ids read before.
 
 #### Scenario 2: BK-2172 restore live
 Test: "BK-2172: should answer 200 with changed false and write no event when restoring a live Test"
-Preconditions: live Test.
-ATCs called: `member.api.tests.restoreLiveTestChangesNothing({ testId, versionBefore })`.
-Test-level assertions: no `test.restored` event.
+Preconditions: live Test from `seedInState({ state: 'live' })`; `test.restored` event ids.
+ATCs called: `member.tests.restoreLiveTestChangesNothing({ testId, versionBefore })`.
+Test-level assertions: no new `test.restored` event.
 
 #### Scenario 3: BK-2153 nothing destroyed
 Test: "BK-2153: should keep the Test row and every Run, step and plan membership unchanged across archive and restore"
-Preconditions: Test with 2 finished Runs, 2 chain steps, 3 plan memberships (`PlansApi.createPlan` x3, `addTests`).
-ATCs called: `member.api.tests.keepRecordsAcrossArchiveAndRestore({ testId })`.
-Test-level assertions: `GET /test-plans/{id}/tests` lists the Test for each plan after each action.
+Preconditions: `seedWithHistory({ chainLength: 2, tags, finishedRuns: 2, plans: 3 })`.
+ATCs called: `member.tests.keepRecordsAcrossArchiveAndRestore({ testId })`.
+Test-level assertions: seeded counts (2 steps, `run_count` 2, 3 plans, the tag) as preconditions; the restored Test keeps title, `run_count` and plan ids. The per-plan member ids are compared inside the ATC.
 
 ### File: tests/integration/test-lifecycle/hideArchivedTestFromOffers.test.ts
 
-Fixture: `{ test: kata }` with Member storage state (workbench tag filter UI half).
+Fixture: `{ test: kata }` with Member storage state (Tests list tag filter UI half).
 
 #### Scenario 1: BK-2146 tag filter (outline, 2 rows)
-Test: "BK-2146: should drop the archived Test from the tag filter and keep its three siblings in the same order"
-Preconditions: `seedSiblings({ count: 3, sharedTag })` plus a Test A carrying the shared tag and a unique tag; baseline `listByTag` for each tag (list and total).
-ATCs called: `member.api.tests.listTagFilterWithoutArchived({ tag, testId, baseline })`.
-Test-level assertions: workbench tag filter shows the same remaining rows (`test-tag-filter`).
-Teardown: Test A restored then archived with the rest in `afterAll`.
+Test: "BK-2146: should drop the archived Test from the tag filter and keep the others in the same order given <row.label>"
+Preconditions: 3 siblings carrying a generated shared tag; Test A carrying the shared tag and its own generated tag; baseline `listByTag` (ordered ids, all pages) for the row's tag; the baseline is asserted to be exactly Test A plus the siblings that carry the tag.
+ATCs called: `member.tests.listTagFilterWithoutArchived({ row, tag, testId, baseline })` after `archiveTest`.
+Test-level assertions: the project Tests list with the tag filter shows every baseline row before the archive and the remaining rows, none for Test A, after it (`TestsListPage`).
+Teardown: all Tests archived in `afterAll`; Test A is already archived.
 
 ### File: tests/integration/test-lifecycle/keepPastNumbersAfterArchive.test.ts
 
@@ -446,3 +446,12 @@ Dependency graph: WP1 -> WP2 -> WP3 -> WP4 -> {WP5 -> WP6} -> {WP7, WP8} -> {WP9
 - BK-2163 asserts status 403 and code `forbidden` only; `details.reason` is not asserted because `not_a_member` for a real viewer is open defect BK-2091.
 - `searchPalette` lives in the `SearchApi` component (`api.search`), not in `TestsApi`.
 - BK-2163 viewer page: it comes from a hand-made browser context, so the Playwright trace, video and screenshot settings do not apply to it and a viewer failure leaves no viewer-side artifacts.
+
+### PR3 deviations (BK-2171, BK-2172, BK-2153, BK-2146)
+
+- Signatures: BK-2146 takes `{ row, tag, testId, baseline }` (row from the literal `TAG_FILTER_ROWS`, `baseline` the ordered id list) and no longer archives inside the ATC; the archive is the test's stimulus, like BK-2178 and BK-2179. The list endpoint has no `total`, so the total is the id count over all pages (`listByTag`, limit 50 plus `next_cursor`), and "drops by one" is `after = baseline minus the Test`, which also pins the order.
+- BK-2171 and BK-2172 keep the plan's signatures. `FirstArchive` is exported from `TestsApi.ts`. Activity events for archive and restore are in the feed allowlist (`test.archived`, `test.restored`), so "no second event" and "no `test.restored` event" are asserted as observable deltas, unlike the reorder and tags events of PR2. The TC's closing restore of BK-2171 is dropped: the Test is generated and the shared teardown archives it again (idempotent).
+- BK-2153: the ATC owns the baseline and both reads. The plan-membership read is a private `TestsApi` method (`GET /test-plans/{id}/tests`) and the ATC compares each plan's member ids, so `PlansApi.listPlanTests` was not built. The Run read is the finished-Run history (all pages); the seeded Test has no running Run. Version is not part of the baseline because the TC expected results do not name it.
+- New supporting code used by BK-2153: `PlansApi` (`createPlan`, `addTests`, registered as `api.plans`), `RunsApi.startRun`, `markStep`, `finishRun`, `StructureApi.listEnvironments`, `createEnvironment` (arena environment `kata-bk596-env`, found or created by `TestSeedSteps`), `TestSeedSteps.seedWithHistory`, `TestsApi.restoreTest`, `listByTag`, `listRunHistory`. Member can create environments and plans (member+). Plans and environments have no archive route and stay in the arena project (3 plans per BK-2153 run).
+- BK-2146 UI half: a new `TestsListPage` (`testsList`) on the project Tests list, which hosts the same `test-tag-filter` as the workbench. It asserts `tests-list-row-{id}` and, when no row should remain, `tests-list-no-match`; the explorer Tests group has no stable locator and is not asserted. The `smoke` row is replaced by the generated solo tag (OQ4), so the second row ends with an empty list.
+- New files `hideArchivedTestFromOffers.test.ts` and `repeatArchiveRestore.test.ts` carry `@critical` (BK-2146, BK-2153), `@high` (BK-2171) and `@medium` (BK-2172) to match their TC priorities.

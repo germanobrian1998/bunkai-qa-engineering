@@ -13,26 +13,29 @@
 ## 2. ATC Contract
 ```typescript
 @atc('BK-2153')
-async keepRecordsAcrossArchiveAndRestore(args: { testId: string }): Promise<[APIResponse, TestBody]> {
+async keepRecordsAcrossArchiveAndRestore(args: { testId: string }): Promise<[APIResponse, GetTestResponse]> {
   const baseline = await this.captureRecords(args.testId);
-  expect((await this.archiveTest(args.testId))[0].status()).toBe(204);
-  expect(await this.captureRecords(args.testId)).toEqual({ ...baseline, archived: true });
-  const [response, body] = await this.restoreTest(args.testId);
-  expect(response.status()).toBe(200);
-  expect(await this.captureRecords(args.testId)).toEqual({ ...baseline, archived: false });
-  return [response, body as unknown as TestBody];
+  await this.archiveTest(args.testId);
+  const [, archived] = await this.getTest(args.testId);
+  expect(archived.test.archived_at).not.toBeNull();
+  expect(await this.captureRecords(args.testId)).toEqual(baseline);
+  const [response] = await this.restoreTest(args.testId);
+  const [, restored] = await this.getTest(args.testId);
+  expect(restored.test.archived_at).toBeNull();
+  expect(await this.captureRecords(args.testId)).toEqual(baseline);
+  return [response, restored];
 }
 ```
-`captureRecords` is a private helper returning `{ archived, runIds, stepIds, atcOrder, planIds, tags }` from `GET /tests/{id}` (200 proves the row exists) and `GET /tests/{id}/runs`. Runs still in progress are not in the history; the Test of this TC has finished Runs only.
+`captureRecords` is a private helper returning `{ runIds, stepIds, tags, planIds, planMemberIds }`: Run ids from `GET /tests/{id}/runs` (all pages, sorted), step ids in chain order and tags from `GET /tests/{id}`, plan ids from `plans[]` (sorted) and, per plan, the sorted member Test ids from `GET /test-plans/{id}/tests`. The ATC first asserts the baseline is not empty (Runs, steps, plans). Runs still in progress are not in the history; the Test of this TC has finished Runs only. The plan member read is a private `TestsApi` method because an ATC never reaches into another component.
 
 ## 3A. API Details
 `DELETE /tests/{id}`, `POST /tests/{id}/restore`, `GET /tests/{id}` (`atcs[].step_id`, `position`, `plans[]`, `tags`), `GET /tests/{id}/runs` (all pages).
 
 ## 4. Assertions Split
 ### Fixed (inside ATC)
-After each action the Test is readable; Run ids, step ids and chain order, plan ids and tags equal the baseline.
+After each action the Test is readable (archived after the first, live after the second); Run ids, step ids and chain order, tags, plan ids and each plan's member ids equal the baseline. Because the member ids are compared for every plan, "the plan still lists the Test" is inside the ATC.
 ### Test-level (in test file)
-`PlansApi.listPlanTests` of each of the 3 plans still lists the Test after each action.
+Preconditions read from the seeded Test: 2 chain steps, `run_count` 2, 3 plans, the tag. After the ATC the returned Test keeps title, `run_count` and plan ids.
 
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |
@@ -42,13 +45,13 @@ After each action the Test is readable; Run ids, step ids and chain order, plan 
 Reduction: none. Rollback of a failed archive is BK-2166, Deferred.
 
 ## 7. Dependencies
-- `TestSeedSteps.seedTest({ atcs: 2, finishedRuns: 2, plans: 3 })`
-- Components: TestsApi NEW, PlansApi NEW
+- `TestSeedSteps.seedWithHistory({ chainLength: 2, tags, finishedRuns: 2, plans: 3 })` (real path: start, mark every step passed, finish; plan create and add)
+- Components: TestsApi, RunsApi (`startRun`, `markStep`, `finishRun`), PlansApi (`createPlan`, `addTests`), StructureApi (`listEnvironments`, `createEnvironment`)
 
 ## 8. Data Context
 | Precondition | Pattern | Source | Placement | Cleanup |
 |--------------|---------|--------|-----------|---------|
-| Runs, steps, 3 plans | Generate | API | test | Test ends live; archived in `afterAll` |
+| Test with 2 finished Runs, 2 chain steps, a tag, 3 plans | Generate | API | test | Test ends live and is archived by the shared teardown. Plans have no archive route and stay open; the arena environment `kata-bk596-env` is found or created once |
 
 ## 9. Checklist
 - [ ] keepRecordsAcrossArchiveAndRestore naming
@@ -56,3 +59,9 @@ Reduction: none. Rollback of a failed archive is BK-2166, Deferred.
 - [ ] Tuple return
 - [ ] Fixed vs test-level split
 - [ ] Not duplicating an existing ATC
+
+## 10. As built
+
+- Signature as in §2. Version is not asserted: the TC expected results do not list it, and the baseline records only what the TC names (Runs, steps, memberships, tags, chain).
+- DB reads are replaced by product reads (plan §4.3). `PlansApi.listPlanTests` was not built: the per-plan member read lives in the ATC component as a private method.
+- The 3 plans are created per run with a generated name and cannot be archived; they stay in the arena project as residue.
