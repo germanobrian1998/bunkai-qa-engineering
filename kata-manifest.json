@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-24T15:03:01.045Z",
+  "generatedAt": "2026-11-24T15:20:05.135Z",
   "components": {
     "api": [
       {
@@ -127,32 +127,32 @@
           {
             "id": "BK-2156",
             "method": "refuseBlankTitle",
-            "line": 185
+            "line": 186
           },
           {
             "id": "BK-2161",
             "method": "refuseWriteOnArchivedTest",
-            "line": 228
+            "line": 229
           },
           {
             "id": "BK-2163",
             "method": "refuseWriteByViewer",
-            "line": 239
+            "line": 240
           },
           {
             "id": "BK-2164",
             "method": "hideTestFromNonMember",
-            "line": 247
+            "line": 248
           },
           {
             "id": "BK-2165",
             "method": "refuseStaleVersionRename",
-            "line": 265
+            "line": 269
           },
           {
             "id": "BK-2167",
             "method": "applyTitleLengthBoundaries",
-            "line": 201
+            "line": 202
           }
         ]
       },
@@ -327,6 +327,7 @@
       "file": "TestSeedSteps.ts",
       "relativePath": "tests/components/steps/TestSeedSteps.ts",
       "methods": [
+        "seedInState",
         "seedTest",
         "teardown"
       ]

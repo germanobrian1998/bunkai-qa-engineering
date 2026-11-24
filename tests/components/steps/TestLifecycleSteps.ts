@@ -3,7 +3,7 @@ import type { FixtureProject, TestLifecycleArena } from '@data/types';
 import type { APIRequestContext, Browser, BrowserContext, PlaywrightWorkerArgs } from '@playwright/test';
 import type { WorkspaceRole } from '@variables';
 import { ApiFixture } from '@ApiFixture';
-import { TEST_LIFECYCLE_FIXTURE, TEST_LIFECYCLE_FOREIGN_FIXTURE } from '@data/constants';
+import { ACTIVE_WORKSPACE_COOKIE, TEST_LIFECYCLE_FIXTURE, TEST_LIFECYCLE_FOREIGN_FIXTURE } from '@data/constants';
 import { DataFactory } from '@DataFactory';
 import { expect } from '@playwright/test';
 import { TestContext } from '@TestContext';
@@ -15,29 +15,56 @@ export interface TestLifecycleSession {
   arena: TestLifecycleArena
 }
 
+type StorageState = Awaited<ReturnType<APIRequestContext['storageState']>>;
+
 const INVITED_ROLES = ['member', 'viewer', 'admin'] as const;
 
 export class TestLifecycleSteps extends TestContext {
   private readonly playwright: PlaywrightWorkerArgs['playwright'];
   private readonly contexts: APIRequestContext[] = [];
   private readonly browserContexts: BrowserContext[] = [];
-  private readonly sessions = new Map<WorkspaceRole, ApiFixture>();
+  private readonly sessions = new Map<string, ApiFixture>();
 
   constructor(args: { playwright: PlaywrightWorkerArgs['playwright'] }) {
     super();
     this.playwright = args.playwright;
   }
 
-  private async openRole(role: WorkspaceRole): Promise<ApiFixture> {
-    const cached = this.sessions.get(role);
+  private async openRole(role: WorkspaceRole, workspaceId?: string): Promise<ApiFixture> {
+    const key = `${role}:${workspaceId ?? ''}`;
+    const cached = this.sessions.get(key);
     if (cached) {
       return cached;
     }
-    const request = await this.playwright.request.newContext({ storageState: config.auth.roleStatePath(role) });
+    const request = await this.playwright.request.newContext({
+      storageState: workspaceId ? await this.stateScopedTo({ role, workspaceId }) : config.auth.roleStatePath(role),
+    });
     this.contexts.push(request);
     const session = new ApiFixture({ request });
-    this.sessions.set(role, session);
+    this.sessions.set(key, session);
     return session;
+  }
+
+  private async stateScopedTo(args: { role: WorkspaceRole, workspaceId: string }): Promise<StorageState> {
+    const probe = await this.playwright.request.newContext({ storageState: config.auth.roleStatePath(args.role) });
+    try {
+      const state = await probe.storageState();
+      const cookies = state.cookies.filter(cookie => cookie.name !== ACTIVE_WORKSPACE_COOKIE);
+      cookies.push({
+        name: ACTIVE_WORKSPACE_COOKIE,
+        value: args.workspaceId,
+        domain: new URL(config.baseUrl).hostname,
+        path: '/',
+        expires: -1,
+        httpOnly: false,
+        secure: true,
+        sameSite: 'Lax',
+      });
+      return { cookies, origins: state.origins };
+    }
+    finally {
+      await probe.dispose();
+    }
   }
 
   private async ensureWorkspace(owner: ApiFixture): Promise<string> {
@@ -154,8 +181,8 @@ export class TestLifecycleSteps extends TestContext {
     return { api: member, arena: { workspaceId, project, atcId } };
   }
 
-  async openRoleSession(role: WorkspaceRole): Promise<ApiFixture> {
-    return this.openRole(role);
+  async openRoleSession(args: { role: WorkspaceRole, workspaceId?: string }): Promise<ApiFixture> {
+    return this.openRole(args.role, args.workspaceId);
   }
 
   async openRoleTestDetail(args: { browser: Browser, role: WorkspaceRole }): Promise<TestDetailPage> {
@@ -184,10 +211,11 @@ export class TestLifecycleSteps extends TestContext {
   }
 
   async openForeignArena(): Promise<TestLifecycleSession> {
-    const member = await this.openRole('member');
+    const plainMember = await this.openRole('member');
     const viewer = await this.openRole('viewer');
-    const workspaceId = await this.findForeignWorkspaceId(member);
+    const workspaceId = await this.findForeignWorkspaceId(plainMember);
     await this.expectNotMember({ api: viewer, workspaceId });
+    const member = await this.openRole('member', workspaceId);
     const project = await this.findProject({ api: member, workspaceId });
     if (!project) {
       throw new Error(`fixture broken: project ${TEST_LIFECYCLE_FIXTURE.projectName} not found in workspace ${workspaceId}`);

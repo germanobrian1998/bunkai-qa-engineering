@@ -5,6 +5,7 @@ import type {
   GetTestResponse,
   RenameTestRequest,
   RenameTestResponse,
+  SearchPageResponse,
   SearchTestsResponse,
   TestCreateBody,
   TestReorderBody,
@@ -162,10 +163,10 @@ export class TestsApi extends ApiBase {
   }
 
   @step
-  async restoreTest(testId: string): Promise<APIResponse> {
-    const [response] = await this.apiPOST<unknown, Record<string, never>>(`/v1/tests/${testId}/restore`, {});
+  async searchPalette(query: string): Promise<[APIResponse, SearchPageResponse]> {
+    const [response, body] = await this.apiGET<SearchPageResponse>('/v1/search', { params: { q: query } });
     expect(response.status()).toBe(200);
-    return response;
+    return [response, body];
   }
 
   @step
@@ -259,6 +260,9 @@ export class TestsApi extends ApiBase {
 
     const [, search] = await this.searchTests({ title: args.title, projectId: args.projectId });
     expect(search.items).toEqual([]);
+
+    const [, palette] = await this.searchPalette(args.title);
+    expect(palette.data.filter(item => item.id === args.testId)).toEqual([]);
     return [response, body];
   }
 

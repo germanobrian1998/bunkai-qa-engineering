@@ -15,6 +15,8 @@ export type TestTagsBody = components['schemas']['TestTagsBody'];
 
 export type SearchTestsResponse = paths['/api/v1/tests/search']['get']['responses']['200']['content']['application/json'];
 
+export type SearchPageResponse = components['schemas']['SearchPageResponse'];
+
 type CreateTestPath = paths['/api/v1/tests']['post'];
 
 export type CreateTestResponse = CreateTestPath['responses']['201']['content']['application/json'];

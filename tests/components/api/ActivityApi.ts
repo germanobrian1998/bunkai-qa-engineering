@@ -77,13 +77,21 @@ export class ActivityApi extends ApiBase {
   }
 
   @step
-  async listTestEvents(
-    args: { workspaceId: string, action: ActivityItem['action'], testId?: string },
-  ): Promise<[APIResponse, ActivityItem[]]> {
+  async snapshotTestEvents(
+    args: { workspaceId: string, actions: ActivityItem['action'][], testId?: string },
+  ): Promise<string[]> {
     const [response, page] = await this.listActivity(args.workspaceId);
-    expect(response.status(), `GET /v1/activity for ${args.action} events`).toBe(200);
-    const items = page.items.filter(item => item.action === args.action
-      && (args.testId === undefined || item.item.entity_id === args.testId));
-    return [response, items];
+    expect(response.status(), `GET /v1/activity for ${args.actions.join(', ')} events`).toBe(200);
+    return page.items
+      .filter(item => args.actions.includes(item.action) && (args.testId === undefined || item.item.entity_id === args.testId))
+      .map(item => item.id);
+  }
+
+  @step
+  async listNewTestEvents(
+    args: { workspaceId: string, actions: ActivityItem['action'][], testId?: string, knownIds: string[] },
+  ): Promise<string[]> {
+    const ids = await this.snapshotTestEvents(args);
+    return ids.filter(id => !args.knownIds.includes(id));
   }
 }

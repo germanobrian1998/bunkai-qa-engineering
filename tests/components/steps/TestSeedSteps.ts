@@ -28,6 +28,25 @@ export class TestSeedSteps extends TestContext {
     return { id: read.test.id, title: read.test.title, version: read.test.version };
   }
 
+  async seedInState(args: {
+    api: ApiFixture
+    arena: TestLifecycleArena
+    state: 'live' | 'archived'
+    chainLength?: number
+    tags?: string[]
+  }): Promise<SeededTest> {
+    const { api, arena, state, chainLength, tags } = args;
+    const seed = await this.seedTest({ api, arena, chainLength });
+    if (tags) {
+      await api.tests.setTags({ testId: seed.id, tags });
+    }
+    if (state === 'archived') {
+      await api.tests.archiveTest(seed.id);
+    }
+    const [, read] = await api.tests.getTest(seed.id);
+    return { id: read.test.id, title: read.test.title, version: read.test.version };
+  }
+
   adopt(args: { api: ApiFixture, testId: string }): void {
     this.created.push({ api: args.api, id: args.testId });
   }

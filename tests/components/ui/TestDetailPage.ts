@@ -11,17 +11,20 @@ export class TestDetailPage extends UiBase {
     super(options);
   }
 
-  @step
-  async goto(args: { projectSlug: string, testId: string, workspaceId: string }): Promise<void> {
+  private async navigate(args: { projectSlug: string, testId: string, workspaceId: string }): Promise<void> {
     await this.page.context().addCookies([{ name: ACTIVE_WORKSPACE_COOKIE, value: args.workspaceId, url: this.baseUrl }]);
     await this.page.goto(this.buildUrl(`/projects/${args.projectSlug}/tests/${args.testId}`));
+  }
+
+  @step
+  async goto(args: { projectSlug: string, testId: string, workspaceId: string }): Promise<void> {
+    await this.navigate(args);
     await expect(this.page.getByTestId('test-detail-rename')).toBeVisible();
   }
 
   @step
   async open(args: { projectSlug: string, testId: string, workspaceId: string }): Promise<void> {
-    await this.page.context().addCookies([{ name: ACTIVE_WORKSPACE_COOKIE, value: args.workspaceId, url: this.baseUrl }]);
-    await this.page.goto(this.buildUrl(`/projects/${args.projectSlug}/tests/${args.testId}`));
+    await this.navigate(args);
     await expect(this.page.getByTestId('test-tabs')).toBeVisible();
   }
 
@@ -32,6 +35,21 @@ export class TestDetailPage extends UiBase {
     await expect(this.page.getByTestId('test-tag-editor-open')).toHaveCount(0);
     await expect(this.page.getByTestId('test-reorder-bar')).toHaveCount(0);
     await expect(this.page.getByLabel(/^Drag to reorder ATC/)).toHaveCount(0);
+  }
+
+  @step
+  async expectEditControlsOffered(): Promise<void> {
+    await expect(this.page.getByTestId('test-detail-rename')).toBeVisible();
+    await expect(this.page.getByTestId('test-tag-editor-open')).toBeVisible();
+    await expect(this.page.getByLabel(/^Drag to reorder ATC/)).not.toHaveCount(0);
+  }
+
+  @step
+  async expectLifecycleControlOffered(state: 'live' | 'archived'): Promise<void> {
+    const testIds = state === 'live' ? ['test-detail-rename', 'test-detail-archive'] : ['test-detail-restore'];
+    for (const testId of testIds) {
+      await expect(this.page.getByTestId(testId)).toBeVisible();
+    }
   }
 
   @step
