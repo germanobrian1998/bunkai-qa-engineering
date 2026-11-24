@@ -5,7 +5,6 @@ import type {
   GetTestResponse,
   RenameTestRequest,
   RenameTestResponse,
-  SearchPageResponse,
   SearchTestsResponse,
   TestCreateBody,
   TestReorderBody,
@@ -163,13 +162,6 @@ export class TestsApi extends ApiBase {
   }
 
   @step
-  async searchPalette(query: string): Promise<[APIResponse, SearchPageResponse]> {
-    const [response, body] = await this.apiGET<SearchPageResponse>('/v1/search', { params: { q: query } });
-    expect(response.status()).toBe(200);
-    return [response, body];
-  }
-
-  @step
   async setTags(args: { testId: string, tags: string[] }): Promise<APIResponse> {
     const [response] = await this.apiPUT<unknown, TestTagsBody>(`/v1/tests/${args.testId}/tags`, { tags: args.tags });
     expect(response.status()).toBe(200);
@@ -259,10 +251,7 @@ export class TestsApi extends ApiBase {
     expect(this.withoutRequestId(body)).toEqual(this.withoutRequestId(missingBody));
 
     const [, search] = await this.searchTests({ title: args.title, projectId: args.projectId });
-    expect(search.items).toEqual([]);
-
-    const [, palette] = await this.searchPalette(args.title);
-    expect(palette.data.filter(item => item.id === args.testId)).toEqual([]);
+    expect(search.items, `project search proves membership: ${row.searchProvesMembership}`).toEqual([]);
     return [response, body];
   }
 

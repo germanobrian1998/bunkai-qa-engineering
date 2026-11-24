@@ -80,9 +80,9 @@ export const TEST_LIFECYCLE_FOREIGN_FIXTURE = {
 } as const;
 
 export const FROZEN_WRITE_ROWS = [
-  { kind: 'rename', label: 'a rename', expectedStatus: 409, expectedCode: 'conflict', expectedReason: TEST_LIFECYCLE.archivedReason },
-  { kind: 'reorder', label: 'a chain reorder', expectedStatus: 409, expectedCode: 'conflict', expectedReason: TEST_LIFECYCLE.archivedReason },
-  { kind: 'tags', label: 'a tag change', expectedStatus: 409, expectedCode: 'conflict', expectedReason: TEST_LIFECYCLE.archivedReason },
+  { kind: 'rename', label: 'a rename', expectedStatus: 409, expectedCode: 'conflict', expectedReason: TEST_LIFECYCLE.archivedReason, watchedActions: ['test.renamed'] },
+  { kind: 'reorder', label: 'a chain reorder', expectedStatus: 409, expectedCode: 'conflict', expectedReason: TEST_LIFECYCLE.archivedReason, watchedActions: [] },
+  { kind: 'tags', label: 'a tag change', expectedStatus: 409, expectedCode: 'conflict', expectedReason: TEST_LIFECYCLE.archivedReason, watchedActions: [] },
 ] as const;
 
 export type FrozenWriteRow = (typeof FROZEN_WRITE_ROWS)[number];
@@ -96,8 +96,8 @@ export const VIEWER_WRITE_ROWS = [
 export type ViewerWriteRow = (typeof VIEWER_WRITE_ROWS)[number];
 
 export const NON_MEMBER_ROWS = [
-  { state: 'live', label: 'a live Test', expectedStatus: 404, expectedCode: 'not_found' },
-  { state: 'archived', label: 'an archived Test', expectedStatus: 404, expectedCode: 'not_found' },
+  { state: 'live', label: 'a live Test', expectedStatus: 404, expectedCode: 'not_found', ownerFinds: true, searchProvesMembership: true },
+  { state: 'archived', label: 'an archived Test', expectedStatus: 404, expectedCode: 'not_found', ownerFinds: false, searchProvesMembership: false },
 ] as const;
 
 export type NonMemberRow = (typeof NON_MEMBER_ROWS)[number];

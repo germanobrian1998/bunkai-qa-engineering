@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-24T15:20:05.135Z",
+  "generatedAt": "2026-11-24T15:36:11.254Z",
   "components": {
     "api": [
       {
@@ -114,6 +114,12 @@
         ]
       },
       {
+        "name": "SearchApi",
+        "file": "SearchApi.ts",
+        "relativePath": "tests/components/api/SearchApi.ts",
+        "atcs": []
+      },
+      {
         "name": "StructureApi",
         "file": "StructureApi.ts",
         "relativePath": "tests/components/api/StructureApi.ts",
@@ -127,32 +133,32 @@
           {
             "id": "BK-2156",
             "method": "refuseBlankTitle",
-            "line": 186
+            "line": 178
           },
           {
             "id": "BK-2161",
             "method": "refuseWriteOnArchivedTest",
-            "line": 229
+            "line": 221
           },
           {
             "id": "BK-2163",
             "method": "refuseWriteByViewer",
-            "line": 240
+            "line": 232
           },
           {
             "id": "BK-2164",
             "method": "hideTestFromNonMember",
-            "line": 248
+            "line": 240
           },
           {
             "id": "BK-2165",
             "method": "refuseStaleVersionRename",
-            "line": 269
+            "line": 258
           },
           {
             "id": "BK-2167",
             "method": "applyTitleLengthBoundaries",
-            "line": 202
+            "line": 194
           }
         ]
       },
@@ -334,9 +340,9 @@
     }
   ],
   "summary": {
-    "totalComponents": 15,
+    "totalComponents": 16,
     "totalATCs": 31,
-    "apiComponents": 10,
+    "apiComponents": 11,
     "uiComponents": 5,
     "stepsModules": 5
   }

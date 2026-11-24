@@ -1,10 +1,17 @@
 import type { Request } from '@playwright/test';
 import type { TestContextOptions } from '@TestContext';
 
-import { ACTIVE_WORKSPACE_COOKIE } from '@data/constants';
 import { expect } from '@playwright/test';
 import { UiBase } from '@ui/UiBase';
+import { activeWorkspaceCookie } from '@utils/cookies';
 import { step } from '@utils/decorators';
+
+const REORDER_HANDLE = /^test-reorder-handle-/;
+
+const LIFECYCLE_CONTROLS = {
+  live: ['test-detail-rename', 'test-detail-archive'],
+  archived: ['test-detail-restore'],
+} as const;
 
 export class TestDetailPage extends UiBase {
   constructor(options: TestContextOptions) {
@@ -12,7 +19,7 @@ export class TestDetailPage extends UiBase {
   }
 
   private async navigate(args: { projectSlug: string, testId: string, workspaceId: string }): Promise<void> {
-    await this.page.context().addCookies([{ name: ACTIVE_WORKSPACE_COOKIE, value: args.workspaceId, url: this.baseUrl }]);
+    await this.page.context().addCookies([activeWorkspaceCookie({ workspaceId: args.workspaceId, hostUrl: this.baseUrl })]);
     await this.page.goto(this.buildUrl(`/projects/${args.projectSlug}/tests/${args.testId}`));
   }
 
@@ -33,31 +40,29 @@ export class TestDetailPage extends UiBase {
     await expect(this.page.getByTestId('test-archived-banner')).toBeVisible();
     await expect(this.page.getByTestId('test-detail-rename')).toHaveCount(0);
     await expect(this.page.getByTestId('test-tag-editor-open')).toHaveCount(0);
-    await expect(this.page.getByTestId('test-reorder-bar')).toHaveCount(0);
-    await expect(this.page.getByLabel(/^Drag to reorder ATC/)).toHaveCount(0);
+    await expect(this.page.getByTestId(REORDER_HANDLE)).toHaveCount(0);
   }
 
   @step
   async expectEditControlsOffered(): Promise<void> {
     await expect(this.page.getByTestId('test-detail-rename')).toBeVisible();
     await expect(this.page.getByTestId('test-tag-editor-open')).toBeVisible();
-    await expect(this.page.getByLabel(/^Drag to reorder ATC/)).not.toHaveCount(0);
+    await expect(this.page.getByTestId(REORDER_HANDLE)).not.toHaveCount(0);
   }
 
   @step
   async expectLifecycleControlOffered(state: 'live' | 'archived'): Promise<void> {
-    const testIds = state === 'live' ? ['test-detail-rename', 'test-detail-archive'] : ['test-detail-restore'];
-    for (const testId of testIds) {
+    for (const testId of LIFECYCLE_CONTROLS[state]) {
       await expect(this.page.getByTestId(testId)).toBeVisible();
     }
   }
 
   @step
-  async expectNoWriteControls(): Promise<void> {
+  async expectNoWriteControls(state: 'live' | 'archived'): Promise<void> {
     await expect(this.page.getByTestId('test-tabs')).toBeVisible();
-    await expect(this.page.getByTestId('test-detail-rename')).toHaveCount(0);
-    await expect(this.page.getByTestId('test-detail-archive')).toHaveCount(0);
-    await expect(this.page.getByTestId('test-detail-restore')).toHaveCount(0);
+    for (const testId of LIFECYCLE_CONTROLS[state]) {
+      await expect(this.page.getByTestId(testId)).toHaveCount(0);
+    }
   }
 
   @step

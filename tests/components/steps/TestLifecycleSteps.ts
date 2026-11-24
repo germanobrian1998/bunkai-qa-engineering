@@ -1,6 +1,6 @@
 import type { FixtureProject, TestLifecycleArena } from '@data/types';
 
-import type { APIRequestContext, Browser, BrowserContext, PlaywrightWorkerArgs } from '@playwright/test';
+import type { APIRequestContext, Browser, BrowserContext, PlaywrightWorkerArgs, TestInfo } from '@playwright/test';
 import type { WorkspaceRole } from '@variables';
 import { ApiFixture } from '@ApiFixture';
 import { ACTIVE_WORKSPACE_COOKIE, TEST_LIFECYCLE_FIXTURE, TEST_LIFECYCLE_FOREIGN_FIXTURE } from '@data/constants';
@@ -8,6 +8,7 @@ import { DataFactory } from '@DataFactory';
 import { expect } from '@playwright/test';
 import { TestContext } from '@TestContext';
 import { TestDetailPage } from '@ui/TestDetailPage';
+import { activeWorkspaceCookie } from '@utils/cookies';
 import { config } from '@variables';
 
 export interface TestLifecycleSession {
@@ -23,6 +24,7 @@ export class TestLifecycleSteps extends TestContext {
   private readonly playwright: PlaywrightWorkerArgs['playwright'];
   private readonly contexts: APIRequestContext[] = [];
   private readonly browserContexts: BrowserContext[] = [];
+  private readonly detailPages = new Map<string, TestDetailPage>();
   private readonly sessions = new Map<string, ApiFixture>();
 
   constructor(args: { playwright: PlaywrightWorkerArgs['playwright'] }) {
@@ -50,16 +52,7 @@ export class TestLifecycleSteps extends TestContext {
     try {
       const state = await probe.storageState();
       const cookies = state.cookies.filter(cookie => cookie.name !== ACTIVE_WORKSPACE_COOKIE);
-      cookies.push({
-        name: ACTIVE_WORKSPACE_COOKIE,
-        value: args.workspaceId,
-        domain: new URL(config.baseUrl).hostname,
-        path: '/',
-        expires: -1,
-        httpOnly: false,
-        secure: true,
-        sameSite: 'Lax',
-      });
+      cookies.push(activeWorkspaceCookie({ workspaceId: args.workspaceId, hostUrl: config.apiUrl }));
       return { cookies, origins: state.origins };
     }
     finally {
@@ -181,14 +174,20 @@ export class TestLifecycleSteps extends TestContext {
     return { api: member, arena: { workspaceId, project, atcId } };
   }
 
-  async openRoleSession(args: { role: WorkspaceRole, workspaceId?: string }): Promise<ApiFixture> {
-    return this.openRole(args.role, args.workspaceId);
+  async openRoleSession(args: { role: WorkspaceRole }): Promise<ApiFixture> {
+    return this.openRole(args.role);
   }
 
-  async openRoleTestDetail(args: { browser: Browser, role: WorkspaceRole }): Promise<TestDetailPage> {
-    const context = await args.browser.newContext({ storageState: config.auth.roleStatePath(args.role) });
+  async openRoleTestDetail(args: { browser: Browser, role: WorkspaceRole, use: TestInfo['project']['use'] }): Promise<TestDetailPage> {
+    const cached = this.detailPages.get(args.role);
+    if (cached) {
+      return cached;
+    }
+    const context = await args.browser.newContext({ ...args.use, storageState: config.auth.roleStatePath(args.role) });
     this.browserContexts.push(context);
-    return new TestDetailPage({ page: await context.newPage() });
+    const detail = new TestDetailPage({ page: await context.newPage() });
+    this.detailPages.set(args.role, detail);
+    return detail;
   }
 
   private async findForeignWorkspaceId(member: ApiFixture): Promise<string> {

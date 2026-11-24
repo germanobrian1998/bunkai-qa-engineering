@@ -37,6 +37,9 @@ export class TestSeedSteps extends TestContext {
   }): Promise<SeededTest> {
     const { api, arena, state, chainLength, tags } = args;
     const seed = await this.seedTest({ api, arena, chainLength });
+    if (!tags && state === 'live') {
+      return seed;
+    }
     if (tags) {
       await api.tests.setTags({ testId: seed.id, tags });
     }

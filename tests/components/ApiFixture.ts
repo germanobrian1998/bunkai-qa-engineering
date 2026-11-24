@@ -24,6 +24,7 @@ import { BugApi } from '@api/BugApi';
 import { DisplayNameApi } from '@api/DisplayNameApi';
 import { InviteApi } from '@api/InviteApi';
 import { RunsApi } from '@api/RunsApi';
+import { SearchApi } from '@api/SearchApi';
 import { StructureApi } from '@api/StructureApi';
 import { TestsApi } from '@api/TestsApi';
 import { WorkspaceApi } from '@api/WorkspaceApi';
@@ -59,6 +60,8 @@ export class ApiFixture extends ApiBase {
 
   readonly structure: StructureApi;
 
+  readonly search: SearchApi;
+
   constructor(options: TestContextOptions) {
     super(options);
 
@@ -73,6 +76,7 @@ export class ApiFixture extends ApiBase {
     this.tests = new TestsApi(options);
     this.atcs = new AtcsApi(options);
     this.structure = new StructureApi(options);
+    this.search = new SearchApi(options);
   }
 
   // ============================================
@@ -95,6 +99,7 @@ export class ApiFixture extends ApiBase {
     this.tests.setAuthToken(token);
     this.atcs.setAuthToken(token);
     this.structure.setAuthToken(token);
+    this.search.setAuthToken(token);
   }
 
   /**
@@ -112,5 +117,6 @@ export class ApiFixture extends ApiBase {
     this.tests.clearAuthToken();
     this.atcs.clearAuthToken();
     this.structure.clearAuthToken();
+    this.search.clearAuthToken();
   }
 }
