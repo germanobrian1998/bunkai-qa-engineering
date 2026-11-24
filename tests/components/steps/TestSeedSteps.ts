@@ -25,7 +25,7 @@ export class TestSeedSteps extends TestContext {
     });
     this.adopt({ api, testId: created.test.id });
     const [, read] = await api.tests.getTest(created.test.id);
-    return { id: read.test.id, title: read.test.title, version: read.test.version };
+    return read.test;
   }
 
   async seedInState(args: {
@@ -47,7 +47,7 @@ export class TestSeedSteps extends TestContext {
       await api.tests.archiveTest(seed.id);
     }
     const [, read] = await api.tests.getTest(seed.id);
-    return { id: read.test.id, title: read.test.title, version: read.test.version };
+    return read.test;
   }
 
   adopt(args: { api: ApiFixture, testId: string }): void {

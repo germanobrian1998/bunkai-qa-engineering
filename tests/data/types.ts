@@ -9,6 +9,7 @@
  */
 
 import type { RunReportItem } from '@schemas/runs.types';
+import type { GetTestResponse } from '@schemas/tests.types';
 
 // ============================================
 // Generic Types
@@ -70,8 +71,4 @@ export interface TestLifecycleArena {
   atcId: string
 }
 
-export interface SeededTest {
-  id: string
-  title: string
-  version: number
-}
+export type SeededTest = GetTestResponse['test'];

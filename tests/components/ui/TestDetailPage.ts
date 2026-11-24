@@ -1,6 +1,7 @@
 import type { Request } from '@playwright/test';
 import type { TestContextOptions } from '@TestContext';
 
+import { ACTIVE_WORKSPACE_COOKIE } from '@data/constants';
 import { expect } from '@playwright/test';
 import { UiBase } from '@ui/UiBase';
 import { activeWorkspaceCookie } from '@utils/cookies';
@@ -19,7 +20,7 @@ export class TestDetailPage extends UiBase {
   }
 
   private async navigate(args: { projectSlug: string, testId: string, workspaceId: string }): Promise<void> {
-    await this.page.context().addCookies([activeWorkspaceCookie({ workspaceId: args.workspaceId, hostUrl: this.baseUrl })]);
+    await this.page.context().addCookies([activeWorkspaceCookie({ name: ACTIVE_WORKSPACE_COOKIE, workspaceId: args.workspaceId, hostUrl: this.baseUrl })]);
     await this.page.goto(this.buildUrl(`/projects/${args.projectSlug}/tests/${args.testId}`));
   }
 

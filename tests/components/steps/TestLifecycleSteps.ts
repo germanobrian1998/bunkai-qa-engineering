@@ -2,6 +2,7 @@ import type { FixtureProject, TestLifecycleArena } from '@data/types';
 
 import type { APIRequestContext, Browser, BrowserContext, PlaywrightWorkerArgs, TestInfo } from '@playwright/test';
 import type { WorkspaceRole } from '@variables';
+import { readFile } from 'node:fs/promises';
 import { ApiFixture } from '@ApiFixture';
 import { ACTIVE_WORKSPACE_COOKIE, TEST_LIFECYCLE_FIXTURE, TEST_LIFECYCLE_FOREIGN_FIXTURE } from '@data/constants';
 import { DataFactory } from '@DataFactory';
@@ -17,6 +18,12 @@ export interface TestLifecycleSession {
 }
 
 type StorageState = Awaited<ReturnType<APIRequestContext['storageState']>>;
+
+function isStorageState(value: unknown): value is StorageState {
+  return typeof value === 'object' && value !== null
+    && 'cookies' in value && Array.isArray(value.cookies)
+    && 'origins' in value && Array.isArray(value.origins);
+}
 
 const INVITED_ROLES = ['member', 'viewer', 'admin'] as const;
 
@@ -48,16 +55,13 @@ export class TestLifecycleSteps extends TestContext {
   }
 
   private async stateScopedTo(args: { role: WorkspaceRole, workspaceId: string }): Promise<StorageState> {
-    const probe = await this.playwright.request.newContext({ storageState: config.auth.roleStatePath(args.role) });
-    try {
-      const state = await probe.storageState();
-      const cookies = state.cookies.filter(cookie => cookie.name !== ACTIVE_WORKSPACE_COOKIE);
-      cookies.push(activeWorkspaceCookie({ workspaceId: args.workspaceId, hostUrl: config.apiUrl }));
-      return { cookies, origins: state.origins };
+    const state: unknown = JSON.parse(await readFile(config.auth.roleStatePath(args.role), 'utf8'));
+    if (!isStorageState(state)) {
+      throw new Error(`fixture broken: the ${args.role} storage state is not a cookies and origins document`);
     }
-    finally {
-      await probe.dispose();
-    }
+    const cookies = state.cookies.filter(cookie => cookie.name !== ACTIVE_WORKSPACE_COOKIE);
+    cookies.push(activeWorkspaceCookie({ name: ACTIVE_WORKSPACE_COOKIE, workspaceId: args.workspaceId, hostUrl: config.apiUrl }));
+    return { cookies, origins: state.origins };
   }
 
   private async ensureWorkspace(owner: ApiFixture): Promise<string> {
@@ -185,7 +189,14 @@ export class TestLifecycleSteps extends TestContext {
     }
     const context = await args.browser.newContext({ ...args.use, storageState: config.auth.roleStatePath(args.role) });
     this.browserContexts.push(context);
-    const detail = new TestDetailPage({ page: await context.newPage() });
+    const page = await context.newPage();
+    if (args.use.actionTimeout !== undefined) {
+      page.setDefaultTimeout(args.use.actionTimeout);
+    }
+    if (args.use.navigationTimeout !== undefined) {
+      page.setDefaultNavigationTimeout(args.use.navigationTimeout);
+    }
+    const detail = new TestDetailPage({ page });
     this.detailPages.set(args.role, detail);
     return detail;
   }

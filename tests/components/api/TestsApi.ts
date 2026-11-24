@@ -251,7 +251,7 @@ export class TestsApi extends ApiBase {
     expect(this.withoutRequestId(body)).toEqual(this.withoutRequestId(missingBody));
 
     const [, search] = await this.searchTests({ title: args.title, projectId: args.projectId });
-    expect(search.items, `project search proves membership: ${row.searchProvesMembership}`).toEqual([]);
+    expect(search.items, 'the project search ignores the workspace scope: it listed a Test of a workspace the caller does not belong to').toEqual([]);
     return [response, body];
   }
 

@@ -1,8 +1,9 @@
 import type { ApiFixture } from '@ApiFixture';
+import type { SeededTest } from '@data/types';
 import type { ActivityItem } from '@schemas/workspace.types';
 import type { TestLifecycleSession } from '@steps/TestLifecycleSteps';
 
-import { FROZEN_WRITE_ROWS, NON_MEMBER_ROWS, TEST_LIFECYCLE, VIEWER_WRITE_ROWS } from '@data/constants';
+import { FROZEN_RENAME_ROW, FROZEN_WRITE_ROWS, NON_MEMBER_ROWS, TEST_LIFECYCLE, VIEWER_WRITE_ROWS } from '@data/constants';
 import { TestLifecycleSteps } from '@steps/TestLifecycleSteps';
 import { TestSeedSteps } from '@steps/TestSeedSteps';
 import { expect, test } from '@TestFixture';
@@ -66,36 +67,63 @@ test.describe('BK-596: Test write guards', () => {
   }
 
   test.describe('BK-2161: archived Test is frozen', () => {
+    async function seedArchivedChain(): Promise<SeededTest> {
+      const seed = await seeds.seedInState({
+        api: member.api,
+        arena: member.arena,
+        state: 'archived',
+        chainLength: 2,
+        tags: [...TEST_LIFECYCLE.seedTags],
+      });
+      expect(seed.atcs, 'precondition: the archived Test chains 2 steps').toHaveLength(2);
+      expect(seed.tags, 'precondition: the archived Test carries the seeded tags').toEqual([...TEST_LIFECYCLE.seedTags]);
+      return seed;
+    }
+
+    async function expectUntouched(args: { id: string, before: SeededTest }): Promise<void> {
+      const [, after] = await member.api.tests.getTest(args.id);
+      expect(after.test.version, 'a refused write must not raise the version').toBe(args.before.version);
+      expect(after.test.updated_at, 'a refused write must not touch updated_at').toBe(args.before.updated_at);
+      expect(after.test.title).toBe(args.before.title);
+      expect(after.test.atcs.map(atc => atc.step_id)).toEqual(args.before.atcs.map(atc => atc.step_id));
+      expect(after.test.tags).toEqual(args.before.tags);
+    }
+
+    test(
+      `BK-2161: should refuse ${FROZEN_RENAME_ROW.label} with a 409 archived error and keep the version, updated_at, title, chain, tags and activity given an archived Test`,
+      { tag: ['@critical', '@regression'] },
+      async () => {
+        const seed = await seedArchivedChain();
+        const eventsBefore = await eventIds({ session: member, testId: seed.id, actions: FROZEN_RENAME_ROW.watchedActions });
+
+        await member.api.tests.refuseWriteOnArchivedTest({
+          testId: seed.id,
+          row: FROZEN_RENAME_ROW,
+          stepIds: seed.atcs.map(atc => atc.step_id),
+        });
+
+        await expectUntouched({ id: seed.id, before: seed });
+        expect(
+          await newEventIds({ session: member, testId: seed.id, actions: FROZEN_RENAME_ROW.watchedActions, before: eventsBefore }),
+          'a refused rename must not emit test.renamed',
+        ).toEqual([]);
+      },
+    );
+
     for (const row of FROZEN_WRITE_ROWS) {
       test(
         `BK-2161: should refuse ${row.label} with a 409 archived error and keep the version, updated_at, title, chain and tags given an archived Test`,
         { tag: ['@critical', '@regression'] },
         async () => {
-          const seed = await seeds.seedInState({
-            api: member.api,
-            arena: member.arena,
-            state: 'archived',
-            chainLength: 2,
-            tags: [...TEST_LIFECYCLE.seedTags],
-          });
-          const [, before] = await member.api.tests.getTest(seed.id);
-          expect(before.test.atcs, 'precondition: the archived Test chains 2 steps').toHaveLength(2);
-          expect(before.test.tags, 'precondition: the archived Test carries the seeded tags').toEqual([...TEST_LIFECYCLE.seedTags]);
-          const eventsBefore = await eventIds({ session: member, testId: seed.id, actions: row.watchedActions });
+          const seed = await seedArchivedChain();
 
           await member.api.tests.refuseWriteOnArchivedTest({
             testId: seed.id,
             row,
-            stepIds: before.test.atcs.map(atc => atc.step_id),
+            stepIds: seed.atcs.map(atc => atc.step_id),
           });
 
-          const [, after] = await member.api.tests.getTest(seed.id);
-          expect(after.test.version).toBe(before.test.version);
-          expect(after.test.updated_at).toBe(before.test.updated_at);
-          expect(after.test.title).toBe(before.test.title);
-          expect(after.test.atcs.map(atc => atc.step_id)).toEqual(before.test.atcs.map(atc => atc.step_id));
-          expect(after.test.tags).toEqual(before.test.tags);
-          expect(await newEventIds({ session: member, testId: seed.id, actions: row.watchedActions, before: eventsBefore })).toEqual([]);
+          await expectUntouched({ id: seed.id, before: seed });
         },
       );
     }
@@ -128,7 +156,6 @@ test.describe('BK-596: Test write guards', () => {
         { tag: ['@critical', '@regression'] },
         async ({ browser, test: kata }, testInfo) => {
           const seed = await seeds.seedInState({ api: member.api, arena: member.arena, state: row.state });
-          const [, before] = await member.api.tests.getTest(seed.id);
           const eventsBefore = await eventIds({ session: member, testId: seed.id, actions: writeActions });
 
           await kata.ui.testDetail.open({
@@ -147,9 +174,9 @@ test.describe('BK-596: Test write guards', () => {
           await viewer.tests.refuseWriteByViewer({ testId: seed.id, row });
 
           const [, after] = await member.api.tests.getTest(seed.id);
-          expect(after.test.title).toBe(before.test.title);
-          expect(after.test.version).toBe(before.test.version);
-          expect(after.test.archived_at).toBe(before.test.archived_at);
+          expect(after.test.title).toBe(seed.title);
+          expect(after.test.version).toBe(seed.version);
+          expect(after.test.archived_at).toBe(seed.archived_at);
           expect(await newEventIds({ session: member, testId: seed.id, actions: writeActions, before: eventsBefore })).toEqual([]);
         },
       );
@@ -174,7 +201,7 @@ test.describe('BK-596: Test write guards', () => {
           const [, ownerSearch] = await foreign.api.tests.searchTests({ title: seed.title, projectId: foreign.arena.project.id });
           expect(
             ownerSearch.items.some(item => item.id === seed.id),
-            'the owner side search finds a live Test and hides an archived one',
+            'the owner side project search finds a live Test and hides an archived one',
           ).toBe(row.ownerFinds);
           const [, ownerPalette] = await foreign.api.search.searchPalette(seed.title);
           expect(
@@ -189,7 +216,7 @@ test.describe('BK-596: Test write guards', () => {
             row,
           });
           const [, viewerPalette] = await viewer.search.searchPalette(seed.title);
-          expect(viewerPalette.data, 'the palette is scoped server-side to the caller own workspaces').toEqual([]);
+          expect(viewerPalette.data, 'the viewer palette lists a Test of a workspace the caller does not belong to: the palette ignores workspace scope or the archive filter').toEqual([]);
         },
       );
     }
