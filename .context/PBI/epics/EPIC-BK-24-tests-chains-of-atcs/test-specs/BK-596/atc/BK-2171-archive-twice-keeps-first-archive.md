@@ -32,7 +32,7 @@ Called on the Admin's `ApiFixture`; the first archive was made by the Member (he
 ### Fixed (inside ATC)
 204; `archived_at` and `archived_by` equal the first archive (still the member).
 ### Test-level (in test file)
-Exactly one `test.archived` event for the Test (`ActivityApi.listTestEvents`); fixture restore in teardown.
+Exactly one `test.archived` event for the Test (`ActivityApi.listNewTestEvents`); fixture restore in teardown.
 
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |

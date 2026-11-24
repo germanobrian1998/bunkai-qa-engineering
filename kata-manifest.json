@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-24T14:41:20.379Z",
+  "generatedAt": "2026-11-24T22:15:08.938Z",
   "components": {
     "api": [
       {
@@ -114,6 +114,12 @@
         ]
       },
       {
+        "name": "SearchApi",
+        "file": "SearchApi.ts",
+        "relativePath": "tests/components/api/SearchApi.ts",
+        "atcs": []
+      },
+      {
         "name": "StructureApi",
         "file": "StructureApi.ts",
         "relativePath": "tests/components/api/StructureApi.ts",
@@ -127,12 +133,32 @@
           {
             "id": "BK-2156",
             "method": "refuseBlankTitle",
-            "line": 104
+            "line": 178
+          },
+          {
+            "id": "BK-2161",
+            "method": "refuseWriteOnArchivedTest",
+            "line": 221
+          },
+          {
+            "id": "BK-2163",
+            "method": "refuseWriteByViewer",
+            "line": 232
+          },
+          {
+            "id": "BK-2164",
+            "method": "hideTestFromNonMember",
+            "line": 240
+          },
+          {
+            "id": "BK-2165",
+            "method": "refuseStaleVersionRename",
+            "line": 258
           },
           {
             "id": "BK-2167",
             "method": "applyTitleLengthBoundaries",
-            "line": 120
+            "line": 194
           }
         ]
       },
@@ -295,7 +321,10 @@
       "file": "TestLifecycleSteps.ts",
       "relativePath": "tests/components/steps/TestLifecycleSteps.ts",
       "methods": [
+        "openForeignArena",
         "openMemberArena",
+        "openRoleSession",
+        "openRoleTestDetail",
         "release"
       ]
     },
@@ -304,15 +333,16 @@
       "file": "TestSeedSteps.ts",
       "relativePath": "tests/components/steps/TestSeedSteps.ts",
       "methods": [
+        "seedInState",
         "seedTest",
         "teardown"
       ]
     }
   ],
   "summary": {
-    "totalComponents": 15,
-    "totalATCs": 27,
-    "apiComponents": 10,
+    "totalComponents": 16,
+    "totalATCs": 31,
+    "apiComponents": 11,
     "uiComponents": 5,
     "stepsModules": 5
   }

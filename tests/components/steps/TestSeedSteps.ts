@@ -16,16 +16,38 @@ export class TestSeedSteps extends TestContext {
     super();
   }
 
-  async seedTest(args: { api: ApiFixture, arena: TestLifecycleArena }): Promise<SeededTest> {
-    const { api, arena } = args;
+  async seedTest(args: { api: ApiFixture, arena: TestLifecycleArena, chainLength?: number }): Promise<SeededTest> {
+    const { api, arena, chainLength = 1 } = args;
     const [, created] = await api.tests.createTest({
       title: DataFactory.createTestTitle(),
-      atcIds: [arena.atcId],
+      atcIds: Array.from({ length: chainLength }).map(() => arena.atcId),
       workspaceId: arena.workspaceId,
     });
     this.adopt({ api, testId: created.test.id });
     const [, read] = await api.tests.getTest(created.test.id);
-    return { id: read.test.id, title: read.test.title, version: read.test.version };
+    return read.test;
+  }
+
+  async seedInState(args: {
+    api: ApiFixture
+    arena: TestLifecycleArena
+    state: 'live' | 'archived'
+    chainLength?: number
+    tags?: string[]
+  }): Promise<SeededTest> {
+    const { api, arena, state, chainLength, tags } = args;
+    const seed = await this.seedTest({ api, arena, chainLength });
+    if (!tags && state === 'live') {
+      return seed;
+    }
+    if (tags) {
+      await api.tests.setTags({ testId: seed.id, tags });
+    }
+    if (state === 'archived') {
+      await api.tests.archiveTest(seed.id);
+    }
+    const [, read] = await api.tests.getTest(seed.id);
+    return read.test;
   }
 
   adopt(args: { api: ApiFixture, testId: string }): void {

@@ -1,12 +1,15 @@
 import type { FixtureProject, TestLifecycleArena } from '@data/types';
 
-import type { APIRequestContext, PlaywrightWorkerArgs } from '@playwright/test';
+import type { APIRequestContext, Browser, BrowserContext, PlaywrightWorkerArgs, TestInfo } from '@playwright/test';
 import type { WorkspaceRole } from '@variables';
+import { readFile } from 'node:fs/promises';
 import { ApiFixture } from '@ApiFixture';
-import { TEST_LIFECYCLE_FIXTURE } from '@data/constants';
+import { ACTIVE_WORKSPACE_COOKIE, TEST_LIFECYCLE_FIXTURE, TEST_LIFECYCLE_FOREIGN_FIXTURE } from '@data/constants';
 import { DataFactory } from '@DataFactory';
 import { expect } from '@playwright/test';
 import { TestContext } from '@TestContext';
+import { TestDetailPage } from '@ui/TestDetailPage';
+import { activeWorkspaceCookie } from '@utils/cookies';
 import { config } from '@variables';
 
 export interface TestLifecycleSession {
@@ -14,21 +17,51 @@ export interface TestLifecycleSession {
   arena: TestLifecycleArena
 }
 
+type StorageState = Awaited<ReturnType<APIRequestContext['storageState']>>;
+
+function isStorageState(value: unknown): value is StorageState {
+  return typeof value === 'object' && value !== null
+    && 'cookies' in value && Array.isArray(value.cookies)
+    && 'origins' in value && Array.isArray(value.origins);
+}
+
 const INVITED_ROLES = ['member', 'viewer', 'admin'] as const;
 
 export class TestLifecycleSteps extends TestContext {
   private readonly playwright: PlaywrightWorkerArgs['playwright'];
   private readonly contexts: APIRequestContext[] = [];
+  private readonly browserContexts: BrowserContext[] = [];
+  private readonly detailPages = new Map<string, TestDetailPage>();
+  private readonly sessions = new Map<string, ApiFixture>();
 
   constructor(args: { playwright: PlaywrightWorkerArgs['playwright'] }) {
     super();
     this.playwright = args.playwright;
   }
 
-  private async openRole(role: WorkspaceRole): Promise<ApiFixture> {
-    const request = await this.playwright.request.newContext({ storageState: config.auth.roleStatePath(role) });
+  private async openRole(role: WorkspaceRole, workspaceId?: string): Promise<ApiFixture> {
+    const key = `${role}:${workspaceId ?? ''}`;
+    const cached = this.sessions.get(key);
+    if (cached) {
+      return cached;
+    }
+    const request = await this.playwright.request.newContext({
+      storageState: workspaceId ? await this.stateScopedTo({ role, workspaceId }) : config.auth.roleStatePath(role),
+    });
     this.contexts.push(request);
-    return new ApiFixture({ request });
+    const session = new ApiFixture({ request });
+    this.sessions.set(key, session);
+    return session;
+  }
+
+  private async stateScopedTo(args: { role: WorkspaceRole, workspaceId: string }): Promise<StorageState> {
+    const state: unknown = JSON.parse(await readFile(config.auth.roleStatePath(args.role), 'utf8'));
+    if (!isStorageState(state)) {
+      throw new Error(`fixture broken: the ${args.role} storage state is not a cookies and origins document`);
+    }
+    const cookies = state.cookies.filter(cookie => cookie.name !== ACTIVE_WORKSPACE_COOKIE);
+    cookies.push(activeWorkspaceCookie({ name: ACTIVE_WORKSPACE_COOKIE, workspaceId: args.workspaceId, hostUrl: config.apiUrl }));
+    return { cookies, origins: state.origins };
   }
 
   private async ensureWorkspace(owner: ApiFixture): Promise<string> {
@@ -145,8 +178,72 @@ export class TestLifecycleSteps extends TestContext {
     return { api: member, arena: { workspaceId, project, atcId } };
   }
 
+  async openRoleSession(args: { role: WorkspaceRole }): Promise<ApiFixture> {
+    return this.openRole(args.role);
+  }
+
+  async openRoleTestDetail(args: { browser: Browser, role: WorkspaceRole, use: TestInfo['project']['use'] }): Promise<TestDetailPage> {
+    const cached = this.detailPages.get(args.role);
+    if (cached) {
+      return cached;
+    }
+    const context = await args.browser.newContext({ ...args.use, storageState: config.auth.roleStatePath(args.role) });
+    this.browserContexts.push(context);
+    const page = await context.newPage();
+    if (args.use.actionTimeout !== undefined) {
+      page.setDefaultTimeout(args.use.actionTimeout);
+    }
+    if (args.use.navigationTimeout !== undefined) {
+      page.setDefaultNavigationTimeout(args.use.navigationTimeout);
+    }
+    const detail = new TestDetailPage({ page });
+    this.detailPages.set(args.role, detail);
+    return detail;
+  }
+
+  private async findForeignWorkspaceId(member: ApiFixture): Promise<string> {
+    const [meResponse, me] = await member.auth.getCurrentUser();
+    expect(meResponse.status(), 'foreign arena discovery: GET /me as member').toBe(200);
+    const found = me.workspaces.find(workspace => workspace.name === TEST_LIFECYCLE_FOREIGN_FIXTURE.workspaceName
+      && workspace.owner_user_id === me.user.id);
+    if (!found) {
+      throw new Error(`fixture broken: member-owned workspace "${TEST_LIFECYCLE_FOREIGN_FIXTURE.workspaceName}" not found`);
+    }
+    return found.id;
+  }
+
+  private async expectNotMember(args: { api: ApiFixture, workspaceId: string }): Promise<void> {
+    const [meResponse, me] = await args.api.auth.getCurrentUser();
+    expect(meResponse.status(), 'foreign arena discovery: GET /me as non-member').toBe(200);
+    if (me.workspaces.some(workspace => workspace.id === args.workspaceId)) {
+      throw new Error(`fixture broken: the non-member user belongs to workspace ${args.workspaceId}`);
+    }
+  }
+
+  async openForeignArena(): Promise<TestLifecycleSession> {
+    const plainMember = await this.openRole('member');
+    const viewer = await this.openRole('viewer');
+    const workspaceId = await this.findForeignWorkspaceId(plainMember);
+    await this.expectNotMember({ api: viewer, workspaceId });
+    const member = await this.openRole('member', workspaceId);
+    const project = await this.findProject({ api: member, workspaceId });
+    if (!project) {
+      throw new Error(`fixture broken: project ${TEST_LIFECYCLE_FIXTURE.projectName} not found in workspace ${workspaceId}`);
+    }
+    const atcId = await this.ensureScaffoldAtc({ owner: member, project });
+    return { api: member, arena: { workspaceId, project, atcId } };
+  }
+
   async release(): Promise<void> {
     const errors: unknown[] = [];
+    for (const context of this.browserContexts) {
+      try {
+        await context.close();
+      }
+      catch (error) {
+        errors.push(error);
+      }
+    }
     for (const context of this.contexts) {
       try {
         await context.dispose();

@@ -34,7 +34,7 @@ Page: Test detail (`/projects/{slug}/tests/{testId}`), workspace set through the
 ### Fixed (inside ATC)
 PATCH answers 200, `changed` true, `test.title` equals the new title, header shows the new title.
 ### Test-level (in test file)
-Version equals the baseline plus 1 (`TestsApi.getTest`); chain order, `step_id`s, ATC ids and tags equal the baseline; Tests list, explorer and workspace search show the new title (`OfferSurfaceSteps`); one new `test.renamed` event with old and new name (`ActivityApi.listTestEvents`); rename back in teardown.
+Version equals the baseline plus 1 (`TestsApi.getTest`); chain order, `step_id`s, ATC ids and tags equal the baseline; Tests list, explorer and workspace search show the new title (`OfferSurfaceSteps`); one new `test.renamed` event with old and new name (`ActivityApi.listNewTestEvents`); rename back in teardown.
 
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |

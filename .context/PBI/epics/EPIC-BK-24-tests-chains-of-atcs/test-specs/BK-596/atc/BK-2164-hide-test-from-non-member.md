@@ -34,9 +34,9 @@ The status of the search for a foreign project is not stated in the TC (empty `i
 
 ## 4. Assertions Split
 ### Fixed (inside ATC)
-404 equal to a missing Test (ignoring `request_id`); search returns an empty list.
+404 equal to a missing Test (ignoring `request_id`), which is the membership proof for both rows; the project search returns an empty list.
 ### Test-level (in test file)
-The palette returns nothing for the title in the Viewer's browser context (UI helper; locator to discover); live and archived rows behave the same; the Member restores the Test archived for the row.
+The viewer palette (`SearchApi.searchPalette`) answers an empty list. The palette is scoped server-side to the caller's own workspaces, so a non-member cannot reach the foreign Test; this is not a membership check. Owner-side controls read `row.ownerFinds` (the member finds the live Test through the Test search and the palette, and not the archived one); live and archived rows behave the same; the Test ends archived (no restore in teardown).
 
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |
@@ -54,7 +54,7 @@ The palette returns nothing for the title in the Viewer's browser context (UI he
 ## 8. Data Context
 | Precondition | Pattern | Source | Placement | Cleanup |
 |--------------|---------|--------|-----------|---------|
-| Foreign workspace, project, Test | Discover workspace and project, Generate Test | Member `GET /me`, `GET /workspaces/{id}/projects`, `POST /tests` | `beforeAll` and test | restore when archived, archive in `afterAll` |
+| Foreign workspace, project, Test | Discover workspace and project, Generate Test | Member `GET /me`, `GET /workspaces/{id}/projects`, `POST /tests` | `beforeAll` and test | archive in `afterAll` |
 
 ## 9. Checklist
 - [ ] hideTestFromNonMember naming
@@ -62,3 +62,13 @@ The palette returns nothing for the title in the Viewer's browser context (UI he
 - [ ] Tuple return
 - [ ] Fixed vs test-level split
 - [ ] Not duplicating an existing ATC
+
+## 10. As built
+
+- Signature `hideTestFromNonMember({ testId, title, projectId, row })`, `row` from `NON_MEMBER_ROWS` (state, expectedStatus 404, expectedCode `not_found`). The search answers 200 with an empty list; the owner-side search is the positive control.
+- Arena: `TestLifecycleSteps.openForeignArena` (find-only workspace and project, viewer non-membership verified). The palette data source is asserted in the test (see below); the palette UI rendering is not (no stable test id).
+- The command palette calls `GET /api/v1/search?q=`. The product honours the `bk_active_ws` cookie only for a workspace the caller can see and otherwise falls back to the caller's oldest workspace, so the viewer never searches the foreign workspace and a forged cookie is ignored. `NON_MEMBER_ROWS` declares `ownerFinds`. Membership proof is the 404 parity with a missing Test; the project search and palette asserts only catch a scope or archive-filter failure (on the archived row every search is empty regardless of scope). Only the owner-side session is scoped with the cookie, built by `activeWorkspaceCookie`.
+
+### Open follow-up
+
+Assert the rendered palette in the viewer's browser (type the title, expect no row); needs a `/playwright-cli` discovery of the palette locators.

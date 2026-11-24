@@ -47,7 +47,7 @@ BVA: N/A (the zero-Run state is TC31, Deferred). Reduction: none.
 
 ## 7. Dependencies
 - `TestSeedSteps.seedTest({ atcs: 2, finishedRuns: 2 })`
-- Components: TestDetailPage NEW, ActivityApi `listTestEvents` NEW helper
+- Components: TestDetailPage NEW, ActivityApi `listNewTestEvents` NEW helper
 
 ## 8. Data Context
 | Precondition | Pattern | Source | Placement | Cleanup |

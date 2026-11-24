@@ -50,24 +50,28 @@ test.describe('BK-596: Test title validation', () => {
   }
 
   async function renamedIds(testId: string): Promise<string[]> {
-    const [, items] = await member.api.activity.listTestEvents({
+    return member.api.activity.snapshotTestEvents({ workspaceId: member.arena.workspaceId, actions: ['test.renamed'], testId });
+  }
+
+  async function newRenamedIds(args: { testId: string, before: string[] }): Promise<string[]> {
+    return member.api.activity.listNewTestEvents({
       workspaceId: member.arena.workspaceId,
-      action: 'test.renamed',
-      testId,
+      actions: ['test.renamed'],
+      testId: args.testId,
+      knownIds: args.before,
     });
-    return items.map(item => item.id);
   }
 
   async function createdIds(): Promise<string[]> {
-    const [, items] = await member.api.activity.listTestEvents({
-      workspaceId: member.arena.workspaceId,
-      action: 'test.created',
-    });
-    return items.map(item => item.id);
+    return member.api.activity.snapshotTestEvents({ workspaceId: member.arena.workspaceId, actions: ['test.created'] });
   }
 
-  function newIds(args: { before: string[], after: string[] }): string[] {
-    return args.after.filter(id => !args.before.includes(id));
+  async function newCreatedIds(before: string[]): Promise<string[]> {
+    return member.api.activity.listNewTestEvents({
+      workspaceId: member.arena.workspaceId,
+      actions: ['test.created'],
+      knownIds: before,
+    });
   }
 
   function createTarget(): CreateTarget {
@@ -97,7 +101,7 @@ test.describe('BK-596: Test title validation', () => {
 
           await member.api.tests.refuseBlankTitle({ target, title: row.title });
 
-          expect(newIds({ before, after: await renamedIds(target.testId) })).toEqual([]);
+          expect(await newRenamedIds({ testId: target.testId, before })).toEqual([]);
         },
       );
     }
@@ -116,7 +120,7 @@ test.describe('BK-596: Test title validation', () => {
 
           await member.api.tests.refuseBlankTitle({ target: createTarget(), title: row.title });
 
-          expect(newIds({ before, after: await createdIds() })).toEqual([]);
+          expect(await newCreatedIds(before)).toEqual([]);
         },
       );
     }
@@ -149,12 +153,12 @@ test.describe('BK-596: Test title validation', () => {
         async () => {
           const title = DataFactory.createTitleOfLength(row);
           const target = row.endpoint === 'rename' ? await seedRenameTarget() : createTarget();
-          const eventsOf = async (): Promise<string[]> => (target.kind === 'rename' ? renamedIds(target.testId) : createdIds());
-          const before = await eventsOf();
+          const before = await (target.kind === 'rename' ? renamedIds(target.testId) : createdIds());
 
           await member.api.tests.applyTitleLengthBoundaries({ target, row, title });
 
-          expect(newIds({ before, after: await eventsOf() })).toHaveLength(row.expectedStatus === 422 ? 0 : 1);
+          const added = await (target.kind === 'rename' ? newRenamedIds({ testId: target.testId, before }) : newCreatedIds(before));
+          expect(added).toHaveLength(row.expectedStatus === 422 ? 0 : 1);
         },
       );
     }

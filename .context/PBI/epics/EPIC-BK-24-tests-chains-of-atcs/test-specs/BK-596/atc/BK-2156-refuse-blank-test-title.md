@@ -51,7 +51,7 @@ BVA: lower boundary 0 is the empty row; the 1-character accept edge has no signe
 
 ## 7. Dependencies
 - `TestSeedSteps.seedTest({ atcs: 1 })` per test, one live ATC from `AtcsApi`
-- Components: TestsApi NEW, ActivityApi `listTestEvents`
+- Components: TestsApi NEW, ActivityApi `listNewTestEvents`
 
 ## 8. Data Context
 | Precondition | Pattern | Source | Placement | Cleanup |
