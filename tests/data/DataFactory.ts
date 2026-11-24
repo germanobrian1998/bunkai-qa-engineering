@@ -10,6 +10,7 @@
  */
 
 import type { TestCredentials, TestUser, TestWorkspace } from '@data/types';
+import type { CreateAtcRequest } from '@schemas/tests.types';
 
 import { faker } from '@faker-js/faker';
 
@@ -94,6 +95,28 @@ export class DataFactory {
 
   static createDisplayName(): string {
     return `Kata ${faker.person.lastName()} ${faker.string.alpha({ length: 4, casing: 'mixed' })}`;
+  }
+
+  static createTestTitle(): string {
+    return `Kata Test ${this.createTestId('bk596')}`;
+  }
+
+  static createTitleOfLength(args: { character: string, count: number }): string {
+    return args.character.repeat(args.count);
+  }
+
+  static createAtcPayload(args: { title: string, moduleId: string, userStoryId: string, acceptanceCriterionIds: string[] }): CreateAtcRequest {
+    return {
+      title: args.title,
+      module_id: args.moduleId,
+      user_story_id: args.userStoryId,
+      acceptance_criterion_ids: args.acceptanceCriterionIds,
+      layer: 'API',
+      steps: [
+        { position: 1, content: faker.lorem.sentence() },
+        { position: 2, content: faker.lorem.sentence() },
+      ],
+    };
   }
 }
 

@@ -1,12 +1,18 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-23T17:21:24.408Z",
+  "generatedAt": "2026-11-24T14:41:20.379Z",
   "components": {
     "api": [
       {
         "name": "ActivityApi",
         "file": "ActivityApi.ts",
         "relativePath": "tests/components/api/ActivityApi.ts",
+        "atcs": []
+      },
+      {
+        "name": "AtcsApi",
+        "file": "AtcsApi.ts",
+        "relativePath": "tests/components/api/AtcsApi.ts",
         "atcs": []
       },
       {
@@ -108,6 +114,29 @@
         ]
       },
       {
+        "name": "StructureApi",
+        "file": "StructureApi.ts",
+        "relativePath": "tests/components/api/StructureApi.ts",
+        "atcs": []
+      },
+      {
+        "name": "TestsApi",
+        "file": "TestsApi.ts",
+        "relativePath": "tests/components/api/TestsApi.ts",
+        "atcs": [
+          {
+            "id": "BK-2156",
+            "method": "refuseBlankTitle",
+            "line": 104
+          },
+          {
+            "id": "BK-2167",
+            "method": "applyTitleLengthBoundaries",
+            "line": 120
+          }
+        ]
+      },
+      {
         "name": "WorkspaceApi",
         "file": "WorkspaceApi.ts",
         "relativePath": "tests/components/api/WorkspaceApi.ts",
@@ -115,17 +144,17 @@
           {
             "id": "BK-1657",
             "method": "removeMemberSuccessfully",
-            "line": 124
+            "line": 151
           },
           {
             "id": "BK-1664",
             "method": "removeOwnerAsAdminRefused",
-            "line": 158
+            "line": 185
           },
           {
             "id": "BK-1665",
             "method": "removeMemberRefusedBelowAdmin",
-            "line": 188
+            "line": 215
           }
         ]
       }
@@ -203,6 +232,12 @@
             "line": 184
           }
         ]
+      },
+      {
+        "name": "TestDetailPage",
+        "file": "TestDetailPage.ts",
+        "relativePath": "tests/components/ui/TestDetailPage.ts",
+        "atcs": []
       }
     ]
   },
@@ -254,13 +289,31 @@
         "readAllRunIds",
         "teardown"
       ]
+    },
+    {
+      "name": "TestLifecycleSteps",
+      "file": "TestLifecycleSteps.ts",
+      "relativePath": "tests/components/steps/TestLifecycleSteps.ts",
+      "methods": [
+        "openMemberArena",
+        "release"
+      ]
+    },
+    {
+      "name": "TestSeedSteps",
+      "file": "TestSeedSteps.ts",
+      "relativePath": "tests/components/steps/TestSeedSteps.ts",
+      "methods": [
+        "seedTest",
+        "teardown"
+      ]
     }
   ],
   "summary": {
-    "totalComponents": 11,
-    "totalATCs": 25,
-    "apiComponents": 7,
-    "uiComponents": 4,
-    "stepsModules": 3
+    "totalComponents": 15,
+    "totalATCs": 27,
+    "apiComponents": 10,
+    "uiComponents": 5,
+    "stepsModules": 5
   }
 }

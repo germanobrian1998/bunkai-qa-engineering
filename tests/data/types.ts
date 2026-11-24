@@ -63,3 +63,15 @@ export interface FixtureProject {
   slug: string
   workspaceId: string
 }
+
+export interface TestLifecycleArena {
+  workspaceId: string
+  project: FixtureProject
+  atcId: string
+}
+
+export interface SeededTest {
+  id: string
+  title: string
+  version: number
+}

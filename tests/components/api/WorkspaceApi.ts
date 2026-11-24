@@ -13,7 +13,10 @@
  */
 
 import type { APIResponse } from '@playwright/test';
+import type { CreateProjectBody, CreateProjectResponse } from '@schemas/tests.types';
 import type {
+  CreateWorkspaceRequest,
+  CreateWorkspaceResponse,
   ErrorEnvelope,
   GetWorkspaceResponse,
   ListMembersResponse,
@@ -23,6 +26,8 @@ import type {
   WorkspaceMemberRemoveResponse,
 } from '@schemas/workspace.types';
 import type { TestContextOptions } from '@TestContext';
+
+import { randomUUID } from 'node:crypto';
 
 import { ApiBase } from '@api/ApiBase';
 import { expect } from '@playwright/test';
@@ -99,6 +104,28 @@ export class WorkspaceApi extends ApiBase {
       `/v1/workspaces/${args.workspaceId}/projects`,
       { params: { slug: args.slug } },
     );
+    return [response, body];
+  }
+
+  @step
+  async createWorkspace(args: { name: string, slug: string }): Promise<[APIResponse, CreateWorkspaceResponse]> {
+    const [response, body] = await this.apiPOST<CreateWorkspaceResponse, CreateWorkspaceRequest>(
+      '/v1/workspaces',
+      { name: args.name, slug: args.slug },
+      { headers: { 'Idempotency-Key': randomUUID() } },
+    );
+    expect(response.status()).toBe(201);
+    return [response, body];
+  }
+
+  @step
+  async createProject(args: { workspaceId: string, name: string }): Promise<[APIResponse, CreateProjectResponse]> {
+    const [response, body] = await this.apiPOST<CreateProjectResponse, CreateProjectBody>(
+      `/v1/workspaces/${args.workspaceId}/projects`,
+      { name: args.name },
+      { headers: { 'Idempotency-Key': randomUUID() } },
+    );
+    expect(response.status()).toBe(201);
     return [response, body];
   }
 

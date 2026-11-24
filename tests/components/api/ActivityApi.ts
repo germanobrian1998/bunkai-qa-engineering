@@ -11,10 +11,11 @@
  */
 
 import type { APIResponse } from '@playwright/test';
-import type { ActivityPage, ListNotificationsResponse, NotificationItem } from '@schemas/workspace.types';
+import type { ActivityItem, ActivityPage, ListNotificationsResponse, NotificationItem } from '@schemas/workspace.types';
 import type { TestContextOptions } from '@TestContext';
 
 import { ApiBase } from '@api/ApiBase';
+import { expect } from '@playwright/test';
 import { step } from '@utils/decorators';
 
 // ============================================
@@ -73,5 +74,16 @@ export class ActivityApi extends ApiBase {
     const [response, body] = await this.listNotifications(args.workspaceId);
     const newItems = body.items.filter(item => !args.knownIds.includes(item.id));
     return [response, { newItems, unreadCount: body.unread_count }];
+  }
+
+  @step
+  async listTestEvents(
+    args: { workspaceId: string, action: ActivityItem['action'], testId?: string },
+  ): Promise<[APIResponse, ActivityItem[]]> {
+    const [response, page] = await this.listActivity(args.workspaceId);
+    expect(response.status(), `GET /v1/activity for ${args.action} events`).toBe(200);
+    const items = page.items.filter(item => item.action === args.action
+      && (args.testId === undefined || item.item.entity_id === args.testId));
+    return [response, items];
   }
 }
