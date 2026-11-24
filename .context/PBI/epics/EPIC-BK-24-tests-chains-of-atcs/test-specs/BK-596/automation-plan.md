@@ -105,7 +105,7 @@ Reused non-ATC members by composition: `RunFixtureSteps.openMemberSession`, `Run
 | TestsApi | `listByTag`, `searchTests` | `[APIResponse, ...]` | `GET /tests?tag=`, `GET /tests/search`, one page or all |
 | RunsApi | `startRun`, `markStep`, `finishRun` | tuples | Real-path Run generation (assert 201/200) |
 | RunsApi | `readWorkspaceRuns`, `readCompare`, `captureRunReads` | tuples / `RunReadsBaseline` | All pages of report and workspace index plus compare, for BK-2178 |
-| ActivityApi | `listTestEvents` | `[APIResponse, ActivityItem[]]` | Feed filtered to `test.*` items of one Test id (delta against a baseline) |
+| ActivityApi | `snapshotTestEvents`, `listNewTestEvents` | `string[]` | Event ids of the feed filtered by action list and optional Test id; the delta read returns the ids not in a known snapshot. The only implementation, used by every spec |
 | AtcsApi | `createAtc`, `archiveAtc`, `readAtcUsage` | tuples | Seeding; usage read for BK-2152 |
 | StructureApi | `createModule`, `createUserStory`, `createAcceptanceCriterion`, `archiveModule` | tuples | Seeding scaffold |
 | SearchApi | `searchWorkspace`, `searchChatEntities` | tuples | Offer-surface reads for BK-2152 |
@@ -159,7 +159,7 @@ The framework has no DB client (`package.json` holds none; the `dbhub` MCP is fo
 | TC body DB read | Replacement |
 |-----------------|-------------|
 | `tests.archived_at`, `archived_by`, `version`, `tags`, title | `GET /tests/{id}` (`archived_at`, `archived_by`, `version`, `tags`, `title`); `char_length` = `[...title].length` |
-| `activity_log` rows by action | `GET /activity?workspace_id=` newest first, filtered by action and entity (`ActivityApi.listTestEvents`), baseline-then-delta |
+| `activity_log` rows by action | `GET /activity?workspace_id=` newest first, filtered by action and entity (`ActivityApi.snapshotTestEvents`, `ActivityApi.listNewTestEvents`), baseline-then-delta |
 | `runs` rows of a Test | `GET /tests/{id}/runs` (finished only) and `GET /workspaces/{id}/runs` (all statuses) |
 | `test_steps` ids, atc ids, positions | `GET /tests/{id}` chain (`atcs[].step_id`, `atc_id` via `id`, `position`) |
 | `test_plan_tests` | `GET /test-plans/{id}/tests` and `plans[]` of `GET /tests/{id}` |
@@ -231,7 +231,7 @@ Fixture: `{ test: kata }` with `test.use({ storageState: config.auth.roleStatePa
 Test: "BK-2140: should show the new name on the Test header, Tests list, explorer and search and raise the version by one keeping chain, step ids and tags after a rename by a member"
 Preconditions: Member session; arena; `seedTest({ atcs: 2, tags: [tag, tagB] })`; baseline `getTest` (version, chain with step ids, tags).
 ATCs called: `kata.ui.testDetail.renameFromHeader({ title })`.
-Test-level assertions: `getTest` shows title, version = baseline + 1, same chain order, same step ids, same tags; `OfferSurfaceSteps.expectTitleOnSurfaces` (Tests list, explorer, workspace search by the unique title); `ActivityApi.listTestEvents` gained one `test.renamed` carrying old and new name.
+Test-level assertions: `getTest` shows title, version = baseline + 1, same chain order, same step ids, same tags; `OfferSurfaceSteps.expectTitleOnSurfaces` (Tests list, explorer, workspace search by the unique title); `ActivityApi.snapshotTestEvents`, `ActivityApi.listNewTestEvents` gained one `test.renamed` carrying old and new name.
 Teardown: rename back via `renameTest`; Test archived in `afterAll`.
 
 ### File: tests/e2e/test-lifecycle/archiveRestoreTest.test.ts
@@ -332,7 +332,7 @@ Teardown: Member restores the Test archived for the restore row.
 Test: "BK-2164: should answer 404 and hide an archived Test from search for a workspace non-member, the same as for a live Test"
 Preconditions: Test in the Member-owned workspace, live or archived; Viewer session (not a member of that workspace).
 ATCs called: `viewer.api.tests.hideTestFromNonMember({ testId, title, projectId, state })`.
-Test-level assertions: the palette returns nothing for the title (UI helper, locator discovered at Code time).
+Test-level assertions: none beyond the ATC; the palette data source (`GET /v1/search`) is asserted inside the ATC with an owner-side positive control in the test.
 Teardown: Member restores the Test when archived for the row.
 
 ### File: tests/integration/test-lifecycle/repeatArchiveRestore.test.ts
@@ -436,7 +436,10 @@ Dependency graph: WP1 -> WP2 -> WP3 -> WP4 -> {WP5 -> WP6} -> {WP7, WP8} -> {WP9
 - The activity feed lists only the MVP event set: `test.renamed`, `test.archived` and `test.restored`. Reorder and tag events are not in it, so "no activity row" is asserted as no new `test.renamed`, `test.archived` or `test.restored` event for the Test; for the reorder and tag rows the unchanged version, chain and tags are the real proof.
 - BK-2164 search for the foreign project answers 200 with an empty `items` list (the plan's `toContain([200, 403, 404])` is tightened to 200). A positive control runs on the owner side: the member search finds the live Test and does not find the archived one, so an empty viewer list cannot come from a title that never matches.
 - BK-2164 arena: `TestLifecycleSteps.openForeignArena` finds, never creates, the member-owned workspace and its project (`fixture broken` when absent), checks the viewer is not a member of it, and finds or completes the scaffold ATC as the member. Workspace name lives in `TEST_LIFECYCLE_FOREIGN_FIXTURE`.
-- The BK-2164 palette check is not built: the palette has no stable test id captured; the API halves (GET, search) are asserted. Open item for a later slice with `/playwright-cli` discovery.
+- BK-2164 palette: the command palette calls `GET /api/v1/search?q=` (cross-entity, scoped by the active-workspace cookie, never by a parameter), a different endpoint from `GET /v1/tests/search`. The ATC asserts it too: a non-member session scoped to the foreign workspace gets no row for the Test, and the test proves the owner-side session scoped to the same workspace finds the live Test and not the archived one. `TestLifecycleSteps.openRoleSession({ role, workspaceId })` builds that scoped session from the stored role state plus the active-workspace cookie. The palette UI rendering is not asserted (no stable test id); the API half covers its data source. Open follow-up: assert the rendered palette with `/playwright-cli` discovery.
 - BK-2161 UI half: `TestDetailPage.expectFrozen` asserts the banner, no rename control, no tag editor open button, no reorder bar and no drag handle (label `Drag to reorder ATC ...`). The reorder bar only exists while the chain is dirty, so the drag handle is the assertion that can fail. BK-2163 UI half runs in a viewer browser context opened by `TestLifecycleSteps.openRoleTestDetail` and asserts no rename, archive or restore control once the tabs are shown.
-- Tests are archived by the shared teardown, so the "member restores the Test at the end" step of BK-2163 and BK-2164 is dropped: each test seeds its own Test and the end state is archived.
+- Event deltas: `ActivityApi.snapshotTestEvents` and `listNewTestEvents` replace the inline snapshots of `guardTestWrites.test.ts` and `refuseInvalidTestTitle.test.ts` (`listTestEvents` is removed), so one implementation serves both specs.
+- Positive controls (LT-1): a member page on a live Test must show the rename control, the tag editor and the drag handle before the archived Test is asserted frozen (BK-2161), and the rename and archive controls (live row) or the restore control (archived row) before the viewer page is asserted free of them (BK-2163). `TestDetailPage.goto` and `open` share one private navigation; they differ only in the ready condition.
+- BK-2163 and BK-2164 carry `@critical` to match their TC tags.
+- Tests are archived by the shared teardown, so the "restore at the end" step of BK-2161, BK-2163 and BK-2164 is dropped: each test seeds its own Test and the end state is archived. `TestSeedSteps.seedInState({ state, chainLength, tags })` prepares live or archived Tests so specs carry no setup branch; the BK-2165 tag reset runs in a `finally`.
 - Role sessions are cached per role inside `TestLifecycleSteps`, so one storage-state context serves every caller of a role.

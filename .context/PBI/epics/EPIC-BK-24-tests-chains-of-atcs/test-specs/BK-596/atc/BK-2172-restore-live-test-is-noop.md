@@ -32,7 +32,7 @@ The `changed` flag sits inside `test` for restore (beside `test` for rename).
 ### Fixed (inside ATC)
 200, `test.changed` false, `archived_at` null, version unchanged.
 ### Test-level (in test file)
-No new `test.restored` event (`ActivityApi.listTestEvents` delta).
+No new `test.restored` event (`ActivityApi.listNewTestEvents` delta).
 
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |

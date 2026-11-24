@@ -60,3 +60,4 @@ Version, title, chain order and tags equal the baseline (`getTest`); no new acti
 
 - Signature `refuseWriteOnArchivedTest({ testId, row, stepIds })`, `row` from the literal `FROZEN_WRITE_ROWS` (kind, expectedStatus 409, expectedCode `conflict`, expectedReason `test_archived`). The chain of 2 is the scaffold ATC chained twice. Reorder and tag events are not in the activity feed, so the no-event check covers `test.renamed`, `test.archived` and `test.restored` and the version, chain and tags carry the proof.
 - UI half: `TestDetailPage.open` then `expectFrozen` (banner, no rename, no tag editor, no reorder bar, no drag handle).
+- A member page on a live Test of the same kind must show the rename control, the tag editor and the drag handle (`expectEditControlsOffered`) before the archived Test is asserted frozen, so the absence checks cannot pass on renamed ids. Archived Tests come from `TestSeedSteps.seedInState`.

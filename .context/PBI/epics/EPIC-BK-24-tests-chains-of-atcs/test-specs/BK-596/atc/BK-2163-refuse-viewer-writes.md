@@ -61,3 +61,4 @@ The Test is unchanged when read by the Member (`getTest`: title, version, archiv
 
 - Signature `refuseWriteByViewer({ testId, row })`, `row` from `VIEWER_WRITE_ROWS` (action, state, expectedStatus 403, expectedCode `forbidden`). The viewer API session comes from `TestLifecycleSteps.openRoleSession('viewer')`; the viewer page from `openRoleTestDetail`, then `expectNoWriteControls`.
 - The Test is not restored at the end; the shared teardown archives it.
+- Tags: `@critical`. A member page must show the rename and archive controls (live row) or the restore control (archived row) before the viewer page is asserted free of them (`expectLifecycleControlOffered`). Tests come from `seedInState`.

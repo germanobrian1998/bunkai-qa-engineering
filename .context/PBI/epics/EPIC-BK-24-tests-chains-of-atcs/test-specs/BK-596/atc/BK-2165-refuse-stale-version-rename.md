@@ -62,3 +62,4 @@ Reduction: none. BVA: N/A.
 ## 10. As built
 
 - Signature `refuseStaleVersionRename({ testId, staleVersion })`; asserts 409, code `conflict`, reason `version_conflict` and `current_version` equal to the stale version plus 1. The test reads the Test after the tag change and guards that its version is the seed version plus 1.
+- The tag reset to the empty list runs in a `finally`.

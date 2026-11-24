@@ -36,7 +36,7 @@ The status of the search for a foreign project is not stated in the TC (empty `i
 ### Fixed (inside ATC)
 404 equal to a missing Test (ignoring `request_id`); search returns an empty list.
 ### Test-level (in test file)
-The palette returns nothing for the title in the Viewer's browser context (UI helper; locator to discover); live and archived rows behave the same; the Member restores the Test archived for the row.
+Owner-side positive controls (the member finds the live Test through the Test search and the palette search, and not the archived one); live and archived rows behave the same; the Member restores the Test archived for the row.
 
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |
@@ -66,4 +66,9 @@ The palette returns nothing for the title in the Viewer's browser context (UI he
 ## 10. As built
 
 - Signature `hideTestFromNonMember({ testId, title, projectId, row })`, `row` from `NON_MEMBER_ROWS` (state, expectedStatus 404, expectedCode `not_found`). The search answers 200 with an empty list; the owner-side search is the positive control.
-- Arena: `TestLifecycleSteps.openForeignArena` (find-only workspace and project, viewer non-membership verified). The palette check is not built (no stable test id).
+- Arena: `TestLifecycleSteps.openForeignArena` (find-only workspace and project, viewer non-membership verified). The palette data source is asserted in the ATC (see below); the palette UI rendering is not (no stable test id).
+- The command palette calls `GET /api/v1/search?q=`, scoped by the active-workspace cookie. The ATC also asserts that the non-member session scoped to the foreign workspace gets no row for the Test there (`searchPalette`). `TestLifecycleSteps.openRoleSession({ role, workspaceId })` builds the scoped session.
+
+### Open follow-up
+
+Assert the rendered palette in the viewer's browser (type the title, expect no row); needs a `/playwright-cli` discovery of the palette locators.
