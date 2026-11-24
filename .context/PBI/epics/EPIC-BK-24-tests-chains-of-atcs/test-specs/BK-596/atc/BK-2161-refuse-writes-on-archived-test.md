@@ -55,3 +55,8 @@ Version, title, chain order and tags equal the baseline (`getTest`); no new acti
 - [ ] Tuple return
 - [ ] Fixed vs test-level split
 - [ ] Not duplicating an existing ATC
+
+## 10. As built
+
+- Signature `refuseWriteOnArchivedTest({ testId, row, stepIds })`, `row` from the literal `FROZEN_WRITE_ROWS` (kind, expectedStatus 409, expectedCode `conflict`, expectedReason `test_archived`). The chain of 2 is the scaffold ATC chained twice. Reorder and tag events are not in the activity feed, so the no-event check covers `test.renamed`, `test.archived` and `test.restored` and the version, chain and tags carry the proof.
+- UI half: `TestDetailPage.open` then `expectFrozen` (banner, no rename, no tag editor, no reorder bar, no drag handle).

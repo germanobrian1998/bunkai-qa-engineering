@@ -58,3 +58,7 @@ Reduction: none. BVA: N/A.
 - [ ] Tuple return
 - [ ] Fixed vs test-level split
 - [ ] Not duplicating an existing ATC
+
+## 10. As built
+
+- Signature `refuseStaleVersionRename({ testId, staleVersion })`; asserts 409, code `conflict`, reason `version_conflict` and `current_version` equal to the stale version plus 1. The test reads the Test after the tag change and guards that its version is the seed version plus 1.

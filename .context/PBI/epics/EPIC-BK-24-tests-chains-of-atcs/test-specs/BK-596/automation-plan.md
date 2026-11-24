@@ -82,10 +82,10 @@ Reused non-ATC members by composition: `RunFixtureSteps.openMemberSession`, `Run
 | BK-2146 | TestsApi | `listTagFilterWithoutArchived` | `GET /tests?tag=` no longer lists the archived Test, total drops by one, remaining order unchanged |
 | BK-2153 | TestsApi | `keepRecordsAcrossArchiveAndRestore` | Archive then restore; Test row, Runs, chain steps, plan memberships, tags equal the baseline after each |
 | BK-2156 | TestsApi | `refuseBlankTitle(target, title)` | 422 `validation_failed`, `details.reason` `title_required` at rename and at create (param: target kind, blank class); the rename target also re-reads the Test and asserts title and version unchanged |
-| BK-2161 | TestsApi | `refuseWriteOnArchivedTest` | 409 `test_archived` on rename, reorder and tags (param: writer) |
-| BK-2163 | TestsApi | `refuseWriteByViewer` | 403 `forbidden` for rename, archive, restore as a viewer (param: action) |
-| BK-2164 | TestsApi | `hideTestFromNonMember` | 404 identical to a missing Test, search returns an empty list (param: Test state) |
-| BK-2165 | TestsApi | `refuseStaleVersionRename` | 409 `version_conflict` naming `current_version` |
+| BK-2161 | TestsApi | `refuseWriteOnArchivedTest({ testId, row, stepIds })` | 409 `conflict` with `details.reason` `test_archived` on rename, reorder and tags; expectations come from the literal `FROZEN_WRITE_ROWS` table |
+| BK-2163 | TestsApi | `refuseWriteByViewer({ testId, row })` | 403 `forbidden` for rename, archive, restore as a viewer; expectations come from the literal `VIEWER_WRITE_ROWS` table |
+| BK-2164 | TestsApi | `hideTestFromNonMember({ testId, title, projectId, row })` | 404 identical to a missing Test (request id ignored), search answers 200 with an empty list; expectations come from the literal `NON_MEMBER_ROWS` table |
+| BK-2165 | TestsApi | `refuseStaleVersionRename({ testId, staleVersion })` | 409 `conflict`, `details.reason` `version_conflict`, `current_version` = stale version + 1 |
 | BK-2167 | TestsApi | `applyTitleLengthBoundaries(target, row, title)` | 200 or 201 within 200 characters (code points), 422 `title_too_long` above, at rename and create; the expected status, reason and code-point count come from the literal TC28 row table (`TITLE_LENGTH_ROWS`) |
 | BK-2171 | TestsApi | `archiveAgainKeepsFirstArchive` | 204, `archived_at` and `archived_by` unchanged |
 | BK-2172 | TestsApi | `restoreLiveTestChangesNothing` | 200, `test.changed` false, `archived_at` null, version unchanged |
@@ -428,3 +428,15 @@ Dependency graph: WP1 -> WP2 -> WP3 -> WP4 -> {WP5 -> WP6} -> {WP7, WP8} -> {WP9
 - Locators for the command palette, the explorer Tests group, the Tests list and the chat picker are not in any TC; record them with `/playwright-cli` before WP5, or narrow the BK-2152 and BK-2140 surface checks to the API reads and raise it.
 - Plan and milestone page routes and the Run detail route are not in the TCs; discover them the same way.
 - OQ1 to OQ7 of spec.md are the decisions the plan waits on; WP1 to WP4 do not depend on them.
+
+### PR2 deviations (BK-2161, BK-2163, BK-2164, BK-2165)
+
+- One ATC per TC id, parameterized by a literal row table in `tests/data/constants.ts` (`FROZEN_WRITE_ROWS`, `VIEWER_WRITE_ROWS`, `NON_MEMBER_ROWS`); each ATC asserts `row.expected*` and the row's discriminant only chooses the request. The error code of the archived guard and of the version conflict is `conflict` (the envelope code), with the `test_archived` and `version_conflict` reasons.
+- The BK-2161 chain of 2 is one scaffold ATC chained twice (a chain may repeat an ATC), so `seedTest` gained an optional `chainLength`. The reorder row sends the reversed `step_ids`; the tag row sends a literal tag.
+- The activity feed lists only the MVP event set: `test.renamed`, `test.archived` and `test.restored`. Reorder and tag events are not in it, so "no activity row" is asserted as no new `test.renamed`, `test.archived` or `test.restored` event for the Test; for the reorder and tag rows the unchanged version, chain and tags are the real proof.
+- BK-2164 search for the foreign project answers 200 with an empty `items` list (the plan's `toContain([200, 403, 404])` is tightened to 200). A positive control runs on the owner side: the member search finds the live Test and does not find the archived one, so an empty viewer list cannot come from a title that never matches.
+- BK-2164 arena: `TestLifecycleSteps.openForeignArena` finds, never creates, the member-owned workspace and its project (`fixture broken` when absent), checks the viewer is not a member of it, and finds or completes the scaffold ATC as the member. Workspace name lives in `TEST_LIFECYCLE_FOREIGN_FIXTURE`.
+- The BK-2164 palette check is not built: the palette has no stable test id captured; the API halves (GET, search) are asserted. Open item for a later slice with `/playwright-cli` discovery.
+- BK-2161 UI half: `TestDetailPage.expectFrozen` asserts the banner, no rename control, no tag editor open button, no reorder bar and no drag handle (label `Drag to reorder ATC ...`). The reorder bar only exists while the chain is dirty, so the drag handle is the assertion that can fail. BK-2163 UI half runs in a viewer browser context opened by `TestLifecycleSteps.openRoleTestDetail` and asserts no rename, archive or restore control once the tabs are shown.
+- Tests are archived by the shared teardown, so the "member restores the Test at the end" step of BK-2163 and BK-2164 is dropped: each test seeds its own Test and the end state is archived.
+- Role sessions are cached per role inside `TestLifecycleSteps`, so one storage-state context serves every caller of a role.

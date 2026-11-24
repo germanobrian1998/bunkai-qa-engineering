@@ -62,3 +62,8 @@ The palette returns nothing for the title in the Viewer's browser context (UI he
 - [ ] Tuple return
 - [ ] Fixed vs test-level split
 - [ ] Not duplicating an existing ATC
+
+## 10. As built
+
+- Signature `hideTestFromNonMember({ testId, title, projectId, row })`, `row` from `NON_MEMBER_ROWS` (state, expectedStatus 404, expectedCode `not_found`). The search answers 200 with an empty list; the owner-side search is the positive control.
+- Arena: `TestLifecycleSteps.openForeignArena` (find-only workspace and project, viewer non-membership verified). The palette check is not built (no stable test id).

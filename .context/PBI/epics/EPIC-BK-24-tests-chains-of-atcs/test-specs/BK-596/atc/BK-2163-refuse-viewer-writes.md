@@ -56,3 +56,8 @@ The Test is unchanged when read by the Member (`getTest`: title, version, archiv
 - [ ] Tuple return
 - [ ] Fixed vs test-level split
 - [ ] Not duplicating an existing ATC
+
+## 10. As built
+
+- Signature `refuseWriteByViewer({ testId, row })`, `row` from `VIEWER_WRITE_ROWS` (action, state, expectedStatus 403, expectedCode `forbidden`). The viewer API session comes from `TestLifecycleSteps.openRoleSession('viewer')`; the viewer page from `openRoleTestDetail`, then `expectNoWriteControls`.
+- The Test is not restored at the end; the shared teardown archives it.
