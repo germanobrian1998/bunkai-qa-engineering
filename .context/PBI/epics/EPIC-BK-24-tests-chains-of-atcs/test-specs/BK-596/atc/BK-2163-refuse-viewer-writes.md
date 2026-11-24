@@ -13,14 +13,14 @@
 ## 2. ATC Contract
 ```typescript
 @atc('BK-2163')
-async refuseWriteByViewer(args: { testId: string, action: 'rename' | 'archive' | 'restore' }): Promise<[APIResponse, ErrorEnvelope]> {
+async refuseWriteByViewer(args: { testId: string, row: ViewerWriteRow }): Promise<[APIResponse, ErrorEnvelope]> {
   const [response, body] = await this.sendViewerWrite(args);
   expect(response.status()).toBe(403);
   expect(body.error.code).toBe('forbidden');
   return [response, body];
 }
 ```
-Called on the Viewer's `ApiFixture` (cookie session of the viewer role). The reason `not_a_member` (every viewer write ends in the workspace write assertion, SQLSTATE 42501, mapped by `mapTestRpcError`) is asserted from `row.expectedReason` next to `error.code`.
+Called on the Viewer's `ApiFixture` (cookie session of the viewer role). Only status 403 and `error.code` `forbidden` are asserted; `details.reason` is not, because `not_a_member` for a real viewer is open defect BK-2091.
 
 ## 3A. API Details
 `PATCH`, `DELETE /api/v1/tests/{id}` and `POST /api/v1/tests/{id}/restore`; 403 `forbidden`.
@@ -59,6 +59,6 @@ The Test is unchanged when read by the Member (`getTest`: title, version, archiv
 
 ## 10. As built
 
-- Signature `refuseWriteByViewer({ testId, row })`, `row` from `VIEWER_WRITE_ROWS` (action, state, expectedStatus 403, expectedCode `forbidden`, expectedReason `not_a_member`). The viewer API session comes from `TestLifecycleSteps.openRoleSession({ role: 'viewer' })`; the viewer page from `openRoleTestDetail` (one browser context per file, project `use` options, closed in `release`), then `expectNoWriteControls`.
+- Signature `refuseWriteByViewer({ testId, row })`, `row` from `VIEWER_WRITE_ROWS` (action, state, expectedStatus 403, expectedCode `forbidden`). The viewer API session comes from `TestLifecycleSteps.openRoleSession({ role: 'viewer' })`; the viewer page from `openRoleTestDetail` (one browser context per file, project `use` options, closed in `release`), then `expectNoWriteControls`.
 - The Test is not restored at the end; the shared teardown archives it.
 - Tags: `@critical`. A member page must show the rename and archive controls (live row) or the restore control (archived row) before the viewer page is asserted free of them (`expectLifecycleControlOffered`). Tests come from `seedInState`.

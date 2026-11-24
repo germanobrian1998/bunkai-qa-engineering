@@ -13,7 +13,7 @@
 ## 2. ATC Contract
 ```typescript
 @atc('BK-2165')
-async refuseStaleVersionRename(args: { testId: string, staleVersion: number }): Promise<[APIResponse, ErrorEnvelope]> {
+async refuseStaleVersionRename(args: { testId: string, staleVersion: number, currentVersion: number }): Promise<[APIResponse, ErrorEnvelope]> {
   const [response, body] = await this.apiPATCH<ErrorEnvelope, { title: string }>(
     `/v1/tests/${args.testId}`,
     { title: DataFactory.createTestTitle() },
@@ -21,7 +21,7 @@ async refuseStaleVersionRename(args: { testId: string, staleVersion: number }): 
   );
   expect(response.status()).toBe(409);
   expect(this.readReason(body)).toBe(TEST_LIFECYCLE.versionConflictReason);
-  expect(this.readDetail(body, 'current_version')).toBe(args.staleVersion + 1);
+  expect(this.readDetail(body, 'current_version')).toBe(args.currentVersion);
   return [response, body];
 }
 ```
@@ -32,7 +32,7 @@ async refuseStaleVersionRename(args: { testId: string, staleVersion: number }): 
 
 ## 4. Assertions Split
 ### Fixed (inside ATC)
-409, reason `version_conflict`, `current_version` equals the stale version plus 1.
+409, reason `version_conflict`, `current_version` equals `currentVersion`, the live version the test reads after the tag change.
 ### Test-level (in test file)
 Title unchanged, no `test.renamed` event; the Test ends archived by the shared teardown.
 
