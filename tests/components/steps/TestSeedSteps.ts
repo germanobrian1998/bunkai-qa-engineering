@@ -16,11 +16,11 @@ export class TestSeedSteps extends TestContext {
     super();
   }
 
-  async seedTest(args: { api: ApiFixture, arena: TestLifecycleArena }): Promise<SeededTest> {
-    const { api, arena } = args;
+  async seedTest(args: { api: ApiFixture, arena: TestLifecycleArena, chainLength?: number }): Promise<SeededTest> {
+    const { api, arena, chainLength = 1 } = args;
     const [, created] = await api.tests.createTest({
       title: DataFactory.createTestTitle(),
-      atcIds: [arena.atcId],
+      atcIds: Array.from({ length: chainLength }).map(() => arena.atcId),
       workspaceId: arena.workspaceId,
     });
     this.adopt({ api, testId: created.test.id });

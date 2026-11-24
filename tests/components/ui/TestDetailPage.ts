@@ -19,6 +19,30 @@ export class TestDetailPage extends UiBase {
   }
 
   @step
+  async open(args: { projectSlug: string, testId: string, workspaceId: string }): Promise<void> {
+    await this.page.context().addCookies([{ name: ACTIVE_WORKSPACE_COOKIE, value: args.workspaceId, url: this.baseUrl }]);
+    await this.page.goto(this.buildUrl(`/projects/${args.projectSlug}/tests/${args.testId}`));
+    await expect(this.page.getByTestId('test-tabs')).toBeVisible();
+  }
+
+  @step
+  async expectFrozen(): Promise<void> {
+    await expect(this.page.getByTestId('test-archived-banner')).toBeVisible();
+    await expect(this.page.getByTestId('test-detail-rename')).toHaveCount(0);
+    await expect(this.page.getByTestId('test-tag-editor-open')).toHaveCount(0);
+    await expect(this.page.getByTestId('test-reorder-bar')).toHaveCount(0);
+    await expect(this.page.getByLabel(/^Drag to reorder ATC/)).toHaveCount(0);
+  }
+
+  @step
+  async expectNoWriteControls(): Promise<void> {
+    await expect(this.page.getByTestId('test-tabs')).toBeVisible();
+    await expect(this.page.getByTestId('test-detail-rename')).toHaveCount(0);
+    await expect(this.page.getByTestId('test-detail-archive')).toHaveCount(0);
+    await expect(this.page.getByTestId('test-detail-restore')).toHaveCount(0);
+  }
+
+  @step
   async expectBlankRenameBlocked(args: { testId: string, message: string }): Promise<void> {
     const patches: string[] = [];
     const onRequest = (request: Request): void => {

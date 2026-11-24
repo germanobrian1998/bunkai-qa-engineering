@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-24T14:41:20.379Z",
+  "generatedAt": "2026-11-24T15:03:01.045Z",
   "components": {
     "api": [
       {
@@ -127,12 +127,32 @@
           {
             "id": "BK-2156",
             "method": "refuseBlankTitle",
-            "line": 104
+            "line": 185
+          },
+          {
+            "id": "BK-2161",
+            "method": "refuseWriteOnArchivedTest",
+            "line": 228
+          },
+          {
+            "id": "BK-2163",
+            "method": "refuseWriteByViewer",
+            "line": 239
+          },
+          {
+            "id": "BK-2164",
+            "method": "hideTestFromNonMember",
+            "line": 247
+          },
+          {
+            "id": "BK-2165",
+            "method": "refuseStaleVersionRename",
+            "line": 265
           },
           {
             "id": "BK-2167",
             "method": "applyTitleLengthBoundaries",
-            "line": 120
+            "line": 201
           }
         ]
       },
@@ -295,7 +315,10 @@
       "file": "TestLifecycleSteps.ts",
       "relativePath": "tests/components/steps/TestLifecycleSteps.ts",
       "methods": [
+        "openForeignArena",
         "openMemberArena",
+        "openRoleSession",
+        "openRoleTestDetail",
         "release"
       ]
     },
@@ -311,7 +334,7 @@
   ],
   "summary": {
     "totalComponents": 15,
-    "totalATCs": 27,
+    "totalATCs": 31,
     "apiComponents": 10,
     "uiComponents": 5,
     "stepsModules": 5
