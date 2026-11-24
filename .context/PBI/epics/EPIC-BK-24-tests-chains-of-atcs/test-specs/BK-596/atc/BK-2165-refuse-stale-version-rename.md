@@ -34,7 +34,7 @@ async refuseStaleVersionRename(args: { testId: string, staleVersion: number }): 
 ### Fixed (inside ATC)
 409, reason `version_conflict`, `current_version` equals the stale version plus 1.
 ### Test-level (in test file)
-Title unchanged, no `test.renamed` event; tags reset to `[]` at the end (`setTags`).
+Title unchanged, no `test.renamed` event; the Test ends archived by the shared teardown.
 
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |
@@ -62,4 +62,4 @@ Reduction: none. BVA: N/A.
 ## 10. As built
 
 - Signature `refuseStaleVersionRename({ testId, staleVersion })`; asserts 409, code `conflict`, reason `version_conflict` and `current_version` equal to the stale version plus 1. The test reads the Test after the tag change and guards that its version is the seed version plus 1.
-- The tag reset to the empty list runs in a `finally`.
+- No tag reset: the teardown archives the Test, so no `finally` can mask the primary error.

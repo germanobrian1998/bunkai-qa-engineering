@@ -29,7 +29,7 @@ Three writers, all mapping the guard to 409 with `details.reason` `test_archived
 ### Fixed (inside ATC)
 409 and reason `test_archived`.
 ### Test-level (in test file)
-Version, title, chain order and tags equal the baseline (`getTest`); no new activity event; UI half `TestDetailPage.expectFrozen` (no `test-detail-rename`, no `test-tag-editor-open`, no `test-reorder-bar`, banner `test-archived-banner` shown). The restore in teardown is not needed; the Test ends archived.
+Version, `updated_at`, title, chain order and tags equal the baseline (`getTest`); no new event of the row's `watchedActions` (`test.renamed` for the rename row; none observable for reorder and tags); UI half in its own test, run once: `TestDetailPage.expectFrozen` (no `test-detail-rename`, no `test-tag-editor-open`, no `test-reorder-handle-*`, banner `test-archived-banner` shown). The restore in teardown is not needed; the Test ends archived.
 
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |
@@ -58,6 +58,6 @@ Version, title, chain order and tags equal the baseline (`getTest`); no new acti
 
 ## 10. As built
 
-- Signature `refuseWriteOnArchivedTest({ testId, row, stepIds })`, `row` from the literal `FROZEN_WRITE_ROWS` (kind, expectedStatus 409, expectedCode `conflict`, expectedReason `test_archived`). The chain of 2 is the scaffold ATC chained twice. Reorder and tag events are not in the activity feed, so the no-event check covers `test.renamed`, `test.archived` and `test.restored` and the version, chain and tags carry the proof.
-- UI half: `TestDetailPage.open` then `expectFrozen` (banner, no rename, no tag editor, no reorder bar, no drag handle).
+- Signature `refuseWriteOnArchivedTest({ testId, row, stepIds })`, `row` from the literal `FROZEN_WRITE_ROWS` (kind, expectedStatus 409, expectedCode `conflict`, expectedReason `test_archived`). The chain of 2 is the scaffold ATC chained twice. The reorder and tags endpoints emit only `test.reordered` and `test.tags_changed`, which the activity feed drops, so "no activity row" is not observable for those rows. Each row declares `watchedActions` and the delta is read only through it; version, `updated_at`, title, chain and tags carry the proof. The precondition asserts the seeded tags (`TEST_LIFECYCLE.seedTags`) next to the chain of 2.
+- UI half: `TestDetailPage.open` then `expectFrozen` (banner, no rename, no tag editor, no drag handle), anchored on the test id prefix `test-reorder-handle-`.
 - A member page on a live Test of the same kind must show the rename control, the tag editor and the drag handle (`expectEditControlsOffered`) before the archived Test is asserted frozen, so the absence checks cannot pass on renamed ids. Archived Tests come from `TestSeedSteps.seedInState`.

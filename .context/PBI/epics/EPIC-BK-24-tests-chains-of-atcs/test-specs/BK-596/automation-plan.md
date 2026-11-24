@@ -42,7 +42,7 @@ All `data-testid` values come from the TC bodies (source-checked there against t
 | Rename entry, form, input, save, error | `getByTestId` | `test-detail-rename`, `test-rename-form`, `test-rename-input`, `test-rename-save`, `test-rename-error` |
 | Archive entry, dialog, Run count, confirm, cancel, plans warning | `getByTestId` | `test-detail-archive`, `archive-test-dialog`, `archive-test-runs`, `archive-test-confirm`, `archive-test-cancel`, `archive-test-plans-warning` |
 | Archived banner, restore, badge | `getByTestId` | `test-archived-banner`, `test-detail-restore`, `test-archived-badge` |
-| Start Run, tag editor, tag filter, reorder bar, tabs | `getByTestId` | `start-run-button`, `test-tag-editor-open`, `test-tag-filter`, `test-reorder-bar`, `test-tab-runs`, `test-tabs` |
+| Start Run, tag editor, tag filter, reorder handle, tabs | `getByTestId` | `start-run-button`, `test-tag-editor-open`, `test-tag-filter`, `test-reorder-handle-<position>`, `test-tab-runs`, `test-tabs` |
 | Traceability | `getByTestId` | `traceability-chain-view`, `traceability-test-archived`, `traceability-atc-archived` |
 | ATC usage | `getByTestId` | `atc-usage`, `atc-usage-count` |
 | Plan and milestone figures | `getByTestId` | `test-plan-progress`, `test-plan-progress-percent`, `test-plan-progress-passed`, `milestone-readiness`, `milestone-readiness-percent` |
@@ -309,7 +309,7 @@ Test-level assertions: accepted rename stores `[...title].length` equal to the c
 Test: "BK-2165: should refuse a rename carrying a stale version with a 409 version conflict and the current version given a Test changed after it was read"
 Preconditions: Test at V; `setTags` raises it to V+1.
 ATCs called: `member.api.tests.refuseStaleVersionRename({ testId, staleVersion })`.
-Test-level assertions: title unchanged, no `test.renamed` event; tags reset to `[]` at the end.
+Test-level assertions: title unchanged, no `test.renamed` event; the Test is archived by the shared teardown.
 
 ### File: tests/integration/test-lifecycle/guardTestWrites.test.ts
 
@@ -319,7 +319,7 @@ Fixture: `{ test: kata }` with Member storage state (UI halves).
 Test: "BK-2161: should refuse rename, reorder and tag changes with a 409 archived error and keep the version, title, chain and tags given an archived Test"
 Preconditions: Test with 2 chained ATCs and tags, archived by the Member; baseline version, title, chain, tags.
 ATCs called: `member.api.tests.refuseWriteOnArchivedTest({ writer })`.
-Test-level assertions: version, title, chain order, tags unchanged; no new events; UI `expectFrozen` (no rename control, tag editor, reorder bar; banner present).
+Test-level assertions: version, title, chain order, tags unchanged; no new events; UI `expectFrozen` (no rename control, tag editor, reorder handle; banner present), run once in its own test.
 
 #### Scenario 2: BK-2163 viewer refused (outline, 3 rows)
 Test: "BK-2163: should offer a workspace viewer no rename, archive or restore control and refuse each call with 403 given a live or archived Test"
@@ -332,7 +332,7 @@ Teardown: Member restores the Test archived for the restore row.
 Test: "BK-2164: should answer 404 and hide an archived Test from search for a workspace non-member, the same as for a live Test"
 Preconditions: Test in the Member-owned workspace, live or archived; Viewer session (not a member of that workspace).
 ATCs called: `viewer.api.tests.hideTestFromNonMember({ testId, title, projectId, state })`.
-Test-level assertions: none beyond the ATC; the palette data source (`GET /v1/search`) is asserted inside the ATC with an owner-side positive control in the test.
+Test-level assertions: the ATC asserts the 404 parity and the empty project search; the test asserts the owner-side controls and that the viewer palette (`GET /v1/search`) answers an empty list.
 Teardown: Member restores the Test when archived for the row.
 
 ### File: tests/integration/test-lifecycle/repeatArchiveRestore.test.ts
@@ -433,13 +433,14 @@ Dependency graph: WP1 -> WP2 -> WP3 -> WP4 -> {WP5 -> WP6} -> {WP7, WP8} -> {WP9
 
 - One ATC per TC id, parameterized by a literal row table in `tests/data/constants.ts` (`FROZEN_WRITE_ROWS`, `VIEWER_WRITE_ROWS`, `NON_MEMBER_ROWS`); each ATC asserts `row.expected*` and the row's discriminant only chooses the request. The error code of the archived guard and of the version conflict is `conflict` (the envelope code), with the `test_archived` and `version_conflict` reasons.
 - The BK-2161 chain of 2 is one scaffold ATC chained twice (a chain may repeat an ATC), so `seedTest` gained an optional `chainLength`. The reorder row sends the reversed `step_ids`; the tag row sends a literal tag.
-- The activity feed lists only the MVP event set: `test.renamed`, `test.archived` and `test.restored`. Reorder and tag events are not in it, so "no activity row" is asserted as no new `test.renamed`, `test.archived` or `test.restored` event for the Test; for the reorder and tag rows the unchanged version, chain and tags are the real proof.
+- The activity feed lists only the MVP event set: `test.renamed`, `test.archived` and `test.restored`. The reorder and tags endpoints emit only `test.reordered` and `test.tags_changed`, which the feed drops, so "no activity row" is not observable for those rows. Each `FROZEN_WRITE_ROWS` row declares `watchedActions` (`test.renamed` for rename, empty for reorder and tags) and the event delta is read only through that field; for every row the unchanged `version`, `updated_at`, title, chain and tags are the independent proof.
 - BK-2164 search for the foreign project answers 200 with an empty `items` list (the plan's `toContain([200, 403, 404])` is tightened to 200). A positive control runs on the owner side: the member search finds the live Test and does not find the archived one, so an empty viewer list cannot come from a title that never matches.
 - BK-2164 arena: `TestLifecycleSteps.openForeignArena` finds, never creates, the member-owned workspace and its project (`fixture broken` when absent), checks the viewer is not a member of it, and finds or completes the scaffold ATC as the member. Workspace name lives in `TEST_LIFECYCLE_FOREIGN_FIXTURE`.
-- BK-2164 palette: the command palette calls `GET /api/v1/search?q=` (cross-entity, scoped by the active-workspace cookie, never by a parameter), a different endpoint from `GET /v1/tests/search`. The ATC asserts it too: a non-member session scoped to the foreign workspace gets no row for the Test, and the test proves the owner-side session scoped to the same workspace finds the live Test and not the archived one. `TestLifecycleSteps.openRoleSession({ role, workspaceId })` builds that scoped session from the stored role state plus the active-workspace cookie. The palette UI rendering is not asserted (no stable test id); the API half covers its data source. Open follow-up: assert the rendered palette with `/playwright-cli` discovery.
-- BK-2161 UI half: `TestDetailPage.expectFrozen` asserts the banner, no rename control, no tag editor open button, no reorder bar and no drag handle (label `Drag to reorder ATC ...`). The reorder bar only exists while the chain is dirty, so the drag handle is the assertion that can fail. BK-2163 UI half runs in a viewer browser context opened by `TestLifecycleSteps.openRoleTestDetail` and asserts no rename, archive or restore control once the tabs are shown.
+- BK-2164 palette: the command palette calls `GET /api/v1/search?q=` (cross-entity, a different endpoint from `GET /v1/tests/search`). The product resolves the active workspace from the `bk_active_ws` cookie only when the caller can see that workspace and otherwise falls back to the caller's oldest workspace, so a forged cookie is ignored. The palette is scoped server-side to the caller's own workspaces, so a non-member cannot reach the foreign Test; it is not a membership check, and the 404 parity is the membership proof for both rows. The test asserts the viewer palette answers an empty list and the owner-side palette finds the live Test and not the archived one. Each `NON_MEMBER_ROWS` row declares `ownerFinds` and `searchProvesMembership` (true for live, false for archived, where archived Tests are hidden from every search). The owner session is scoped with the active-workspace cookie built by `activeWorkspaceCookie` (secure and domain derived from the request host). The palette UI rendering is not asserted (no stable test id). Open follow-up: assert the rendered palette with `/playwright-cli` discovery.
+- BK-2161 UI half: its own test, run once (not per row): a member page on a live Test shows the edit controls, then `TestDetailPage.expectFrozen` asserts the banner, no rename control, no tag editor open button and no drag handle, anchored on the product test id prefix `test-reorder-handle-`. BK-2163 UI half runs in one viewer browser context per file, opened with the project `use` options by `TestLifecycleSteps.openRoleTestDetail` and closed in `release`; `expectNoWriteControls(state)` asserts only the controls the state could offer.
 - Event deltas: `ActivityApi.snapshotTestEvents` and `listNewTestEvents` replace the inline snapshots of `guardTestWrites.test.ts` and `refuseInvalidTestTitle.test.ts` (`listTestEvents` is removed), so one implementation serves both specs.
 - Positive controls (LT-1): a member page on a live Test must show the rename control, the tag editor and the drag handle before the archived Test is asserted frozen (BK-2161), and the rename and archive controls (live row) or the restore control (archived row) before the viewer page is asserted free of them (BK-2163). `TestDetailPage.goto` and `open` share one private navigation; they differ only in the ready condition.
 - BK-2163 and BK-2164 carry `@critical` to match their TC tags.
-- Tests are archived by the shared teardown, so the "restore at the end" step of BK-2161, BK-2163 and BK-2164 is dropped: each test seeds its own Test and the end state is archived. `TestSeedSteps.seedInState({ state, chainLength, tags })` prepares live or archived Tests so specs carry no setup branch; the BK-2165 tag reset runs in a `finally`.
+- Tests are archived by the shared teardown, so the "restore at the end" step of BK-2161, BK-2163 and BK-2164 is dropped: each test seeds its own Test and the end state is archived. `TestSeedSteps.seedInState({ state, chainLength, tags })` prepares live or archived Tests so specs carry no setup branch; it re-reads the Test only when a tag or archive step changed it. The BK-2165 tag reset is dropped because the teardown archives the Test.
 - Role sessions are cached per role inside `TestLifecycleSteps`, so one storage-state context serves every caller of a role.
+- `searchPalette` lives in the `SearchApi` component (`api.search`), not in `TestsApi`.

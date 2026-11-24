@@ -34,9 +34,9 @@ The status of the search for a foreign project is not stated in the TC (empty `i
 
 ## 4. Assertions Split
 ### Fixed (inside ATC)
-404 equal to a missing Test (ignoring `request_id`); search returns an empty list.
+404 equal to a missing Test (ignoring `request_id`), which is the membership proof for both rows; the project search returns an empty list.
 ### Test-level (in test file)
-Owner-side positive controls (the member finds the live Test through the Test search and the palette search, and not the archived one); live and archived rows behave the same; the Member restores the Test archived for the row.
+The viewer palette (`SearchApi.searchPalette`) answers an empty list. The palette is scoped server-side to the caller's own workspaces, so a non-member cannot reach the foreign Test; this is not a membership check. Owner-side controls read `row.ownerFinds` (the member finds the live Test through the Test search and the palette, and not the archived one); live and archived rows behave the same; the Member restores the Test archived for the row.
 
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |
@@ -66,8 +66,8 @@ Owner-side positive controls (the member finds the live Test through the Test se
 ## 10. As built
 
 - Signature `hideTestFromNonMember({ testId, title, projectId, row })`, `row` from `NON_MEMBER_ROWS` (state, expectedStatus 404, expectedCode `not_found`). The search answers 200 with an empty list; the owner-side search is the positive control.
-- Arena: `TestLifecycleSteps.openForeignArena` (find-only workspace and project, viewer non-membership verified). The palette data source is asserted in the ATC (see below); the palette UI rendering is not (no stable test id).
-- The command palette calls `GET /api/v1/search?q=`, scoped by the active-workspace cookie. The ATC also asserts that the non-member session scoped to the foreign workspace gets no row for the Test there (`searchPalette`). `TestLifecycleSteps.openRoleSession({ role, workspaceId })` builds the scoped session.
+- Arena: `TestLifecycleSteps.openForeignArena` (find-only workspace and project, viewer non-membership verified). The palette data source is asserted in the test (see below); the palette UI rendering is not (no stable test id).
+- The command palette calls `GET /api/v1/search?q=`. The product honours the `bk_active_ws` cookie only for a workspace the caller can see and otherwise falls back to the caller's oldest workspace, so the viewer never searches the foreign workspace and a forged cookie is ignored. `NON_MEMBER_ROWS` declares `ownerFinds` and `searchProvesMembership` (true for live, false for archived, where every search is empty). Only the owner-side session is scoped with the cookie, built by `activeWorkspaceCookie`.
 
 ### Open follow-up
 
