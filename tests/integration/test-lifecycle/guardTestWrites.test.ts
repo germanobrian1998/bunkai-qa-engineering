@@ -233,7 +233,7 @@ test.describe('BK-596: Test write guards', () => {
         expect(before.test.version, 'precondition: the tag change raised the version by one').toBe(seed.version + 1);
         const eventsBefore = await eventIds({ session: member, testId: seed.id, actions: writeActions });
 
-        await member.api.tests.refuseStaleVersionRename({ testId: seed.id, staleVersion: seed.version });
+        await member.api.tests.refuseStaleVersionRename({ testId: seed.id, staleVersion: seed.version, currentVersion: before.test.version });
 
         const [, after] = await member.api.tests.getTest(seed.id);
         expect(after.test.title).toBe(seed.title);

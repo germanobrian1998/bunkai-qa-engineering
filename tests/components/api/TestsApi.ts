@@ -234,6 +234,7 @@ export class TestsApi extends ApiBase {
     const [response, body] = await this.sendViewerWrite(args);
     expect(response.status()).toBe(args.row.expectedStatus);
     expect(body.error.code).toBe(args.row.expectedCode);
+    expect(this.readReason(body)).toBe(args.row.expectedReason);
     return [response, body];
   }
 
@@ -251,12 +252,12 @@ export class TestsApi extends ApiBase {
     expect(this.withoutRequestId(body)).toEqual(this.withoutRequestId(missingBody));
 
     const [, search] = await this.searchTests({ title: args.title, projectId: args.projectId });
-    expect(search.items, 'the project search ignores the workspace scope: it listed a Test of a workspace the caller does not belong to').toEqual([]);
+    expect(search.items, 'the project search lists a Test of a workspace the caller does not belong to: it ignores the workspace scope or the archive filter').toEqual([]);
     return [response, body];
   }
 
   @atc('BK-2165')
-  async refuseStaleVersionRename(args: { testId: string, staleVersion: number }): Promise<[APIResponse, ErrorEnvelope]> {
+  async refuseStaleVersionRename(args: { testId: string, staleVersion: number, currentVersion: number }): Promise<[APIResponse, ErrorEnvelope]> {
     const [response, body] = await this.apiPATCH<ErrorEnvelope, RenameTestRequest>(
       `/v1/tests/${args.testId}`,
       { title: DataFactory.createTestTitle() },
@@ -265,7 +266,7 @@ export class TestsApi extends ApiBase {
     expect(response.status()).toBe(409);
     expect(body.error.code).toBe('conflict');
     expect(this.readReason(body)).toBe(TEST_LIFECYCLE.versionConflictReason);
-    expect(this.readCurrentVersion(body)).toBe(args.staleVersion + 1);
+    expect(this.readCurrentVersion(body)).toBe(args.currentVersion);
     return [response, body];
   }
 }
