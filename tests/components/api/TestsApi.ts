@@ -26,7 +26,8 @@ function hasReason(details: unknown): details is { reason: string } {
 }
 
 function hasTest(body: unknown): body is CreateTestResponse {
-  return typeof body === 'object' && body !== null && 'test' in body;
+  return typeof body === 'object' && body !== null && 'test' in body
+    && typeof body.test === 'object' && body.test !== null && 'id' in body.test && typeof body.test.id === 'string';
 }
 
 export class TestsApi extends ApiBase {
@@ -137,6 +138,7 @@ export class TestsApi extends ApiBase {
     }
     else if (hasTest(body)) {
       const [, read] = await this.getTest(body.test.id);
+      expect(read.test.title).toBe(title);
       expect([...read.test.title]).toHaveLength(row.count);
     }
     return [response, body];

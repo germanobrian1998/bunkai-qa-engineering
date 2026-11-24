@@ -1,3 +1,4 @@
+import type { Request } from '@playwright/test';
 import type { TestContextOptions } from '@TestContext';
 
 import { ACTIVE_WORKSPACE_COOKIE } from '@data/constants';
@@ -20,15 +21,21 @@ export class TestDetailPage extends UiBase {
   @step
   async expectBlankRenameBlocked(args: { testId: string, message: string }): Promise<void> {
     const patches: string[] = [];
-    this.page.on('request', (request) => {
+    const onRequest = (request: Request): void => {
       if (request.method() === 'PATCH' && request.url().endsWith(`/api/v1/tests/${args.testId}`)) {
         patches.push(request.url());
       }
-    });
-    await this.page.getByTestId('test-detail-rename').click();
-    await this.page.getByTestId('test-rename-input').fill('');
-    await this.page.getByTestId('test-rename-save').click();
-    await expect(this.page.getByTestId('test-rename-error')).toHaveText(args.message);
-    expect(patches, 'a blank rename must not leave the page').toEqual([]);
+    };
+    this.page.on('request', onRequest);
+    try {
+      await this.page.getByTestId('test-detail-rename').click();
+      await this.page.getByTestId('test-rename-input').fill('');
+      await this.page.getByTestId('test-rename-save').click();
+      await expect(this.page.getByTestId('test-rename-error')).toHaveText(args.message);
+      expect(patches, 'a blank rename must not leave the page').toEqual([]);
+    }
+    finally {
+      this.page.off('request', onRequest);
+    }
   }
 }

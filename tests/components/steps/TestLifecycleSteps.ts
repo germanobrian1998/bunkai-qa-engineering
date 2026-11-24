@@ -102,7 +102,7 @@ export class TestLifecycleSteps extends TestContext {
 
   private async ensureScaffoldAtc(args: { owner: ApiFixture, project: FixtureProject }): Promise<string> {
     const { owner, project } = args;
-    const [treeResponse, tree] = await owner.structure.listModuleTree(project.id);
+    const [treeResponse, tree] = await owner.bug.listModules(project.id);
     expect(treeResponse.status(), 'arena discovery: module tree').toBe(200);
 
     const foundModule = tree.modules.find(item => item.name === TEST_LIFECYCLE_FIXTURE.moduleName);

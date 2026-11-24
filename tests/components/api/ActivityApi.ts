@@ -78,16 +78,12 @@ export class ActivityApi extends ApiBase {
 
   @step
   async listTestEvents(
-    args: { workspaceId: string, action: ActivityItem['action'], testId?: string, title?: string },
+    args: { workspaceId: string, action: ActivityItem['action'], testId?: string },
   ): Promise<[APIResponse, ActivityItem[]]> {
-    if (args.title !== undefined && args.action !== 'test.created') {
-      throw new Error(`listTestEvents: the title filter only applies to test.created, got ${args.action}`);
-    }
     const [response, page] = await this.listActivity(args.workspaceId);
     expect(response.status(), `GET /v1/activity for ${args.action} events`).toBe(200);
     const items = page.items.filter(item => item.action === args.action
-      && (args.testId === undefined || item.item.entity_id === args.testId)
-      && (args.title === undefined || (item.action === 'test.created' && item.payload.title === args.title)));
+      && (args.testId === undefined || item.item.entity_id === args.testId));
     return [response, items];
   }
 }

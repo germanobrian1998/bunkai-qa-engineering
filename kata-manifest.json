@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-24T14:32:06.500Z",
+  "generatedAt": "2026-11-24T14:41:20.379Z",
   "components": {
     "api": [
       {
@@ -127,12 +127,12 @@
           {
             "id": "BK-2156",
             "method": "refuseBlankTitle",
-            "line": 103
+            "line": 104
           },
           {
             "id": "BK-2167",
             "method": "applyTitleLengthBoundaries",
-            "line": 119
+            "line": 120
           }
         ]
       },
