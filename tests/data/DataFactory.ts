@@ -101,6 +101,14 @@ export class DataFactory {
     return `Kata Test ${this.createTestId('bk596')}`;
   }
 
+  static createTag(): string {
+    return this.createTestId('bk596').toLowerCase();
+  }
+
+  static createPlanName(): string {
+    return `Kata Plan ${this.createTestId('bk596')}`;
+  }
+
   static createTitleOfLength(args: { character: string, count: number }): string {
     return args.character.repeat(args.count);
   }

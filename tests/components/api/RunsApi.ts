@@ -1,7 +1,10 @@
 import type { APIResponse } from '@playwright/test';
 import type { RunReportPage } from '@schemas/runs.types';
+import type { FinishRunBody, FinishRunResponse, MarkStepBody, MarkStepResponse, StartRunBody, StartRunResponse } from '@schemas/tests.types';
 import type { ErrorEnvelope } from '@schemas/workspace.types';
 import type { TestContextOptions } from '@TestContext';
+
+import { randomUUID } from 'node:crypto';
 
 import { ApiBase } from '@api/ApiBase';
 import { expect } from '@playwright/test';
@@ -42,6 +45,38 @@ export class RunsApi extends ApiBase {
   private readReason(body: ErrorEnvelope): unknown {
     const details = body.error.details;
     return typeof details === 'object' && details !== null ? (details as { reason?: unknown }).reason : undefined;
+  }
+
+  @step
+  async startRun(args: { testId: string, environmentId: string }): Promise<[APIResponse, StartRunResponse]> {
+    const [response, body] = await this.apiPOST<StartRunResponse, StartRunBody>(
+      '/v1/runs',
+      { test_id: args.testId, environment_id: args.environmentId },
+      { headers: { 'Idempotency-Key': randomUUID() } },
+    );
+    expect(response.status()).toBe(201);
+    return [response, body];
+  }
+
+  @step
+  async markStep(args: { runId: string, stepId: string, status: MarkStepBody['status'] }): Promise<[APIResponse, MarkStepResponse]> {
+    const [response, body] = await this.apiPOST<MarkStepResponse, MarkStepBody>(
+      `/v1/runs/${args.runId}/steps/${args.stepId}/mark`,
+      { status: args.status },
+      { headers: { 'Idempotency-Key': randomUUID() } },
+    );
+    expect(response.status()).toBe(200);
+    return [response, body];
+  }
+
+  @step
+  async finishRun(args: { runId: string, verdict: FinishRunBody['verdict'] }): Promise<[APIResponse, FinishRunResponse]> {
+    const [response, body] = await this.apiPOST<FinishRunResponse, FinishRunBody>(
+      `/v1/runs/${args.runId}/finish`,
+      { verdict: args.verdict },
+    );
+    expect(response.status()).toBe(200);
+    return [response, body];
   }
 
   @step

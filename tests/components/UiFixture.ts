@@ -21,6 +21,7 @@ import { LoginPage } from '@ui/LoginPage';
 import { MembersPage } from '@ui/MembersPage';
 import { RunsReportPage } from '@ui/RunsReportPage';
 import { TestDetailPage } from '@ui/TestDetailPage';
+import { TestsListPage } from '@ui/TestsListPage';
 import { UiBase } from '@ui/UiBase';
 
 // ============================================
@@ -41,6 +42,8 @@ export class UiFixture extends UiBase {
 
   readonly testDetail: TestDetailPage;
 
+  readonly testsList: TestsListPage;
+
   constructor(options: TestContextOptions) {
     super(options);
 
@@ -50,5 +53,6 @@ export class UiFixture extends UiBase {
     this.runsReport = new RunsReportPage(options);
     this.account = new AccountPage(options);
     this.testDetail = new TestDetailPage(options);
+    this.testsList = new TestsListPage(options);
   }
 }
