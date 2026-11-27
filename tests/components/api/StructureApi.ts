@@ -34,6 +34,13 @@ export class StructureApi extends ApiBase {
   }
 
   @step
+  async archiveModule(moduleId: string): Promise<APIResponse> {
+    const [response] = await this.apiDELETE(`/v1/modules/${moduleId}`);
+    expect(response.status()).toBe(200);
+    return response;
+  }
+
+  @step
   async createUserStory(args: { moduleId: string, title: string }): Promise<[APIResponse, CreateUserStoryResponse]> {
     const [response, body] = await this.apiPOST<CreateUserStoryResponse, CreateUserStoryBody>(
       `/v1/modules/${args.moduleId}/user-stories`,

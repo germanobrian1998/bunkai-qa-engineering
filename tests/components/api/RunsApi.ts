@@ -1,5 +1,6 @@
+import type { RunReadsBaseline, RunReadsScope } from '@data/types';
 import type { APIResponse } from '@playwright/test';
-import type { RunReportPage } from '@schemas/runs.types';
+import type { RunComparison, RunReportItem, RunReportPage, WorkspaceRun, WorkspaceRuns } from '@schemas/runs.types';
 import type { FinishRunBody, FinishRunResponse, MarkStepBody, MarkStepResponse, StartRunBody, StartRunResponse } from '@schemas/tests.types';
 import type { ErrorEnvelope } from '@schemas/workspace.types';
 import type { TestContextOptions } from '@TestContext';
@@ -9,6 +10,8 @@ import { randomUUID } from 'node:crypto';
 import { ApiBase } from '@api/ApiBase';
 import { expect } from '@playwright/test';
 import { atc, step } from '@utils/decorators';
+
+const READ_PAGE_CAP = 40;
 
 const DATABASE_ERROR_TEXT = /invalid input (syntax|value)|out of range|date\/time field|violates|SQLSTATE|relation "|column "/i;
 
@@ -93,6 +96,59 @@ export class RunsApi extends ApiBase {
       `${this.reportPath(args.projectId)}${this.toQueryString(args.query ?? {})}`,
     );
     return [response, body];
+  }
+
+  @step
+  async readModuleReport(args: { projectId: string, moduleId: string }): Promise<[APIResponse, Pick<RunReportPage, 'totals' | 'scope' | 'items'>]> {
+    const items: RunReportItem[] = [];
+    let cursor: string | null = null;
+    for (let pageNumber = 0; pageNumber < READ_PAGE_CAP; pageNumber++) {
+      const query: Record<string, string[]> = cursor === null
+        ? { module_id: [args.moduleId], limit: ['50'] }
+        : { module_id: [args.moduleId], limit: ['50'], cursor: [cursor] };
+      const [response, page] = await this.getReport({ projectId: args.projectId, query });
+      expect(response.status()).toBe(200);
+      items.push(...page.items);
+      cursor = page.next_cursor;
+      if (cursor === null) {
+        return [response, { totals: page.totals, scope: page.scope, items }];
+      }
+    }
+    throw new Error(`GET ${this.reportPath(args.projectId)}: the runs of module ${args.moduleId} were not covered within ${READ_PAGE_CAP} pages`);
+  }
+
+  @step
+  async readWorkspaceRuns(args: { workspaceId: string, projectId: string, testId: string }): Promise<[APIResponse, WorkspaceRun[]]> {
+    const rows: WorkspaceRun[] = [];
+    let cursor: string | null = null;
+    for (let pageNumber = 0; pageNumber < READ_PAGE_CAP; pageNumber++) {
+      const params: Record<string, string> = cursor === null
+        ? { project_id: args.projectId, limit: '50' }
+        : { project_id: args.projectId, limit: '50', cursor };
+      const [response, page] = await this.apiGET<WorkspaceRuns>(`/v1/workspaces/${args.workspaceId}/runs`, { params });
+      expect(response.status()).toBe(200);
+      rows.push(...page.items.filter(row => row.test_id === args.testId));
+      cursor = page.next_cursor;
+      if (cursor === null) {
+        return [response, rows];
+      }
+    }
+    throw new Error(`GET /v1/workspaces/${args.workspaceId}/runs: the runs of project ${args.projectId} were not covered within ${READ_PAGE_CAP} pages`);
+  }
+
+  @step
+  async readCompare(runId: string): Promise<[APIResponse, RunComparison]> {
+    const [response, body] = await this.apiGET<RunComparison>(`/v1/runs/${runId}/compare`);
+    expect(response.status()).toBe(200);
+    return [response, body];
+  }
+
+  @step
+  async captureRunReads(scope: RunReadsScope): Promise<RunReadsBaseline> {
+    const [, report] = await this.readModuleReport({ projectId: scope.projectId, moduleId: scope.moduleId });
+    const [, workspaceRuns] = await this.readWorkspaceRuns({ workspaceId: scope.workspaceId, projectId: scope.projectId, testId: scope.testId });
+    const [, compare] = await this.readCompare(scope.runId);
+    return { report, workspaceRuns, compare };
   }
 
   @atc('BK-1974')
@@ -203,5 +259,17 @@ export class RunsApi extends ApiBase {
       expect(JSON.stringify(error.error)).not.toMatch(DATABASE_ERROR_TEXT);
     }
     return [response, body];
+  }
+
+  @atc('BK-2178')
+  async holdRunReadsAfterArchive(args: { baseline: RunReadsBaseline, scope: RunReadsScope }): Promise<[APIResponse, RunReadsBaseline]> {
+    const { baseline, scope } = args;
+    const after = await this.captureRunReads(scope);
+    expect(after.report, 'the runs report of the Test module (totals, scope and every row) equals its baseline').toEqual(baseline.report);
+    expect(after.workspaceRuns, 'the workspace runs index rows of the Test equal their baseline').toEqual(baseline.workspaceRuns);
+    expect(after.compare, 'the comparison of the latest Run equals its baseline').toEqual(baseline.compare);
+    const [response] = await this.apiGET(`/v1/runs/${scope.runId}`);
+    expect(response.status(), 'the Run of the archived Test still resolves').toBe(200);
+    return [response, after];
   }
 }

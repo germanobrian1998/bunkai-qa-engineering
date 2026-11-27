@@ -109,6 +109,19 @@ export class DataFactory {
     return `Kata Plan ${this.createTestId('bk596')}`;
   }
 
+  static createMilestoneName(): string {
+    return `Kata Milestone ${this.createTestId('bk596')}`;
+  }
+
+  static createMilestoneTargetDate(): string {
+    const day = 24 * 60 * 60 * 1000;
+    return new Date(Date.now() + 30 * day).toISOString().slice(0, 10);
+  }
+
+  static createScaffoldName(): string {
+    return `Kata scaffold ${this.createTestId('bk596')}`;
+  }
+
   static createTitleOfLength(args: { character: string, count: number }): string {
     return args.character.repeat(args.count);
   }

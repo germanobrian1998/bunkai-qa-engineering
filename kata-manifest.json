@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-27T14:40:24.270Z",
+  "generatedAt": "2026-11-27T15:25:01.283Z",
   "components": {
     "api": [
       {
@@ -100,22 +100,27 @@
           {
             "id": "BK-1974",
             "method": "readReportIsolatedToProject",
-            "line": 98
+            "line": 154
           },
           {
             "id": "BK-1975",
             "method": "readReportWithConsistentTotals",
-            "line": 125
+            "line": 181
           },
           {
             "id": "BK-1982",
             "method": "readReportWithScopedToken",
-            "line": 147
+            "line": 203
           },
           {
             "id": "BK-1983",
             "method": "probeReportParameters",
-            "line": 173
+            "line": 229
+          },
+          {
+            "id": "BK-2178",
+            "method": "holdRunReadsAfterArchive",
+            "line": 264
           }
         ]
       },
@@ -264,6 +269,18 @@
         ]
       },
       {
+        "name": "PlanFiguresPage",
+        "file": "PlanFiguresPage.ts",
+        "relativePath": "tests/components/ui/PlanFiguresPage.ts",
+        "atcs": [
+          {
+            "id": "BK-2179",
+            "method": "expectFiguresUnchangedAfterArchive",
+            "line": 59
+          }
+        ]
+      },
+      {
         "name": "RunsReportPage",
         "file": "RunsReportPage.ts",
         "relativePath": "tests/components/ui/RunsReportPage.ts",
@@ -366,6 +383,8 @@
       "relativePath": "tests/components/steps/TestSeedSteps.ts",
       "methods": [
         "seedInState",
+        "seedIsolatedModule",
+        "seedPlanFigures",
         "seedTest",
         "seedWithHistory",
         "teardown"
@@ -373,10 +392,10 @@
     }
   ],
   "summary": {
-    "totalComponents": 18,
-    "totalATCs": 35,
+    "totalComponents": 19,
+    "totalATCs": 37,
     "apiComponents": 12,
-    "uiComponents": 6,
+    "uiComponents": 7,
     "stepsModules": 5
   }
 }

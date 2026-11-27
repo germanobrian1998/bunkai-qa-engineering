@@ -19,6 +19,7 @@ import type { TestContextOptions } from '@TestContext';
 import { AccountPage } from '@ui/AccountPage';
 import { LoginPage } from '@ui/LoginPage';
 import { MembersPage } from '@ui/MembersPage';
+import { PlanFiguresPage } from '@ui/PlanFiguresPage';
 import { RunsReportPage } from '@ui/RunsReportPage';
 import { TestDetailPage } from '@ui/TestDetailPage';
 import { TestsListPage } from '@ui/TestsListPage';
@@ -44,6 +45,8 @@ export class UiFixture extends UiBase {
 
   readonly testsList: TestsListPage;
 
+  readonly planFigures: PlanFiguresPage;
+
   constructor(options: TestContextOptions) {
     super(options);
 
@@ -54,5 +57,6 @@ export class UiFixture extends UiBase {
     this.account = new AccountPage(options);
     this.testDetail = new TestDetailPage(options);
     this.testsList = new TestsListPage(options);
+    this.planFigures = new PlanFiguresPage(options);
   }
 }
