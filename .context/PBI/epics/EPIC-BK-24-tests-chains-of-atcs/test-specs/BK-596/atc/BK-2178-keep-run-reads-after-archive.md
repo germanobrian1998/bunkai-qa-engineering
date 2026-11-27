@@ -13,42 +13,44 @@
 ## 2. ATC Contract
 ```typescript
 @atc('BK-2178')
-async holdRunReadsAfterArchive(args: { baseline: RunReadsBaseline, projectId: string, workspaceId: string, runId: string }): Promise<[APIResponse, RunReadsBaseline]> {
-  const after = await this.captureRunReads(args);
-  expect(after.report).toEqual(args.baseline.report);
-  expect(after.workspaceIndex).toEqual(args.baseline.workspaceIndex);
-  expect(after.compare).toEqual(args.baseline.compare);
-  const [response] = await this.apiGET(`/v1/runs/${args.runId}`);
+async holdRunReadsAfterArchive(args: { baseline: RunReadsBaseline, scope: RunReadsScope }): Promise<[APIResponse, RunReadsBaseline]> {
+  const { baseline, scope } = args;
+  const after = await this.captureRunReads(scope);
+  expect(after.report).toEqual(baseline.report);
+  expect(after.workspaceRuns).toEqual(baseline.workspaceRuns);
+  expect(after.compare).toEqual(baseline.compare);
+  const [response] = await this.apiGET(`/v1/runs/${scope.runId}`);
   expect(response.status()).toBe(200);
   return [response, after];
 }
 ```
-`captureRunReads` is the public `@step` helper that reads every page (`limit` 50 plus `next_cursor`) of `GET /v1/projects/{id}/runs/report` and `GET /v1/workspaces/{id}/runs`, and `GET /v1/runs/{id}/compare`; it is also how the baseline is taken before the archive.
+`RunReadsScope` is `{ workspaceId, projectId, moduleId, testId, runId }`. `captureRunReads(scope)` is the public `@step` helper that reads every page (`limit` 50 plus `next_cursor`, 40-page cap with a named error) of `GET /v1/projects/{id}/runs/report?module_id=` (`readModuleReport`) and `GET /v1/workspaces/{id}/runs?project_id=` (`readWorkspaceRuns`, rows of the Test only), plus `GET /v1/runs/{id}/compare` (`readCompare`); it is also how the baseline is taken before the archive. `RunReadsBaseline` is `{ report: { totals, scope, items }, workspaceRuns, compare }`.
 
 ## 3A. API Details
-`GET /projects/{id}/runs/report`, `GET /workspaces/{id}/runs`, `GET /runs/{id}/compare`; totals are recomputed over the whole filtered set, so every page is read. The archive stimulus is `TestsApi.archiveTest` called by the test between baseline and ATC (the ATC owns the observable outcome, the archive is the shared stimulus of eight TCs; flagged for review).
+`GET /projects/{id}/runs/report`, `GET /workspaces/{id}/runs`, `GET /runs/{id}/compare`, `GET /runs/{id}`; totals are recomputed over the whole filtered set, so every page is read. The archive stimulus is `TestsApi.archiveTest` called by the test between baseline and ATC (the ATC owns the observable outcome, the archive is the shared stimulus of eight TCs).
 
 ## 4. Assertions Split
 ### Fixed (inside ATC)
-Report, workspace index and comparison equal their baselines (totals, counts, rates, rows); the Run still resolves.
+The module-scoped report (totals, scope flags, every row), the workspace index rows of the Test and the comparison of the latest Run equal their baselines; the Run still resolves with 200.
 ### Test-level (in test file)
-Archive 204 and `restoreTest` in teardown; the API proxy of "no row added to or removed from runs" is the equality of the workspace index rows.
+Preconditions that keep the equality from being empty: the report lists exactly the 2 Run ids of the Test history (so the module scope isolates the data), `totals.passed` is 2, the workspace index rows of the Test are exactly those 2 Run ids, and the comparison state is `compared` (the latest Run has a previous Run). The archive (204) is the stimulus.
 
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |
 |----|-----------------|---------------|
 | AC-04 4.3 | EP (single partition: Test with finished Runs) | 1 |
 
-Reduction: none. Isolation: the arena project lives in the Member-owned workspace so concurrent files cannot move the workspace index (OQ3).
+Reduction: none. Isolation: the report is scoped by `module_id` to a module generated for this test, so its totals and rows can only move because of this test (the project and the workspace are shared with other files and sessions). The workspace runs index has no module or Test filter, so it is read with `project_id` and every page, and only the rows of the Test are compared; `workspace_run_count` is workspace-wide shared state and is not compared.
 
 ## 7. Dependencies
-- `TestSeedSteps.seedTest({ atcs: 1, finishedRuns: 2 })`, `TestsApi.archiveTest`
-- Components: RunsApi (reuse and extend: `getReport` is reused for report pages)
+- `TestSeedSteps.seedIsolatedModule` (module, story, criterion and ATC generated for the test), `TestSeedSteps.seedWithHistory({ chainLength: 1, tags, finishedRuns: 2, plans: 0 })`, `TestsApi.listRunHistory`, `TestsApi.archiveTest`
+- Components: RunsApi (extended: `getReport` is reused for the report pages), TestsApi, StructureApi (`archiveModule`), AtcsApi
 
 ## 8. Data Context
 | Precondition | Pattern | Source | Placement | Cleanup |
 |--------------|---------|--------|-----------|---------|
-| Finished Runs | Generate | `POST /runs`, mark, finish | test | `restoreTest`, archive in `afterAll` |
+| Module, story, criterion and ATC of its own | Generate | `POST /projects/{id}/modules`, `/modules/{id}/user-stories`, `/user-stories/{id}/acceptance-criteria`, `POST /atcs` | test | the module is archived by the shared teardown (`DELETE /modules/{id}`, cascade to its ATC), after the Test; residue: the archived module, story and criterion remain in the arena project |
+| Test with 2 finished Runs in that module | Generate | `POST /runs`, mark, finish | test | Test archived by the stimulus and again (idempotent) by the shared teardown; the Runs remain as history |
 
 ## 9. Checklist
 - [ ] holdRunReadsAfterArchive naming
@@ -56,3 +58,12 @@ Reduction: none. Isolation: the arena project lives in the Member-owned workspac
 - [ ] Tuple return
 - [ ] Fixed vs test-level split
 - [ ] Not duplicating an existing ATC
+
+## 10. As built
+
+- Signature: `{ baseline, scope }` instead of the planned flat args, because the module, Test and Run ids travel together (`RunReadsScope` in `tests/data/types.ts`). `restoreTest` in teardown is dropped: the shared teardown archives the Test (idempotent), so a restore would be undone at once.
+- Isolation, decided at Code time: a cookie session cannot send CI context (`branch`) when starting a Run (`ci_context_not_allowed`), so a unique branch could not scope the report. The report is scoped with `module_id` instead, which needs a module generated per test (`TestSeedSteps.seedIsolatedModule`). Without it the project report totals would be shared with every other file of the arena and could move for reasons that have nothing to do with the archive.
+- Workspace index: no Test or module filter exists, so it is read with `project_id`, every page, and only the rows whose `test_id` is the Test are kept and compared. A change to other Tests rows or to `workspace_run_count` is not asserted; a change to the rows of this Test (a row dropped, a count or status moved) fails.
+- Preconditions asserted in the test (report ids equal the history ids, workspace rows equal the history ids, `totals.passed` 2, compare state `compared`) so none of the three equalities can hold only because a read came back empty.
+- The TC line "Run-count integrity is also asserted against the runs table" has no DB client: the equality of the Test rows of the workspace index and of the report rows is its API proxy.
+- Teardown: the Test is archived (the stimulus) and the module is archived by `TestSeedSteps.teardown`; no error from teardown replaces the test error.

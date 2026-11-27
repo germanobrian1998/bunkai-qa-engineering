@@ -89,8 +89,8 @@ Reused non-ATC members by composition: `RunFixtureSteps.openMemberSession`, `Run
 | BK-2167 | TestsApi | `applyTitleLengthBoundaries(target, row, title)` | 200 or 201 within 200 characters (code points), 422 `title_too_long` above, at rename and create; the expected status, reason and code-point count come from the literal TC28 row table (`TITLE_LENGTH_ROWS`) |
 | BK-2171 | TestsApi | `archiveAgainKeepsFirstArchive({ testId, firstArchive })` | 204, `archived_at` and `archived_by` unchanged |
 | BK-2172 | TestsApi | `restoreLiveTestChangesNothing({ testId, versionBefore })` | 200, `test.changed` false, `archived_at` null, version unchanged |
-| BK-2178 | RunsApi | `holdRunReadsAfterArchive` | Runs report, workspace runs index and run comparison equal their baselines, every page |
-| BK-2179 | PlanFiguresPage | `expectFiguresUnchangedAfterArchive` | Open plan figures, milestone readiness and closed plan frozen figures equal the baselines |
+| BK-2178 | RunsApi | `holdRunReadsAfterArchive({ baseline, scope })` | Module-scoped runs report, workspace runs index rows of the Test and run comparison equal their baselines, every page |
+| BK-2179 | PlanFiguresPage | `expectFiguresUnchangedAfterArchive({ baseline, scope })` | Open plan figures, milestone readiness and closed plan frozen figures equal the baselines |
 
 ### New Helpers (No @atc)
 
@@ -104,12 +104,12 @@ Reused non-ATC members by composition: `RunFixtureSteps.openMemberSession`, `Run
 | TestsApi | `listRunHistory` | `[APIResponse, RunHistoryPage]` | `GET /tests/{id}/runs`, one page or all pages |
 | TestsApi | `listByTag`, `searchTests` | `[APIResponse, ...]` | `GET /tests?tag=`, `GET /tests/search`, one page or all |
 | RunsApi | `startRun`, `markStep`, `finishRun` | tuples | Real-path Run generation (assert 201/200) |
-| RunsApi | `readWorkspaceRuns`, `readCompare`, `captureRunReads` | tuples / `RunReadsBaseline` | All pages of report and workspace index plus compare, for BK-2178 |
+| RunsApi | `readModuleReport`, `readWorkspaceRuns`, `readCompare`, `captureRunReads` | tuples / `RunReadsBaseline` | All pages of the module-scoped report and the workspace index (rows of the Test) plus compare, for BK-2178 |
 | ActivityApi | `snapshotTestEvents`, `listNewTestEvents` | `string[]` | Event ids of the feed filtered by action list and optional Test id; the delta read returns the ids not in a known snapshot. The only implementation, used by every spec |
 | AtcsApi | `createAtc`, `archiveAtc`, `readAtcUsage` | tuples | Seeding; usage read for BK-2152 |
 | StructureApi | `createModule`, `createUserStory`, `createAcceptanceCriterion`, `archiveModule` | tuples | Seeding scaffold |
 | SearchApi | `searchWorkspace`, `searchChatEntities` | tuples | Offer-surface reads for BK-2152 |
-| PlansApi | `createPlan`, `addTests`, `closePlan`, `listPlanTests`, `createMilestone`, `attachPlans` | tuples | TC40 seeding and the "no membership row added or removed" read |
+| PlansApi | `createPlan`, `addTests`, `closePlan`, `listPlanTests`, `createMilestone`, `attachPlans`, `archiveMilestone` | tuples | TC40 seeding, teardown and the "no membership row added or removed" read |
 | TestDetailPage | `goto`, `expectNoWriteControls`, `expectOffersWriteControls`, `expectFrozen`, `expectNoStartRun`, `expectRenameError`, `readRunHistoryRows` | `void` / data | Test-level UI assertions for ATC-owning TCs and the UI halves of integration TCs |
 
 ## 4. Test Data Strategy
@@ -149,8 +149,8 @@ Generate per test through the product API (Test, ATCs, Runs, plans, milestone), 
 | BK-2167 | live Test, one live ATC | Generate | Feasible | Titles from `DataFactory.createTitleOfLength`; created Tests archived in `afterAll` |
 | BK-2171 | Test archived by the Member; Admin session | Generate + Discover | Feasible | QA workspace |
 | BK-2172 | live Test | Generate | Feasible | |
-| BK-2178 | Test with finished Runs; baselines of 3 reads | Generate | Risky | Workspace runs index is workspace-wide: concurrent files could move it; arena is the Member-owned workspace, project generated (OQ3) |
-| BK-2179 | Test in open plan (in milestone) and closed plan; baselines | Generate through the real path | Risky | Figures readable only on pages (OQ1); closing a plan needs a verdict |
+| BK-2178 | Test with finished Runs; baselines of 3 reads | Generate | Feasible | Report scoped by a generated module (`module_id`); workspace index read per project and compared on the Test rows only (PR4 deviations) |
+| BK-2179 | Test in open plan (in milestone) and closed plan; baselines | Generate through the real path | Feasible | Figures readable only on pages (OQ1, decided: UI ATC); closing a plan needs a verdict; a milestone accepts open plans only |
 
 ### 4.3 DB reads replaced by product API reads
 
@@ -374,16 +374,16 @@ Fixture: `{ test: kata }` with Member storage state.
 
 #### Scenario 1: BK-2178 run reads unchanged
 Test: "BK-2178: should keep the runs report, the workspace runs index and the run comparison identical after archiving a Test given a Test with finished Runs"
-Preconditions: arena project and workspace; Test with finished Runs; `RunsApi.captureRunReads` baseline (every page, limit 50 plus cursor).
-ATCs called: `member.api.runs.holdRunReadsAfterArchive({ baseline, ... })` after `member.api.tests.archiveTest`.
-Teardown: `restoreTest`.
+Preconditions: arena workspace and project; a module of its own (`seedIsolatedModule`); Test with 2 finished Runs in it; `RunsApi.captureRunReads` baseline (every page, limit 50 plus cursor) with the report scoped by `module_id`; the baseline is asserted to list exactly the 2 Runs of the Test, `compared` state.
+ATCs called: `member.api.runs.holdRunReadsAfterArchive({ baseline, scope })` after `member.api.tests.archiveTest`.
+Teardown: the shared teardown archives the Test and the module (no `restoreTest`).
 
 #### Scenario 2: BK-2179 plan figures unchanged
 Test: "BK-2179: should keep open plan progress, milestone readiness and a closed plan snapshot identical after archiving a Test given a Test held by open and closed plans"
-Preconditions: Test with a finished passed Run; open plan holding it, attached to a milestone; closed plan holding it (closed through `closePlan`); `PlanFiguresPage` baselines.
-ATCs called: `kata.ui.planFigures.expectFiguresUnchangedAfterArchive({ baseline })` after `archiveTest`.
-Test-level assertions: `listPlanTests` of both plans still lists the Test (no membership row added or removed).
-Teardown: `restoreTest`.
+Preconditions: a Test with a finished passed Run and a never-run Test; open plan holding both, attached to a milestone; closed plan holding both (closed through `closePlan`); `PlanFiguresPage.readFigures` baseline (open 50 percent).
+ATCs called: `kata.ui.planFigures.expectFiguresUnchangedAfterArchive({ baseline, scope })` after `archiveTest`.
+Test-level assertions: `listPlanTests` of both plans lists the same memberships (`id`, `added_at`, `added_by`) before and after (no membership row added or removed).
+Teardown: the shared teardown closes the open plan, archives the milestone and the Tests (no `restoreTest`).
 
 ### PR1 deviations (BK-2156 and BK-2167)
 
@@ -455,3 +455,14 @@ Dependency graph: WP1 -> WP2 -> WP3 -> WP4 -> {WP5 -> WP6} -> {WP7, WP8} -> {WP9
 - New supporting code used by BK-2153: `PlansApi` (`createPlan`, `addTests`, `closePlan`, registered as `api.plans`), `RunsApi.startRun`, `markStep`, `finishRun`, `StructureApi.listEnvironments`, `createEnvironment` (arena environment `kata-bk596-env`, found or created by `TestSeedSteps`), `TestSeedSteps.seedWithHistory`, `TestsApi.restoreTest`, `listByTag`, `listRunHistory`. Member can create environments and plans (member+). Environments have no archive route and stay in the arena project. Plans have no archive route or delete route either, but `TestSeedSteps.teardown` closes every plan it created (`PlansApi.closePlan({ planId, verdict, summary })`, `POST /test-plans/{id}/close`, 200, with the `PLAN_TEARDOWN` verdict and a summary that marks the closure as fixture teardown), so a BK-2153 run leaves 3 closed plans in staging history and no open one; `ActivityApi.snapshotTestEvents` with a `testId` now follows `next_cursor` (cap 20 pages) until events are older than the Test's `created_at`.
 - BK-2146 UI half: a new `TestsListPage` (`testsList`) on the project Tests list, which hosts the same `test-tag-filter` as the workbench. `filterByTag` retries fill plus the product's lookup response (`GET /api/v1/tests?tag=`, debounced 250 ms) in a bounded `toPass`, because the input is server-rendered and a fill before hydration is lost. `expectFilteredRows({ ids })` asserts `tests-list-error` is not visible, then for ids waits for `tests-list-table` and polls until the visible `tests-list-row-{id}` set equals the API ids in order, and for an empty list asserts `tests-list-no-match`. While the lookup is pending the list shows a skeleton, not the unfiltered list. The UI half proves the filter ran (the untagged live Test, seeded as negative control, is absent on the shared row; `tests-list-no-match` on the empty row) and that rendered rows follow the list's sort, which matches the API order; it cannot observe an archived id leaking out of the tag API because the list source excludes archived Tests, so the API half is the proof that archived Tests are dropped. The UI order equality relies on the list default sort (`created desc`) matching the API order, so a sort change there would surface as a UI failure. The explorer Tests group has no stable locator and is not asserted. The `smoke` row is replaced by the generated solo tag (OQ4), so the second row ends with an empty list.
 - New files `hideArchivedTestFromOffers.test.ts` and `repeatArchiveRestore.test.ts` carry `@critical` (BK-2146, BK-2153), `@high` (BK-2171) and `@medium` (BK-2172) to match their TC priorities.
+
+### PR4 deviations (BK-2178, BK-2179)
+
+- Signatures: both ATCs take `{ baseline, scope }` (`RunReadsScope`, `PlanFiguresScope` in `tests/data/types.ts`) instead of loose ids; the ids of one scenario travel together and stay within the two-positional-parameter rule. `restoreTest` in teardown is dropped for both (the shared teardown archives the Tests; a restore would be undone at once), like PR2 and PR3.
+- BK-2178 isolation (lesson: shared reads): the project runs report totals are shared with every file of the arena, so the report is scoped with `module_id` to a module, story, criterion and ATC generated for the test (`TestSeedSteps.seedIsolatedModule`, archived by the teardown through the new `StructureApi.archiveModule`). A unique `branch` would have scoped it without a module, but a cookie session cannot send CI context (`ci_context_not_allowed`), so the Member cookie Runs cannot carry one. The workspace runs index has no Test or module filter: it is read per `project_id`, every page, and only the rows of the Test are compared; `workspace_run_count` is workspace-wide and not compared. The seed helpers `seedWithHistory` and `finishPassedRun` are unchanged; the isolated arena is passed as the `arena` argument (`{ ...arena, atcId }`).
+- BK-2178 preconditions in the test make each equality able to fail: the module report lists exactly the Test Run ids, the workspace rows of the Test are exactly those ids, `totals.passed` is 2 and the comparison state is `compared`.
+- BK-2179 data: a second Test, never run, joins the passed Test in both plans, so the open plan reads 50 percent, 1 of 2, and an archive that dropped the member would move percent and count. The plan page, the milestone page and the closed plan page are read with their server-rendered routes (no hydration wait); the visibility wait on the figures card rejects the empty and unavailable states. Figures are read as `textContent` (the passed label is upper-cased by CSS).
+- BK-2179 milestone: the product accepts open plans only, so the closed plan is outside the milestone; the milestone pools the open plan. `PlansApi` gained `createMilestone`, `attachPlans`, `archiveMilestone` and `listPlanTests` (the PR3 deviation that skipped `listPlanTests` no longer applies: BK-2179 reads memberships from the test). Milestone and plan teardown: the open plan is closed (`PLAN_TEARDOWN`), the milestone archived; the closed plan is removed from the teardown list once its close succeeds (a second close would be refused). `PLAN_FIGURES_CLOSE` holds the verdict and summary of the closed plan.
+- Gap kept visible: the closed plan `progress_snapshot` "byte-identical" check has no DB or API path; the frozen figures rendered by the closed plan page stand in for it (spec.md OQ1).
+- Residue per run in staging: BK-2178 leaves 1 archived module with its story, criterion and ATC and 2 finished Runs of an archived Test; BK-2179 leaves 2 closed plans, 1 archived milestone and 2 archived Tests (one with a finished Run).
+- Both tests carry `@critical` and `@regression` to match the TC priority.
