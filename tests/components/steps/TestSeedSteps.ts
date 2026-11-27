@@ -1,7 +1,7 @@
 import type { ApiFixture } from '@ApiFixture';
 
 import type { SeededTest, TestLifecycleArena } from '@data/types';
-import { TEST_LIFECYCLE_FIXTURE } from '@data/constants';
+import { PLAN_TEARDOWN, TEST_LIFECYCLE_FIXTURE } from '@data/constants';
 import { DataFactory } from '@DataFactory';
 import { TestContext } from '@TestContext';
 
@@ -116,7 +116,7 @@ export class TestSeedSteps extends TestContext {
     const failedPlanIds: string[] = [];
     for (const plan of this.createdPlans) {
       try {
-        await plan.api.plans.closePlan(plan.id);
+        await plan.api.plans.closePlan({ planId: plan.id, verdict: PLAN_TEARDOWN.verdict, summary: PLAN_TEARDOWN.summary });
       }
       catch (error) {
         failedPlanIds.push(plan.id);

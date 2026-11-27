@@ -42,8 +42,11 @@ export class PlansApi extends ApiBase {
   }
 
   @step
-  async closePlan(planId: string): Promise<[APIResponse, ClosePlanResponse]> {
-    const [response, body] = await this.apiPOST<ClosePlanResponse, ClosePlanBody>(`/v1/test-plans/${planId}/close`, { verdict: 'passed' });
+  async closePlan(args: { planId: string, verdict: ClosePlanBody['verdict'], summary: string }): Promise<[APIResponse, ClosePlanResponse]> {
+    const [response, body] = await this.apiPOST<ClosePlanResponse, ClosePlanBody>(
+      `/v1/test-plans/${args.planId}/close`,
+      { verdict: args.verdict, summary: args.summary },
+    );
     expect(response.status()).toBe(200);
     return [response, body];
   }

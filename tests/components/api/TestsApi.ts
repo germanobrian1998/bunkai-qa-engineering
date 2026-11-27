@@ -32,6 +32,8 @@ export interface CreateTarget { kind: 'create', atcId: string, workspaceId: stri
 export type TitleWriteBody = RenameTestResponse | CreateTestResponse | ErrorEnvelope;
 export interface FirstArchive { archivedAt: string, archivedBy: string }
 
+const LIST_PAGE_CAP = 20;
+
 interface PlanMembership { id: string, added_at: string, added_by: string | null }
 
 interface TestRecords {
@@ -196,32 +198,34 @@ export class TestsApi extends ApiBase {
   async listByTag(tag: string): Promise<[APIResponse, FilteredTest[]]> {
     const items: FilteredTest[] = [];
     let cursor: string | null = null;
-    let last: APIResponse;
-    do {
+    for (let pageNumber = 0; pageNumber < LIST_PAGE_CAP; pageNumber++) {
       const params: Record<string, string> = cursor === null ? { tag, limit: '50' } : { tag, limit: '50', cursor };
       const [response, body] = await this.apiGET<FilterTestsResponse>('/v1/tests', { params });
       expect(response.status()).toBe(200);
       items.push(...body.items);
       cursor = body.next_cursor;
-      last = response;
-    } while (cursor !== null);
-    return [last, items];
+      if (cursor === null) {
+        return [response, items];
+      }
+    }
+    throw new Error(`GET /v1/tests: the Tests tagged ${tag} were not covered within ${LIST_PAGE_CAP} pages`);
   }
 
   @step
   async listRunHistory(testId: string): Promise<[APIResponse, RunHistoryItem[]]> {
     const items: RunHistoryItem[] = [];
     let cursor: string | null = null;
-    let last: APIResponse;
-    do {
+    for (let pageNumber = 0; pageNumber < LIST_PAGE_CAP; pageNumber++) {
       const params: Record<string, string> = cursor === null ? {} : { cursor };
       const [response, body] = await this.apiGET<RunHistoryPage>(`/v1/tests/${testId}/runs`, { params });
       expect(response.status()).toBe(200);
       items.push(...body.items);
       cursor = body.next_cursor;
-      last = response;
-    } while (cursor !== null);
-    return [last, items];
+      if (cursor === null) {
+        return [response, items];
+      }
+    }
+    throw new Error(`GET /v1/tests/${testId}/runs: the run history was not covered within ${LIST_PAGE_CAP} pages`);
   }
 
   @step

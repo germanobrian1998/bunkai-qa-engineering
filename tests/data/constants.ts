@@ -63,6 +63,11 @@ export const TEST_LIFECYCLE = {
   staleTags: ['bk596-stale'],
 } as const;
 
+export const PLAN_TEARDOWN = {
+  verdict: 'passed',
+  summary: 'kata teardown: fixture plan closed by automated cleanup',
+} as const;
+
 export const ACTIVE_WORKSPACE_COOKIE = 'bk_active_ws';
 
 export const TEST_LIFECYCLE_FIXTURE = {
