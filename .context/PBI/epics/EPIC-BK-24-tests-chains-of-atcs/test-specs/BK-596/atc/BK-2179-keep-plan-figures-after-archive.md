@@ -29,7 +29,7 @@ Routes (product source): `/projects/{slug}/plans/{planId}` and `/projects/{slug}
 ### Fixed (inside ATC)
 Open plan, milestone and closed plan figures (percent, passed label, outcome chips, note) equal their baselines.
 ### Test-level (in test file)
-Preconditions that keep the equality meaningful: the open plan reads 50 percent with "1 of 2", live note; the milestone reads 50 percent; the closed plan reads 50 percent with the frozen note. Archive 204 via `TestsApi.archiveTest` between baseline and ATC. After the ATC, `PlansApi.listPlanTests` of both plans lists the same memberships (`id`, `added_at`, `added_by`) as before the archive (no membership row added or removed; `archived_at` of the Test row legitimately changes and is not compared).
+Preconditions that keep the equality meaningful: the open plan reads 50 percent with "1 of 2", chips Passed 1 and Not run 1, live note; the milestone reads 50 percent; the closed plan, closed before the passed Run finished, reads 0 percent with "0 of 2" and the frozen note, so its frozen figures differ from the live ones and a live recompute (50 percent) would fail the equality. Archive 204 via `TestsApi.archiveTest` between baseline and ATC. After the ATC (kept in the spec, with an honest message, to keep one TC = one ATC), `PlansApi.listPlanMemberships` of both plans lists the same memberships (`id`, `added_at`, `added_by`) as before the archive (no membership row added or removed; `archived_at` of the Test row legitimately changes and is not compared).
 
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |
@@ -39,13 +39,13 @@ Preconditions that keep the equality meaningful: the open plan reads 50 percent 
 Reduction: none.
 
 ## 7. Dependencies
-- `TestSeedSteps.seedWithHistory({ chainLength: 1, tags, finishedRuns: 1, plans: 0 })` (Test with a passed Run), `TestSeedSteps.seedTest` (second Test, never run), `TestSeedSteps.seedPlanFigures({ testIds })` (open plan in a milestone, closed plan, both holding the two Tests)
-- Components: PlanFiguresPage NEW, PlansApi (`createPlan`, `addTests`, `closePlan`, `listPlanTests`, `createMilestone`, `attachPlans`, `archiveMilestone`), TestsApi
+- `TestSeedSteps.seedPlanFigures` (two Tests without tags, one never run; open plan holding both; closed plan holding both, closed before the passed Run finishes; then one finished passed Run; milestone with the open plan)
+- Components: PlanFiguresPage NEW, PlansApi (`createPlan`, `addTests`, `closePlan`, `listPlanMemberships`, `createMilestone`, `attachPlans`, `archiveMilestone`), TestsApi
 
 ## 8. Data Context
 | Precondition | Pattern | Source | Placement | Cleanup |
 |--------------|---------|--------|-----------|---------|
-| Test with a passed Run and a second Test never run | Generate | `POST /tests`, `POST /runs`, mark, finish | test | both Tests archived by the shared teardown |
+| Two Tests (no tags), one given a passed Run after the closed plan closes | Generate | `POST /tests`, `POST /runs`, mark, finish | test | both Tests archived by the shared teardown |
 | Open plan in a milestone, closed plan, both with the two Tests | Generate through the real path | `POST /projects/{id}/test-plans`, `POST /test-plans/{id}/tests`, `POST /projects/{id}/milestones`, `POST .../milestones/{id}/plans`, `POST /test-plans/{id}/close` (`PLAN_FIGURES_CLOSE`) | test | the open plan is closed by the shared teardown (`PLAN_TEARDOWN`), the milestone is archived (`POST /milestones/{id}/archive`); the closed plan is not registered for teardown once its close succeeded; residue: 2 closed plans and 1 archived milestone per run |
 
 ## 9. Checklist
@@ -58,8 +58,8 @@ Reduction: none.
 ## 10. As built
 
 - Signature: `{ baseline, scope }` (the plan had `openPlanId`, `closedPlanId`, `milestoneId`; the page also needs the project slug and the workspace id for the active workspace cookie). The type of the figures is `PlanFiguresBaseline` in `tests/data/types.ts`.
-- Two members, not one: a passed Test and a never-run Test, so the open plan reads 50 percent, 1 of 2. With one member an archive that dropped it from the count would leave an empty state; with two it moves the percent and the member count, so the equality can fail. The closed plan is closed with both members before the archive, so its frozen figures also carry 50 percent; its page never recomputes, and the equality proves the page still shows the frozen figures.
+- Two members, not one: a passed Test and a never-run Test, so the open plan reads 50 percent, 1 of 2. With one member an archive that dropped it from the count would leave an empty state; with two it moves the percent and the member count, so the equality can fail. The closed plan is closed with both members BEFORE the passed Run finishes (`seedPlanFigures` order), so its frozen snapshot reads 0 percent, 0 of 2 while a live recompute reads 50 percent, 1 of 2. Preconditions pin both literals; the equality therefore proves the page keeps the frozen snapshot (product `0095_plan_close.sql` stores `bunkai_plan_progress` at close, the plan page renders `progress_snapshot` for closed plans) and not a live recompute. Without this ordering the snapshot and the live figures coincide and the check cannot fail.
 - The figures are read as text of product test ids; chips and notes use `textContent` (the passed label is upper-cased by CSS, so `innerText` would differ from the source copy). The milestone and plan states other than the figures card (empty, unavailable, skeleton) fail the visibility wait instead of producing an empty comparison.
 - Shared state: every figure belongs to plans and a milestone generated for the test, so concurrent files cannot move them.
-- `restoreTest` in teardown is dropped (the shared teardown archives the Tests). The milestone is archived and the open plan closed by `TestSeedSteps.teardown`; the closed plan is already closed. The TC "no row added to or removed from `test_plan_tests`" is the equality of the memberships (`id`, `added_at`, `added_by`) of both plans before and after, read with the new `PlansApi.listPlanTests`.
+- `restoreTest` in teardown is dropped (the shared teardown archives the Tests). The milestone is archived and the open plan closed by `TestSeedSteps.teardown`; the closed plan is already closed. The TC "no row added to or removed from `test_plan_tests`" is the equality of the memberships (`id`, `added_at`, `added_by`) of both plans before and after, read with the new `PlansApi.listPlanMemberships` (the spec has no local reader; `TestsApi` keeps its own private reader because the KATA layer rule forbids a domain component importing another).
 - The closed plan `progress_snapshot` byte equality is approximated by the rendered frozen figures (no DB client, no endpoint); recorded as a gap, not a silent pass.
