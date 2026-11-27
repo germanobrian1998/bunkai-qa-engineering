@@ -1,10 +1,16 @@
-import type { FrozenWriteRow, NonMemberRow, TitleLengthRow, ViewerWriteRow } from '@data/constants';
+import type { FrozenWriteRow, NonMemberRow, TagFilterRow, TitleLengthRow, ViewerWriteRow } from '@data/constants';
 import type { APIResponse } from '@playwright/test';
 import type {
   CreateTestResponse,
+  FilteredTest,
+  FilterTestsResponse,
   GetTestResponse,
+  PlanMemberTestsResponse,
   RenameTestRequest,
   RenameTestResponse,
+  RestoreTestResponse,
+  RunHistoryItem,
+  RunHistoryPage,
   SearchTestsResponse,
   TestCreateBody,
   TestReorderBody,
@@ -24,6 +30,19 @@ import { atc, step } from '@utils/decorators';
 export interface RenameTarget { kind: 'rename', testId: string, seedTitle: string, seedVersion: number }
 export interface CreateTarget { kind: 'create', atcId: string, workspaceId: string, onCreated: (testId: string) => void }
 export type TitleWriteBody = RenameTestResponse | CreateTestResponse | ErrorEnvelope;
+export interface FirstArchive { archivedAt: string, archivedBy: string }
+
+const LIST_PAGE_CAP = 20;
+
+interface PlanMembership { id: string, added_at: string, added_by: string | null }
+
+interface TestRecords {
+  runIds: string[]
+  stepIds: string[]
+  tags: string[]
+  planIds: string[]
+  planMemberships: Record<string, PlanMembership[]>
+}
 
 function hasReason(details: unknown): details is { reason: string } {
   return typeof details === 'object' && details !== null && 'reason' in details && typeof details.reason === 'string';
@@ -169,6 +188,74 @@ export class TestsApi extends ApiBase {
   }
 
   @step
+  async restoreTest(testId: string): Promise<[APIResponse, RestoreTestResponse]> {
+    const [response, body] = await this.apiPOST<RestoreTestResponse, Record<string, never>>(`/v1/tests/${testId}/restore`, {});
+    expect(response.status()).toBe(200);
+    return [response, body];
+  }
+
+  @step
+  async listByTag(tag: string): Promise<[APIResponse, FilteredTest[]]> {
+    const items: FilteredTest[] = [];
+    let cursor: string | null = null;
+    for (let pageNumber = 0; pageNumber < LIST_PAGE_CAP; pageNumber++) {
+      const params: Record<string, string> = cursor === null ? { tag, limit: '50' } : { tag, limit: '50', cursor };
+      const [response, body] = await this.apiGET<FilterTestsResponse>('/v1/tests', { params });
+      expect(response.status()).toBe(200);
+      items.push(...body.items);
+      cursor = body.next_cursor;
+      if (cursor === null) {
+        return [response, items];
+      }
+    }
+    throw new Error(`GET /v1/tests: the Tests tagged ${tag} were not covered within ${LIST_PAGE_CAP} pages`);
+  }
+
+  @step
+  async listRunHistory(testId: string): Promise<[APIResponse, RunHistoryItem[]]> {
+    const items: RunHistoryItem[] = [];
+    let cursor: string | null = null;
+    for (let pageNumber = 0; pageNumber < LIST_PAGE_CAP; pageNumber++) {
+      const params: Record<string, string> = cursor === null ? {} : { cursor };
+      const [response, body] = await this.apiGET<RunHistoryPage>(`/v1/tests/${testId}/runs`, { params });
+      expect(response.status()).toBe(200);
+      items.push(...body.items);
+      cursor = body.next_cursor;
+      if (cursor === null) {
+        return [response, items];
+      }
+    }
+    throw new Error(`GET /v1/tests/${testId}/runs: the run history was not covered within ${LIST_PAGE_CAP} pages`);
+  }
+
+  @step
+  private async readPlanMemberships(planId: string): Promise<PlanMembership[]> {
+    const [response, body] = await this.apiGET<PlanMemberTestsResponse>(`/v1/test-plans/${planId}/tests`);
+    expect(response.status()).toBe(200);
+    return body.tests
+      .map(member => ({ id: member.id, added_at: member.added_at, added_by: member.added_by }))
+      .sort((a, b) => a.id.localeCompare(b.id));
+  }
+
+  @step
+  private async captureRecords(testId: string): Promise<TestRecords> {
+    const [, read] = await this.getTest(testId);
+    const [, runs] = await this.listRunHistory(testId);
+    const planIds = read.test.plans.map(plan => plan.id).sort();
+    const planMemberships: Record<string, PlanMembership[]> = {};
+    for (const planId of planIds) {
+      planMemberships[planId] = await this.readPlanMemberships(planId);
+    }
+    return {
+      runIds: runs.map(run => run.id).sort(),
+      stepIds: read.test.atcs.map(atc => atc.step_id),
+      tags: [...read.test.tags].sort(),
+      planIds,
+      planMemberships,
+    };
+  }
+
+  @step
   private async expectSeedUntouched(target: RenameTarget): Promise<void> {
     const [, read] = await this.getTest(target.testId);
     expect(read.test.title).toBe(target.seedTitle);
@@ -267,5 +354,59 @@ export class TestsApi extends ApiBase {
     expect(this.readReason(body)).toBe(TEST_LIFECYCLE.versionConflictReason);
     expect(this.readCurrentVersion(body)).toBe(args.currentVersion);
     return [response, body];
+  }
+
+  @atc('BK-2171')
+  async archiveAgainKeepsFirstArchive(args: { testId: string, firstArchive: FirstArchive }): Promise<[APIResponse, GetTestResponse]> {
+    const [response] = await this.apiDELETE(`/v1/tests/${args.testId}`);
+    expect(response.status()).toBe(204);
+    const [readResponse, read] = await this.getTest(args.testId);
+    expect(read.test.archived_at).toBe(args.firstArchive.archivedAt);
+    expect(read.test.archived_by).toBe(args.firstArchive.archivedBy);
+    return [readResponse, read];
+  }
+
+  @atc('BK-2172')
+  async restoreLiveTestChangesNothing(args: { testId: string, versionBefore: number }): Promise<[APIResponse, RestoreTestResponse]> {
+    const [response, body] = await this.restoreTest(args.testId);
+    expect(body.test.changed).toBe(false);
+    expect(body.test.archived_at).toBeNull();
+    const [, read] = await this.getTest(args.testId);
+    expect(read.test.archived_at).toBeNull();
+    expect(read.test.version).toBe(args.versionBefore);
+    return [response, body];
+  }
+
+  @atc('BK-2153')
+  async keepRecordsAcrossArchiveAndRestore(args: { testId: string }): Promise<[APIResponse, GetTestResponse]> {
+    const baseline = await this.captureRecords(args.testId);
+    expect(baseline.runIds, 'precondition: the Test has Runs to keep').not.toHaveLength(0);
+    expect(baseline.stepIds, 'precondition: the Test chains steps to keep').not.toHaveLength(0);
+    expect(baseline.planIds, 'precondition: plans hold the Test').not.toHaveLength(0);
+
+    await this.archiveTest(args.testId);
+    const [, archived] = await this.getTest(args.testId);
+    expect(archived.test.archived_at, 'the Test row still resolves and is marked archived').not.toBeNull();
+    expect(await this.captureRecords(args.testId), 'archive must not add, remove or re-insert a Run, step, tag or plan membership (member, added_at, added_by)').toEqual(baseline);
+
+    const [response] = await this.restoreTest(args.testId);
+    const [, restored] = await this.getTest(args.testId);
+    expect(restored.test.archived_at, 'the Test row is live again').toBeNull();
+    expect(await this.captureRecords(args.testId), 'restore must leave every Run, step, tag and plan membership (member, added_at, added_by) at the baseline').toEqual(baseline);
+    return [response, restored];
+  }
+
+  @atc('BK-2146')
+  async listTagFilterWithoutArchived(
+    args: { row: TagFilterRow, tag: string, testId: string, baseline: string[] },
+  ): Promise<[APIResponse, FilteredTest[]]> {
+    const { row, tag, testId, baseline } = args;
+    expect(baseline, 'precondition: the tag filter lists the Test before it is archived').toContain(testId);
+    const [response, items] = await this.listByTag(tag);
+    const ids = items.map(item => item.id);
+    expect(ids).not.toContain(testId);
+    expect(ids, 'the tag filter drops exactly the archived Test and keeps the rest in the baseline order').toEqual(baseline.filter(id => id !== testId));
+    expect(ids).toHaveLength(row.expectedRemaining);
+    return [response, items];
   }
 }

@@ -38,3 +38,31 @@ export type CreateAcceptanceCriterionResponse = paths['/api/v1/user-stories/{id}
 export type CreateAtcResponse = paths['/api/v1/atcs']['post']['responses']['201']['content']['application/json'];
 
 export type SearchAtcsResponse = paths['/api/v1/atcs/search']['get']['responses']['200']['content']['application/json'];
+
+export type RestoreTestResponse = paths['/api/v1/tests/{id}/restore']['post']['responses']['200']['content']['application/json'];
+
+export type FilterTestsResponse = paths['/api/v1/tests']['get']['responses']['200']['content']['application/json'];
+export type FilteredTest = components['schemas']['FilteredTest'];
+
+export type RunHistoryPage = components['schemas']['RunHistoryPage'];
+export type RunHistoryItem = components['schemas']['RunHistoryItem'];
+
+export type PlanMemberTestsResponse = components['schemas']['TestPlanMemberTestListResponse'];
+
+export type StartRunBody = components['schemas']['RunCreateBody'];
+export type StartRunResponse = paths['/api/v1/runs']['post']['responses']['201']['content']['application/json'];
+export type MarkStepBody = components['schemas']['RunStepMarkBody'];
+export type MarkStepResponse = paths['/api/v1/runs/{id}/steps/{stepId}/mark']['post']['responses']['200']['content']['application/json'];
+export type FinishRunBody = components['schemas']['RunFinishBody'];
+export type FinishRunResponse = paths['/api/v1/runs/{id}/finish']['post']['responses']['200']['content']['application/json'];
+
+export type CreatePlanBody = components['schemas']['TestPlanCreateBody'];
+export type CreatePlanResponse = components['schemas']['TestPlanCreateResponse'];
+export type AddPlanTestsBody = components['schemas']['TestPlanAddTestsBody'];
+export type AddPlanTestsResponse = components['schemas']['TestPlanAddTestsResponse'];
+export type ClosePlanBody = components['schemas']['TestPlanCloseBody'];
+export type ClosePlanResponse = components['schemas']['TestPlanClosureResponse'];
+
+export type ListEnvironmentsResponse = components['schemas']['ProjectEnvironmentListResponse'];
+export type CreateEnvironmentBody = components['schemas']['ProjectEnvironmentCreateBody'];
+export type CreateEnvironmentResponse = components['schemas']['ProjectEnvironmentCreateResponse'];

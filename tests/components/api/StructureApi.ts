@@ -2,10 +2,13 @@ import type { APIResponse } from '@playwright/test';
 import type {
   CreateAcceptanceCriterionBody,
   CreateAcceptanceCriterionResponse,
+  CreateEnvironmentBody,
+  CreateEnvironmentResponse,
   CreateModuleBody,
   CreateModuleResponse,
   CreateUserStoryBody,
   CreateUserStoryResponse,
+  ListEnvironmentsResponse,
 } from '@schemas/tests.types';
 import type { TestContextOptions } from '@TestContext';
 
@@ -48,6 +51,23 @@ export class StructureApi extends ApiBase {
     const [response, body] = await this.apiPOST<CreateAcceptanceCriterionResponse, CreateAcceptanceCriterionBody>(
       `/v1/user-stories/${args.userStoryId}/acceptance-criteria`,
       { title: args.title },
+    );
+    expect(response.status()).toBe(201);
+    return [response, body];
+  }
+
+  @step
+  async listEnvironments(projectId: string): Promise<[APIResponse, ListEnvironmentsResponse]> {
+    const [response, body] = await this.apiGET<ListEnvironmentsResponse>(`/v1/projects/${projectId}/environments`);
+    expect(response.status()).toBe(200);
+    return [response, body];
+  }
+
+  @step
+  async createEnvironment(args: { projectId: string, name: string }): Promise<[APIResponse, CreateEnvironmentResponse]> {
+    const [response, body] = await this.apiPOST<CreateEnvironmentResponse, CreateEnvironmentBody>(
+      `/v1/projects/${args.projectId}/environments`,
+      { name: args.name },
     );
     expect(response.status()).toBe(201);
     return [response, body];

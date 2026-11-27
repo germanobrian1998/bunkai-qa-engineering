@@ -63,6 +63,11 @@ export const TEST_LIFECYCLE = {
   staleTags: ['bk596-stale'],
 } as const;
 
+export const PLAN_TEARDOWN = {
+  verdict: 'passed',
+  summary: 'kata teardown: fixture plan closed by automated cleanup',
+} as const;
+
 export const ACTIVE_WORKSPACE_COOKIE = 'bk_active_ws';
 
 export const TEST_LIFECYCLE_FIXTURE = {
@@ -73,6 +78,7 @@ export const TEST_LIFECYCLE_FIXTURE = {
   storyTitle: 'Kata scaffold story',
   criterionTitle: 'Kata scaffold criterion',
   atcTitle: 'Kata scaffold ATC',
+  environmentName: 'kata-bk596-env',
 } as const;
 
 export const TEST_LIFECYCLE_FOREIGN_FIXTURE = {
@@ -122,3 +128,10 @@ export const TITLE_LENGTH_ROWS = [
 ] as const;
 
 export type TitleLengthRow = (typeof TITLE_LENGTH_ROWS)[number];
+
+export const TAG_FILTER_ROWS = [
+  { label: 'a tag shared with three live siblings', carriedBy: 'shared', expectedRemaining: 3 },
+  { label: 'a tag only the archived Test carries', carriedBy: 'solo', expectedRemaining: 0 },
+] as const;
+
+export type TagFilterRow = (typeof TAG_FILTER_ROWS)[number];

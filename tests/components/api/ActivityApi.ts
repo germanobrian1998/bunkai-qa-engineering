@@ -11,12 +11,15 @@
  */
 
 import type { APIResponse } from '@playwright/test';
+import type { GetTestResponse } from '@schemas/tests.types';
 import type { ActivityItem, ActivityPage, ListNotificationsResponse, NotificationItem } from '@schemas/workspace.types';
 import type { TestContextOptions } from '@TestContext';
 
 import { ApiBase } from '@api/ApiBase';
 import { expect } from '@playwright/test';
 import { step } from '@utils/decorators';
+
+const ACTIVITY_PAGE_CAP = 20;
 
 // ============================================
 // Activity API Component
@@ -80,11 +83,33 @@ export class ActivityApi extends ApiBase {
   async snapshotTestEvents(
     args: { workspaceId: string, actions: ActivityItem['action'][], testId?: string },
   ): Promise<string[]> {
-    const [response, page] = await this.listActivity(args.workspaceId);
-    expect(response.status(), `GET /v1/activity for ${args.actions.join(', ')} events`).toBe(200);
-    return page.items
-      .filter(item => args.actions.includes(item.action) && (args.testId === undefined || item.item.entity_id === args.testId))
-      .map(item => item.id);
+    const { workspaceId, actions, testId } = args;
+    const ids: string[] = [];
+    const floor = testId === undefined ? null : await this.readTestCreatedAt(testId);
+    let cursor: string | null = null;
+    for (let pageNumber = 0; pageNumber < ACTIVITY_PAGE_CAP; pageNumber++) {
+      const params: Record<string, string> = cursor === null
+        ? { workspace_id: workspaceId, limit: '50' }
+        : { workspace_id: workspaceId, limit: '50', cursor };
+      const [response, page] = await this.apiGET<ActivityPage>('/v1/activity', { params });
+      expect(response.status(), `GET /v1/activity for ${actions.join(', ')} events`).toBe(200);
+      ids.push(...page.items
+        .filter(item => actions.includes(item.action) && (testId === undefined || item.item.entity_id === testId))
+        .map(item => item.id));
+      cursor = page.next_cursor;
+      const oldest = page.items.at(-1);
+      const coveredFloor = floor !== null && oldest !== undefined && Date.parse(oldest.created_at) < Date.parse(floor);
+      if (cursor === null || floor === null || coveredFloor) {
+        return ids;
+      }
+    }
+    throw new Error(`GET /v1/activity: the events of Test ${testId} were not covered within ${ACTIVITY_PAGE_CAP} pages`);
+  }
+
+  private async readTestCreatedAt(testId: string): Promise<string> {
+    const [response, body] = await this.apiGET<GetTestResponse>(`/v1/tests/${testId}`);
+    expect(response.status(), `GET /v1/tests/${testId} for its creation time`).toBe(200);
+    return body.test.created_at;
   }
 
   @step

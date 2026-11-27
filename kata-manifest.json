@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-24T22:15:08.938Z",
+  "generatedAt": "2026-11-27T14:40:24.270Z",
   "components": {
     "api": [
       {
@@ -87,6 +87,12 @@
         "atcs": []
       },
       {
+        "name": "PlansApi",
+        "file": "PlansApi.ts",
+        "relativePath": "tests/components/api/PlansApi.ts",
+        "atcs": []
+      },
+      {
         "name": "RunsApi",
         "file": "RunsApi.ts",
         "relativePath": "tests/components/api/RunsApi.ts",
@@ -94,22 +100,22 @@
           {
             "id": "BK-1974",
             "method": "readReportIsolatedToProject",
-            "line": 63
+            "line": 98
           },
           {
             "id": "BK-1975",
             "method": "readReportWithConsistentTotals",
-            "line": 90
+            "line": 125
           },
           {
             "id": "BK-1982",
             "method": "readReportWithScopedToken",
-            "line": 112
+            "line": 147
           },
           {
             "id": "BK-1983",
             "method": "probeReportParameters",
-            "line": 138
+            "line": 173
           }
         ]
       },
@@ -131,34 +137,54 @@
         "relativePath": "tests/components/api/TestsApi.ts",
         "atcs": [
           {
+            "id": "BK-2146",
+            "method": "listTagFilterWithoutArchived",
+            "line": 399
+          },
+          {
+            "id": "BK-2153",
+            "method": "keepRecordsAcrossArchiveAndRestore",
+            "line": 380
+          },
+          {
             "id": "BK-2156",
             "method": "refuseBlankTitle",
-            "line": 178
+            "line": 265
           },
           {
             "id": "BK-2161",
             "method": "refuseWriteOnArchivedTest",
-            "line": 221
+            "line": 308
           },
           {
             "id": "BK-2163",
             "method": "refuseWriteByViewer",
-            "line": 232
+            "line": 319
           },
           {
             "id": "BK-2164",
             "method": "hideTestFromNonMember",
-            "line": 240
+            "line": 327
           },
           {
             "id": "BK-2165",
             "method": "refuseStaleVersionRename",
-            "line": 258
+            "line": 345
           },
           {
             "id": "BK-2167",
             "method": "applyTitleLengthBoundaries",
-            "line": 194
+            "line": 281
+          },
+          {
+            "id": "BK-2171",
+            "method": "archiveAgainKeepsFirstArchive",
+            "line": 359
+          },
+          {
+            "id": "BK-2172",
+            "method": "restoreLiveTestChangesNothing",
+            "line": 369
           }
         ]
       },
@@ -264,6 +290,12 @@
         "file": "TestDetailPage.ts",
         "relativePath": "tests/components/ui/TestDetailPage.ts",
         "atcs": []
+      },
+      {
+        "name": "TestsListPage",
+        "file": "TestsListPage.ts",
+        "relativePath": "tests/components/ui/TestsListPage.ts",
+        "atcs": []
       }
     ]
   },
@@ -335,15 +367,16 @@
       "methods": [
         "seedInState",
         "seedTest",
+        "seedWithHistory",
         "teardown"
       ]
     }
   ],
   "summary": {
-    "totalComponents": 16,
-    "totalATCs": 31,
-    "apiComponents": 11,
-    "uiComponents": 5,
+    "totalComponents": 18,
+    "totalATCs": 35,
+    "apiComponents": 12,
+    "uiComponents": 6,
     "stepsModules": 5
   }
 }
