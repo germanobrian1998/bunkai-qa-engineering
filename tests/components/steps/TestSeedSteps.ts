@@ -10,8 +10,14 @@ interface CreatedTest {
   id: string
 }
 
+interface CreatedPlan {
+  api: ApiFixture
+  id: string
+}
+
 export class TestSeedSteps extends TestContext {
   private readonly created: CreatedTest[] = [];
+  private readonly createdPlans: CreatedPlan[] = [];
   private readonly environments = new Map<string, string>();
 
   constructor() {
@@ -93,6 +99,7 @@ export class TestSeedSteps extends TestContext {
     }
     for (let plan = 0; plan < plans; plan++) {
       const [, created] = await api.plans.createPlan({ projectId: arena.project.id, name: DataFactory.createPlanName() });
+      this.createdPlans.push({ api, id: created.test_plan.id });
       await api.plans.addTests({ planId: created.test_plan.id, testIds: [seed.id] });
     }
     const [, read] = await api.tests.getTest(seed.id);
@@ -106,6 +113,16 @@ export class TestSeedSteps extends TestContext {
   async teardown(): Promise<void> {
     const errors: unknown[] = [];
     const failedIds: string[] = [];
+    const failedPlanIds: string[] = [];
+    for (const plan of this.createdPlans) {
+      try {
+        await plan.api.plans.closePlan(plan.id);
+      }
+      catch (error) {
+        failedPlanIds.push(plan.id);
+        errors.push(error);
+      }
+    }
     for (const test of this.created) {
       try {
         await test.api.tests.archiveTest(test.id);
@@ -116,7 +133,7 @@ export class TestSeedSteps extends TestContext {
       }
     }
     if (errors.length > 0) {
-      throw new AggregateError(errors, `teardown failed: could not archive Test ids [${failedIds.join(', ')}]`);
+      throw new AggregateError(errors, `teardown failed: could not archive Test ids [${failedIds.join(', ')}] or close plan ids [${failedPlanIds.join(', ')}]`);
     }
   }
 }

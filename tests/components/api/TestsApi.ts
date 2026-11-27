@@ -32,12 +32,14 @@ export interface CreateTarget { kind: 'create', atcId: string, workspaceId: stri
 export type TitleWriteBody = RenameTestResponse | CreateTestResponse | ErrorEnvelope;
 export interface FirstArchive { archivedAt: string, archivedBy: string }
 
+interface PlanMembership { id: string, added_at: string, added_by: string | null }
+
 interface TestRecords {
   runIds: string[]
   stepIds: string[]
   tags: string[]
   planIds: string[]
-  planMemberIds: Record<string, string[]>
+  planMemberships: Record<string, PlanMembership[]>
 }
 
 function hasReason(details: unknown): details is { reason: string } {
@@ -223,10 +225,12 @@ export class TestsApi extends ApiBase {
   }
 
   @step
-  private async readPlanMemberIds(planId: string): Promise<string[]> {
+  private async readPlanMemberships(planId: string): Promise<PlanMembership[]> {
     const [response, body] = await this.apiGET<PlanMemberTestsResponse>(`/v1/test-plans/${planId}/tests`);
     expect(response.status()).toBe(200);
-    return body.tests.map(member => member.id).sort();
+    return body.tests
+      .map(member => ({ id: member.id, added_at: member.added_at, added_by: member.added_by }))
+      .sort((a, b) => a.id.localeCompare(b.id));
   }
 
   @step
@@ -234,16 +238,16 @@ export class TestsApi extends ApiBase {
     const [, read] = await this.getTest(testId);
     const [, runs] = await this.listRunHistory(testId);
     const planIds = read.test.plans.map(plan => plan.id).sort();
-    const planMemberIds: Record<string, string[]> = {};
+    const planMemberships: Record<string, PlanMembership[]> = {};
     for (const planId of planIds) {
-      planMemberIds[planId] = await this.readPlanMemberIds(planId);
+      planMemberships[planId] = await this.readPlanMemberships(planId);
     }
     return {
       runIds: runs.map(run => run.id).sort(),
       stepIds: read.test.atcs.map(atc => atc.step_id),
-      tags: read.test.tags,
+      tags: [...read.test.tags].sort(),
       planIds,
-      planMemberIds,
+      planMemberships,
     };
   }
 
@@ -379,12 +383,12 @@ export class TestsApi extends ApiBase {
     await this.archiveTest(args.testId);
     const [, archived] = await this.getTest(args.testId);
     expect(archived.test.archived_at, 'the Test row still resolves and is marked archived').not.toBeNull();
-    expect(await this.captureRecords(args.testId), 'archive must not add or remove a Run, step, tag or plan membership').toEqual(baseline);
+    expect(await this.captureRecords(args.testId), 'archive must not add, remove or re-insert a Run, step, tag or plan membership (member, added_at, added_by)').toEqual(baseline);
 
     const [response] = await this.restoreTest(args.testId);
     const [, restored] = await this.getTest(args.testId);
     expect(restored.test.archived_at, 'the Test row is live again').toBeNull();
-    expect(await this.captureRecords(args.testId), 'restore must leave every Run, step, tag and plan membership at the baseline').toEqual(baseline);
+    expect(await this.captureRecords(args.testId), 'restore must leave every Run, step, tag and plan membership (member, added_at, added_by) at the baseline').toEqual(baseline);
     return [response, restored];
   }
 

@@ -61,6 +61,7 @@ test.describe('BK-596: Archived Test leaves the tag filter', () => {
         const soloTag = DataFactory.createTag();
         const siblings = await seedSiblings(sharedTag);
         const target = await seeds.seedInState({ api: member.api, arena: member.arena, state: 'live', tags: [sharedTag, soloTag] });
+        const untagged = await seeds.seedInState({ api: member.api, arena: member.arena, state: 'live' });
         const tag = row.carriedBy === 'shared' ? sharedTag : soloTag;
         const [, baselineItems] = await member.api.tests.listByTag(tag);
         const baseline = baselineItems.map(item => item.id);
@@ -69,17 +70,18 @@ test.describe('BK-596: Archived Test leaves the tag filter', () => {
           baseline.slice().sort(),
           'precondition: the tag filter lists the Test and every sibling that carries the tag',
         ).toEqual([target.id, ...remaining].sort());
+        expect(baseline, 'precondition: the live Test without the tag stays out of the tag filter').not.toContain(untagged.id);
 
         await kata.ui.testsList.open({ projectSlug: member.arena.project.slug, workspaceId: member.arena.workspaceId });
         await kata.ui.testsList.filterByTag(tag);
-        await kata.ui.testsList.expectFilteredRows({ present: baseline, absent: [] });
+        await kata.ui.testsList.expectFilteredRows({ ids: baseline });
 
         await member.api.tests.archiveTest(target.id);
         await member.api.tests.listTagFilterWithoutArchived({ row, tag, testId: target.id, baseline });
 
         await kata.ui.testsList.open({ projectSlug: member.arena.project.slug, workspaceId: member.arena.workspaceId });
         await kata.ui.testsList.filterByTag(tag);
-        await kata.ui.testsList.expectFilteredRows({ present: remaining, absent: [target.id] });
+        await kata.ui.testsList.expectFilteredRows({ ids: baseline.filter(id => id !== target.id) });
       },
     );
   }

@@ -2,6 +2,8 @@ import type { APIResponse } from '@playwright/test';
 import type {
   AddPlanTestsBody,
   AddPlanTestsResponse,
+  ClosePlanBody,
+  ClosePlanResponse,
   CreatePlanBody,
   CreatePlanResponse,
 } from '@schemas/tests.types';
@@ -36,6 +38,13 @@ export class PlansApi extends ApiBase {
       { headers: { 'Idempotency-Key': randomUUID() } },
     );
     expect(response.status()).toBe(201);
+    return [response, body];
+  }
+
+  @step
+  async closePlan(planId: string): Promise<[APIResponse, ClosePlanResponse]> {
+    const [response, body] = await this.apiPOST<ClosePlanResponse, ClosePlanBody>(`/v1/test-plans/${planId}/close`, { verdict: 'passed' });
+    expect(response.status()).toBe(200);
     return [response, body];
   }
 }

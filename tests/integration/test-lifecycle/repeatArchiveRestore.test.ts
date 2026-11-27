@@ -2,12 +2,10 @@ import type { FirstArchive } from '@api/TestsApi';
 import type { SeededTest } from '@data/types';
 import type { TestLifecycleSession } from '@steps/TestLifecycleSteps';
 
+import { DataFactory } from '@DataFactory';
 import { TestLifecycleSteps } from '@steps/TestLifecycleSteps';
 import { TestSeedSteps } from '@steps/TestSeedSteps';
 import { expect, test } from '@TestFixture';
-import { config } from '@variables';
-
-test.use({ storageState: config.auth.roleStatePath('member') });
 
 const RECORD_COUNTS = { chainLength: 2, finishedRuns: 2, plans: 3 } as const;
 
@@ -107,18 +105,19 @@ test.describe('BK-596: Archive and restore repeats', () => {
     'BK-2153: should keep the Test row and every Run, step and plan membership unchanged across archive and restore',
     { tag: ['@critical', '@regression'] },
     async () => {
+      const keepTag = DataFactory.createTag();
       const seed = await seeds.seedWithHistory({
         api: member.api,
         arena: member.arena,
         chainLength: RECORD_COUNTS.chainLength,
-        tags: ['bk596-keep'],
+        tags: [keepTag],
         finishedRuns: RECORD_COUNTS.finishedRuns,
         plans: RECORD_COUNTS.plans,
       });
       expect(seed.atcs, 'precondition: the chain holds 2 steps').toHaveLength(RECORD_COUNTS.chainLength);
       expect(seed.run_count, 'precondition: the Test has 2 finished Runs').toBe(RECORD_COUNTS.finishedRuns);
       expect(seed.plans, 'precondition: 3 plans hold the Test').toHaveLength(RECORD_COUNTS.plans);
-      expect(seed.tags, 'precondition: the Test carries its tag').toEqual(['bk596-keep']);
+      expect(seed.tags, 'precondition: the Test carries its tag').toEqual([keepTag]);
 
       const [, restored] = await member.api.tests.keepRecordsAcrossArchiveAndRestore({ testId: seed.id });
 

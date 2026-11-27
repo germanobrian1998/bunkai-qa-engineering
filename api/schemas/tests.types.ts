@@ -60,6 +60,8 @@ export type CreatePlanBody = components['schemas']['TestPlanCreateBody'];
 export type CreatePlanResponse = components['schemas']['TestPlanCreateResponse'];
 export type AddPlanTestsBody = components['schemas']['TestPlanAddTestsBody'];
 export type AddPlanTestsResponse = components['schemas']['TestPlanAddTestsResponse'];
+export type ClosePlanBody = components['schemas']['TestPlanCloseBody'];
+export type ClosePlanResponse = components['schemas']['TestPlanClosureResponse'];
 
 export type ListEnvironmentsResponse = components['schemas']['ProjectEnvironmentListResponse'];
 export type CreateEnvironmentBody = components['schemas']['ProjectEnvironmentCreateBody'];
