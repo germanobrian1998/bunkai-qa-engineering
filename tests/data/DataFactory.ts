@@ -118,8 +118,8 @@ export class DataFactory {
     return new Date(Date.now() + 30 * day).toISOString().slice(0, 10);
   }
 
-  static createScaffoldName(): string {
-    return `Kata scaffold ${this.createTestId('bk596')}`;
+  static createIsolatedName(): string {
+    return `Kata isolated ${this.createTestId('bk596')}`;
   }
 
   static createTitleOfLength(args: { character: string, count: number }): string {

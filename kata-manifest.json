@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-27T15:25:01.283Z",
+  "generatedAt": "2026-11-27T15:50:47.100Z",
   "components": {
     "api": [
       {
@@ -100,27 +100,27 @@
           {
             "id": "BK-1974",
             "method": "readReportIsolatedToProject",
-            "line": 154
+            "line": 162
           },
           {
             "id": "BK-1975",
             "method": "readReportWithConsistentTotals",
-            "line": 181
+            "line": 189
           },
           {
             "id": "BK-1982",
             "method": "readReportWithScopedToken",
-            "line": 203
+            "line": 211
           },
           {
             "id": "BK-1983",
             "method": "probeReportParameters",
-            "line": 229
+            "line": 237
           },
           {
             "id": "BK-2178",
             "method": "holdRunReadsAfterArchive",
-            "line": 264
+            "line": 272
           }
         ]
       },
@@ -144,52 +144,52 @@
           {
             "id": "BK-2146",
             "method": "listTagFilterWithoutArchived",
-            "line": 399
+            "line": 398
           },
           {
             "id": "BK-2153",
             "method": "keepRecordsAcrossArchiveAndRestore",
-            "line": 380
+            "line": 379
           },
           {
             "id": "BK-2156",
             "method": "refuseBlankTitle",
-            "line": 265
+            "line": 264
           },
           {
             "id": "BK-2161",
             "method": "refuseWriteOnArchivedTest",
-            "line": 308
+            "line": 307
           },
           {
             "id": "BK-2163",
             "method": "refuseWriteByViewer",
-            "line": 319
+            "line": 318
           },
           {
             "id": "BK-2164",
             "method": "hideTestFromNonMember",
-            "line": 327
+            "line": 326
           },
           {
             "id": "BK-2165",
             "method": "refuseStaleVersionRename",
-            "line": 345
+            "line": 344
           },
           {
             "id": "BK-2167",
             "method": "applyTitleLengthBoundaries",
-            "line": 281
+            "line": 280
           },
           {
             "id": "BK-2171",
             "method": "archiveAgainKeepsFirstArchive",
-            "line": 359
+            "line": 358
           },
           {
             "id": "BK-2172",
             "method": "restoreLiveTestChangesNothing",
-            "line": 369
+            "line": 368
           }
         ]
       },

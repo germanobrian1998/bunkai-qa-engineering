@@ -1,3 +1,4 @@
+import type { PlanMembership } from '@data/types';
 import type { APIResponse } from '@playwright/test';
 import type {
   AddPlanTestsBody,
@@ -48,10 +49,12 @@ export class PlansApi extends ApiBase {
   }
 
   @step
-  async listPlanTests(planId: string): Promise<[APIResponse, PlanMemberTestsResponse]> {
+  async listPlanMemberships(planId: string): Promise<PlanMembership[]> {
     const [response, body] = await this.apiGET<PlanMemberTestsResponse>(`/v1/test-plans/${planId}/tests`);
     expect(response.status()).toBe(200);
-    return [response, body];
+    return body.tests
+      .map(member => ({ id: member.id, added_at: member.added_at, added_by: member.added_by }))
+      .sort((a, b) => a.id.localeCompare(b.id));
   }
 
   @step

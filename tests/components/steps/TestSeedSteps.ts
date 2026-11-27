@@ -120,12 +120,12 @@ export class TestSeedSteps extends TestContext {
 
   async seedIsolatedModule(args: { api: ApiFixture, arena: TestLifecycleArena }): Promise<IsolatedArena> {
     const { api, arena } = args;
-    const [, module] = await api.structure.createModule({ projectId: arena.project.id, name: DataFactory.createScaffoldName() });
+    const [, module] = await api.structure.createModule({ projectId: arena.project.id, name: DataFactory.createIsolatedName() });
     this.createdModules.push({ api, id: module.module.id });
-    const [, story] = await api.structure.createUserStory({ moduleId: module.module.id, title: DataFactory.createScaffoldName() });
-    const [, criterion] = await api.structure.createAcceptanceCriterion({ userStoryId: story.user_story.id, title: DataFactory.createScaffoldName() });
+    const [, story] = await api.structure.createUserStory({ moduleId: module.module.id, title: DataFactory.createIsolatedName() });
+    const [, criterion] = await api.structure.createAcceptanceCriterion({ userStoryId: story.user_story.id, title: DataFactory.createIsolatedName() });
     const [, atc] = await api.atcs.createAtc(DataFactory.createAtcPayload({
-      title: DataFactory.createScaffoldName(),
+      title: DataFactory.createIsolatedName(),
       moduleId: module.module.id,
       userStoryId: story.user_story.id,
       acceptanceCriterionIds: [criterion.acceptance_criterion.id],
@@ -133,12 +133,23 @@ export class TestSeedSteps extends TestContext {
     return { arena: { ...arena, atcId: atc.atc.id }, moduleId: module.module.id };
   }
 
-  async seedPlanFigures(args: { api: ApiFixture, arena: TestLifecycleArena, testIds: string[] }): Promise<PlanFigureSeed> {
-    const { api, arena, testIds } = args;
+  async seedPlanFigures(args: { api: ApiFixture, arena: TestLifecycleArena }): Promise<PlanFigureSeed> {
+    const { api, arena } = args;
     const projectId = arena.project.id;
+    const passed = await this.seedTest({ api, arena });
+    const idle = await this.seedTest({ api, arena });
+    const testIds = [passed.id, idle.id];
     const [, open] = await api.plans.createPlan({ projectId, name: DataFactory.createPlanName() });
     this.createdPlans.push({ api, id: open.test_plan.id });
     await api.plans.addTests({ planId: open.test_plan.id, testIds });
+    const [, closed] = await api.plans.createPlan({ projectId, name: DataFactory.createPlanName() });
+    const pending: CreatedPlan = { api, id: closed.test_plan.id };
+    this.createdPlans.push(pending);
+    await api.plans.addTests({ planId: closed.test_plan.id, testIds });
+    await api.plans.closePlan({ planId: closed.test_plan.id, verdict: PLAN_FIGURES_CLOSE.verdict, summary: PLAN_FIGURES_CLOSE.summary });
+    this.createdPlans.splice(this.createdPlans.indexOf(pending), 1);
+    const environmentId = await this.ensureEnvironment({ api, projectId });
+    await this.finishPassedRun({ api, testId: passed.id, environmentId });
     const [, milestone] = await api.plans.createMilestone({
       projectId,
       name: DataFactory.createMilestoneName(),
@@ -146,13 +157,13 @@ export class TestSeedSteps extends TestContext {
     });
     this.createdMilestones.push({ api, id: milestone.milestone.id });
     await api.plans.attachPlans({ projectId, milestoneId: milestone.milestone.id, planIds: [open.test_plan.id] });
-    const [, closed] = await api.plans.createPlan({ projectId, name: DataFactory.createPlanName() });
-    const pending: CreatedPlan = { api, id: closed.test_plan.id };
-    this.createdPlans.push(pending);
-    await api.plans.addTests({ planId: closed.test_plan.id, testIds });
-    await api.plans.closePlan({ planId: closed.test_plan.id, verdict: PLAN_FIGURES_CLOSE.verdict, summary: PLAN_FIGURES_CLOSE.summary });
-    this.createdPlans.splice(this.createdPlans.indexOf(pending), 1);
-    return { openPlanId: open.test_plan.id, closedPlanId: closed.test_plan.id, milestoneId: milestone.milestone.id };
+    return {
+      openPlanId: open.test_plan.id,
+      closedPlanId: closed.test_plan.id,
+      milestoneId: milestone.milestone.id,
+      passedTestId: passed.id,
+      idleTestId: idle.id,
+    };
   }
 
   adopt(args: { api: ApiFixture, testId: string }): void {
@@ -202,7 +213,7 @@ export class TestSeedSteps extends TestContext {
       }
     }
     if (errors.length > 0) {
-      throw new AggregateError(errors, `teardown failed: could not archive Test ids [${failedIds.join(', ')}], close plan ids [${failedPlanIds.join(', ')}] archive milestone ids [${failedMilestoneIds.join(', ')}] or archive module ids [${failedModuleIds.join(', ')}]`);
+      throw new AggregateError(errors, `teardown failed: could not archive Test ids [${failedIds.join(', ')}], close plan ids [${failedPlanIds.join(', ')}], archive milestone ids [${failedMilestoneIds.join(', ')}] or archive module ids [${failedModuleIds.join(', ')}]`);
     }
   }
 }

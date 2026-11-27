@@ -1,6 +1,6 @@
 import type { RunReadsBaseline, RunReadsScope } from '@data/types';
 import type { APIResponse } from '@playwright/test';
-import type { RunComparison, RunReportItem, RunReportPage, WorkspaceRun, WorkspaceRuns } from '@schemas/runs.types';
+import type { RunComparison, RunReportItem, RunReportPage, RunResponse, WorkspaceRun, WorkspaceRuns } from '@schemas/runs.types';
 import type { FinishRunBody, FinishRunResponse, MarkStepBody, MarkStepResponse, StartRunBody, StartRunResponse } from '@schemas/tests.types';
 import type { ErrorEnvelope } from '@schemas/workspace.types';
 import type { TestContextOptions } from '@TestContext';
@@ -118,8 +118,9 @@ export class RunsApi extends ApiBase {
   }
 
   @step
-  async readWorkspaceRuns(args: { workspaceId: string, projectId: string, testId: string }): Promise<[APIResponse, WorkspaceRun[]]> {
+  async readWorkspaceRuns(args: { workspaceId: string, projectId: string, testId: string, since: string }): Promise<[APIResponse, { rows: WorkspaceRun[], runCount: number }]> {
     const rows: WorkspaceRun[] = [];
+    const floor = Date.parse(args.since);
     let cursor: string | null = null;
     for (let pageNumber = 0; pageNumber < READ_PAGE_CAP; pageNumber++) {
       const params: Record<string, string> = cursor === null
@@ -129,11 +130,13 @@ export class RunsApi extends ApiBase {
       expect(response.status()).toBe(200);
       rows.push(...page.items.filter(row => row.test_id === args.testId));
       cursor = page.next_cursor;
-      if (cursor === null) {
-        return [response, rows];
+      const oldest = page.items.at(-1);
+      const coveredFloor = oldest !== undefined && Date.parse(oldest.started_at) < floor;
+      if (cursor === null || coveredFloor) {
+        return [response, { rows, runCount: page.workspace_run_count }];
       }
     }
-    throw new Error(`GET /v1/workspaces/${args.workspaceId}/runs: the runs of project ${args.projectId} were not covered within ${READ_PAGE_CAP} pages`);
+    throw new Error(`GET /v1/workspaces/${args.workspaceId}/runs: the runs of Test ${args.testId} were not covered within ${READ_PAGE_CAP} pages`);
   }
 
   @step
@@ -146,9 +149,14 @@ export class RunsApi extends ApiBase {
   @step
   async captureRunReads(scope: RunReadsScope): Promise<RunReadsBaseline> {
     const [, report] = await this.readModuleReport({ projectId: scope.projectId, moduleId: scope.moduleId });
-    const [, workspaceRuns] = await this.readWorkspaceRuns({ workspaceId: scope.workspaceId, projectId: scope.projectId, testId: scope.testId });
+    const [, workspace] = await this.readWorkspaceRuns({
+      workspaceId: scope.workspaceId,
+      projectId: scope.projectId,
+      testId: scope.testId,
+      since: scope.testCreatedAt,
+    });
     const [, compare] = await this.readCompare(scope.runId);
-    return { report, workspaceRuns, compare };
+    return { report, workspaceRuns: workspace.rows, workspaceRunCount: workspace.runCount, compare };
   }
 
   @atc('BK-1974')
@@ -265,10 +273,12 @@ export class RunsApi extends ApiBase {
   async holdRunReadsAfterArchive(args: { baseline: RunReadsBaseline, scope: RunReadsScope }): Promise<[APIResponse, RunReadsBaseline]> {
     const { baseline, scope } = args;
     const after = await this.captureRunReads(scope);
-    expect(after.report, 'the runs report of the Test module (totals, scope and every row) equals its baseline').toEqual(baseline.report);
+    expect(after.report.totals, 'the runs report totals of the Test module equal their baseline').toEqual(baseline.report.totals);
+    expect(after.report.items, 'every runs report row of the Test module equals its baseline').toEqual(baseline.report.items);
     expect(after.workspaceRuns, 'the workspace runs index rows of the Test equal their baseline').toEqual(baseline.workspaceRuns);
     expect(after.compare, 'the comparison of the latest Run equals its baseline').toEqual(baseline.compare);
-    const [response] = await this.apiGET(`/v1/runs/${scope.runId}`);
+    expect(after.workspaceRunCount, 'the workspace run count has not dropped below its baseline').toBeGreaterThanOrEqual(baseline.workspaceRunCount);
+    const [response] = await this.apiGET<RunResponse>(`/v1/runs/${scope.runId}`);
     expect(response.status(), 'the Run of the archived Test still resolves').toBe(200);
     return [response, after];
   }

@@ -73,17 +73,25 @@ export interface TestLifecycleArena {
 
 export type SeededTest = GetTestResponse['test'];
 
+export interface PlanMembership {
+  id: string
+  added_at: string
+  added_by: string | null
+}
+
 export interface RunReadsScope {
   workspaceId: string
   projectId: string
   moduleId: string
   testId: string
+  testCreatedAt: string
   runId: string
 }
 
 export interface RunReadsBaseline {
   report: Pick<RunReportPage, 'totals' | 'scope' | 'items'>
   workspaceRuns: WorkspaceRun[]
+  workspaceRunCount: number
   compare: RunComparison
 }
 
@@ -120,6 +128,8 @@ export interface IsolatedArena {
 }
 
 export interface PlanFigureSeed {
+  passedTestId: string
+  idleTestId: string
   openPlanId: string
   closedPlanId: string
   milestoneId: string
