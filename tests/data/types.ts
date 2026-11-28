@@ -8,7 +8,7 @@
  *   api/schemas/{domain}.types.ts → import from '@schemas/{domain}.types'
  */
 
-import type { RunReportItem } from '@schemas/runs.types';
+import type { RunComparison, RunReportItem, RunReportPage, WorkspaceRun } from '@schemas/runs.types';
 import type { GetTestResponse } from '@schemas/tests.types';
 
 // ============================================
@@ -72,3 +72,65 @@ export interface TestLifecycleArena {
 }
 
 export type SeededTest = GetTestResponse['test'];
+
+export interface PlanMembership {
+  id: string
+  added_at: string
+  added_by: string | null
+}
+
+export interface RunReadsScope {
+  workspaceId: string
+  projectId: string
+  moduleId: string
+  testId: string
+  testCreatedAt: string
+  runId: string
+}
+
+export interface RunReadsBaseline {
+  report: Pick<RunReportPage, 'totals' | 'scope' | 'items'>
+  workspaceRuns: WorkspaceRun[]
+  workspaceRunCount: number
+  compare: RunComparison
+}
+
+export interface PlanFiguresScope {
+  projectSlug: string
+  workspaceId: string
+  openPlanId: string
+  closedPlanId: string
+  milestoneId: string
+}
+
+export interface PlanFigure {
+  percent: string
+  passedLabel: string
+  chips: string[]
+  note: string
+}
+
+export interface MilestoneFigure {
+  percent: string
+  chips: string[]
+  note: string
+}
+
+export interface PlanFiguresBaseline {
+  openPlan: PlanFigure
+  milestone: MilestoneFigure
+  closedPlan: PlanFigure
+}
+
+export interface IsolatedArena {
+  arena: TestLifecycleArena
+  moduleId: string
+}
+
+export interface PlanFigureSeed {
+  passedTestId: string
+  idleTestId: string
+  openPlanId: string
+  closedPlanId: string
+  milestoneId: string
+}

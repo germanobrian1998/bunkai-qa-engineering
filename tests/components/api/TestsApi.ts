@@ -1,4 +1,5 @@
 import type { FrozenWriteRow, NonMemberRow, TagFilterRow, TitleLengthRow, ViewerWriteRow } from '@data/constants';
+import type { PlanMembership } from '@data/types';
 import type { APIResponse } from '@playwright/test';
 import type {
   CreateTestResponse,
@@ -33,8 +34,6 @@ export type TitleWriteBody = RenameTestResponse | CreateTestResponse | ErrorEnve
 export interface FirstArchive { archivedAt: string, archivedBy: string }
 
 const LIST_PAGE_CAP = 20;
-
-interface PlanMembership { id: string, added_at: string, added_by: string | null }
 
 interface TestRecords {
   runIds: string[]

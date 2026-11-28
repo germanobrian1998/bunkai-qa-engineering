@@ -68,6 +68,11 @@ export const PLAN_TEARDOWN = {
   summary: 'kata teardown: fixture plan closed by automated cleanup',
 } as const;
 
+export const PLAN_FIGURES_CLOSE = {
+  verdict: 'passed',
+  summary: 'kata BK-596: plan closed to freeze its figures',
+} as const;
+
 export const ACTIVE_WORKSPACE_COOKIE = 'bk_active_ws';
 
 export const TEST_LIFECYCLE_FIXTURE = {

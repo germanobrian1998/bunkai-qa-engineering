@@ -66,3 +66,9 @@ export type ClosePlanResponse = components['schemas']['TestPlanClosureResponse']
 export type ListEnvironmentsResponse = components['schemas']['ProjectEnvironmentListResponse'];
 export type CreateEnvironmentBody = components['schemas']['ProjectEnvironmentCreateBody'];
 export type CreateEnvironmentResponse = components['schemas']['ProjectEnvironmentCreateResponse'];
+
+export type CreateMilestoneBody = components['schemas']['MilestoneCreateBody'];
+export type CreateMilestoneResponse = components['schemas']['MilestoneCreateResponse'];
+export type AttachPlansBody = components['schemas']['MilestoneAttachPlansBody'];
+export type AttachPlansResponse = components['schemas']['MilestoneAttachPlansResponse'];
+export type ArchiveMilestoneResponse = components['schemas']['MilestoneArchiveResponse'];

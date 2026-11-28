@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-27T14:40:24.270Z",
+  "generatedAt": "2026-11-27T15:50:47.100Z",
   "components": {
     "api": [
       {
@@ -100,22 +100,27 @@
           {
             "id": "BK-1974",
             "method": "readReportIsolatedToProject",
-            "line": 98
+            "line": 162
           },
           {
             "id": "BK-1975",
             "method": "readReportWithConsistentTotals",
-            "line": 125
+            "line": 189
           },
           {
             "id": "BK-1982",
             "method": "readReportWithScopedToken",
-            "line": 147
+            "line": 211
           },
           {
             "id": "BK-1983",
             "method": "probeReportParameters",
-            "line": 173
+            "line": 237
+          },
+          {
+            "id": "BK-2178",
+            "method": "holdRunReadsAfterArchive",
+            "line": 272
           }
         ]
       },
@@ -139,52 +144,52 @@
           {
             "id": "BK-2146",
             "method": "listTagFilterWithoutArchived",
-            "line": 399
+            "line": 398
           },
           {
             "id": "BK-2153",
             "method": "keepRecordsAcrossArchiveAndRestore",
-            "line": 380
+            "line": 379
           },
           {
             "id": "BK-2156",
             "method": "refuseBlankTitle",
-            "line": 265
+            "line": 264
           },
           {
             "id": "BK-2161",
             "method": "refuseWriteOnArchivedTest",
-            "line": 308
+            "line": 307
           },
           {
             "id": "BK-2163",
             "method": "refuseWriteByViewer",
-            "line": 319
+            "line": 318
           },
           {
             "id": "BK-2164",
             "method": "hideTestFromNonMember",
-            "line": 327
+            "line": 326
           },
           {
             "id": "BK-2165",
             "method": "refuseStaleVersionRename",
-            "line": 345
+            "line": 344
           },
           {
             "id": "BK-2167",
             "method": "applyTitleLengthBoundaries",
-            "line": 281
+            "line": 280
           },
           {
             "id": "BK-2171",
             "method": "archiveAgainKeepsFirstArchive",
-            "line": 359
+            "line": 358
           },
           {
             "id": "BK-2172",
             "method": "restoreLiveTestChangesNothing",
-            "line": 369
+            "line": 368
           }
         ]
       },
@@ -260,6 +265,18 @@
             "id": "BK-1656",
             "method": "removeMemberViaConfirmation",
             "line": 56
+          }
+        ]
+      },
+      {
+        "name": "PlanFiguresPage",
+        "file": "PlanFiguresPage.ts",
+        "relativePath": "tests/components/ui/PlanFiguresPage.ts",
+        "atcs": [
+          {
+            "id": "BK-2179",
+            "method": "expectFiguresUnchangedAfterArchive",
+            "line": 59
           }
         ]
       },
@@ -366,6 +383,8 @@
       "relativePath": "tests/components/steps/TestSeedSteps.ts",
       "methods": [
         "seedInState",
+        "seedIsolatedModule",
+        "seedPlanFigures",
         "seedTest",
         "seedWithHistory",
         "teardown"
@@ -373,10 +392,10 @@
     }
   ],
   "summary": {
-    "totalComponents": 18,
-    "totalATCs": 35,
+    "totalComponents": 19,
+    "totalATCs": 37,
     "apiComponents": 12,
-    "uiComponents": 6,
+    "uiComponents": 7,
     "stepsModules": 5
   }
 }

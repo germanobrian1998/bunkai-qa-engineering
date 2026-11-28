@@ -1,7 +1,7 @@
 import type { ApiFixture } from '@ApiFixture';
 
-import type { SeededTest, TestLifecycleArena } from '@data/types';
-import { PLAN_TEARDOWN, TEST_LIFECYCLE_FIXTURE } from '@data/constants';
+import type { IsolatedArena, PlanFigureSeed, SeededTest, TestLifecycleArena } from '@data/types';
+import { PLAN_FIGURES_CLOSE, PLAN_TEARDOWN, TEST_LIFECYCLE_FIXTURE } from '@data/constants';
 import { DataFactory } from '@DataFactory';
 import { TestContext } from '@TestContext';
 
@@ -15,9 +15,21 @@ interface CreatedPlan {
   id: string
 }
 
+interface CreatedModule {
+  api: ApiFixture
+  id: string
+}
+
+interface CreatedMilestone {
+  api: ApiFixture
+  id: string
+}
+
 export class TestSeedSteps extends TestContext {
   private readonly created: CreatedTest[] = [];
   private readonly createdPlans: CreatedPlan[] = [];
+  private readonly createdMilestones: CreatedMilestone[] = [];
+  private readonly createdModules: CreatedModule[] = [];
   private readonly environments = new Map<string, string>();
 
   constructor() {
@@ -106,6 +118,54 @@ export class TestSeedSteps extends TestContext {
     return read.test;
   }
 
+  async seedIsolatedModule(args: { api: ApiFixture, arena: TestLifecycleArena }): Promise<IsolatedArena> {
+    const { api, arena } = args;
+    const [, module] = await api.structure.createModule({ projectId: arena.project.id, name: DataFactory.createIsolatedName() });
+    this.createdModules.push({ api, id: module.module.id });
+    const [, story] = await api.structure.createUserStory({ moduleId: module.module.id, title: DataFactory.createIsolatedName() });
+    const [, criterion] = await api.structure.createAcceptanceCriterion({ userStoryId: story.user_story.id, title: DataFactory.createIsolatedName() });
+    const [, atc] = await api.atcs.createAtc(DataFactory.createAtcPayload({
+      title: DataFactory.createIsolatedName(),
+      moduleId: module.module.id,
+      userStoryId: story.user_story.id,
+      acceptanceCriterionIds: [criterion.acceptance_criterion.id],
+    }));
+    return { arena: { ...arena, atcId: atc.atc.id }, moduleId: module.module.id };
+  }
+
+  async seedPlanFigures(args: { api: ApiFixture, arena: TestLifecycleArena }): Promise<PlanFigureSeed> {
+    const { api, arena } = args;
+    const projectId = arena.project.id;
+    const passed = await this.seedTest({ api, arena });
+    const idle = await this.seedTest({ api, arena });
+    const testIds = [passed.id, idle.id];
+    const [, open] = await api.plans.createPlan({ projectId, name: DataFactory.createPlanName() });
+    this.createdPlans.push({ api, id: open.test_plan.id });
+    await api.plans.addTests({ planId: open.test_plan.id, testIds });
+    const [, closed] = await api.plans.createPlan({ projectId, name: DataFactory.createPlanName() });
+    const pending: CreatedPlan = { api, id: closed.test_plan.id };
+    this.createdPlans.push(pending);
+    await api.plans.addTests({ planId: closed.test_plan.id, testIds });
+    await api.plans.closePlan({ planId: closed.test_plan.id, verdict: PLAN_FIGURES_CLOSE.verdict, summary: PLAN_FIGURES_CLOSE.summary });
+    this.createdPlans.splice(this.createdPlans.indexOf(pending), 1);
+    const environmentId = await this.ensureEnvironment({ api, projectId });
+    await this.finishPassedRun({ api, testId: passed.id, environmentId });
+    const [, milestone] = await api.plans.createMilestone({
+      projectId,
+      name: DataFactory.createMilestoneName(),
+      targetDate: DataFactory.createMilestoneTargetDate(),
+    });
+    this.createdMilestones.push({ api, id: milestone.milestone.id });
+    await api.plans.attachPlans({ projectId, milestoneId: milestone.milestone.id, planIds: [open.test_plan.id] });
+    return {
+      openPlanId: open.test_plan.id,
+      closedPlanId: closed.test_plan.id,
+      milestoneId: milestone.milestone.id,
+      passedTestId: passed.id,
+      idleTestId: idle.id,
+    };
+  }
+
   adopt(args: { api: ApiFixture, testId: string }): void {
     this.created.push({ api: args.api, id: args.testId });
   }
@@ -114,12 +174,23 @@ export class TestSeedSteps extends TestContext {
     const errors: unknown[] = [];
     const failedIds: string[] = [];
     const failedPlanIds: string[] = [];
+    const failedMilestoneIds: string[] = [];
+    const failedModuleIds: string[] = [];
     for (const plan of this.createdPlans) {
       try {
         await plan.api.plans.closePlan({ planId: plan.id, verdict: PLAN_TEARDOWN.verdict, summary: PLAN_TEARDOWN.summary });
       }
       catch (error) {
         failedPlanIds.push(plan.id);
+        errors.push(error);
+      }
+    }
+    for (const milestone of this.createdMilestones) {
+      try {
+        await milestone.api.plans.archiveMilestone(milestone.id);
+      }
+      catch (error) {
+        failedMilestoneIds.push(milestone.id);
         errors.push(error);
       }
     }
@@ -132,8 +203,17 @@ export class TestSeedSteps extends TestContext {
         errors.push(error);
       }
     }
+    for (const module of this.createdModules) {
+      try {
+        await module.api.structure.archiveModule(module.id);
+      }
+      catch (error) {
+        failedModuleIds.push(module.id);
+        errors.push(error);
+      }
+    }
     if (errors.length > 0) {
-      throw new AggregateError(errors, `teardown failed: could not archive Test ids [${failedIds.join(', ')}] or close plan ids [${failedPlanIds.join(', ')}]`);
+      throw new AggregateError(errors, `teardown failed: could not archive Test ids [${failedIds.join(', ')}], close plan ids [${failedPlanIds.join(', ')}], archive milestone ids [${failedMilestoneIds.join(', ')}] or archive module ids [${failedModuleIds.join(', ')}]`);
     }
   }
 }
