@@ -171,6 +171,13 @@ export class TestsApi extends ApiBase {
   }
 
   @step
+  async renameTest(args: { testId: string, title: string }): Promise<[APIResponse, RenameTestResponse]> {
+    const [response, body] = await this.patchTitle<RenameTestResponse>(args);
+    expect(response.status()).toBe(200);
+    return [response, body];
+  }
+
+  @step
   async searchTests(args: { title: string, projectId: string }): Promise<[APIResponse, SearchTestsResponse]> {
     const [response, body] = await this.apiGET<SearchTestsResponse>('/v1/tests/search', {
       params: { query: args.title, project_id: args.projectId },

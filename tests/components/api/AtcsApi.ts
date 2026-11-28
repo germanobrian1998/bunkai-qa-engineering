@@ -1,5 +1,5 @@
 import type { APIResponse } from '@playwright/test';
-import type { CreateAtcRequest, CreateAtcResponse, SearchAtcsResponse } from '@schemas/tests.types';
+import type { AtcUsageReport, CreateAtcRequest, CreateAtcResponse, SearchAtcsResponse } from '@schemas/tests.types';
 import type { TestContextOptions } from '@TestContext';
 
 import { randomUUID } from 'node:crypto';
@@ -29,6 +29,13 @@ export class AtcsApi extends ApiBase {
     const [response, body] = await this.apiGET<SearchAtcsResponse>('/v1/atcs/search', {
       params: { project_id: args.projectId, query: args.query, limit: '50' },
     });
+    return [response, body];
+  }
+
+  @step
+  async readAtcUsage(atcId: string): Promise<[APIResponse, AtcUsageReport]> {
+    const [response, body] = await this.apiGET<AtcUsageReport>(`/v1/atcs/${atcId}/usage`);
+    expect(response.status()).toBe(200);
     return [response, body];
   }
 }

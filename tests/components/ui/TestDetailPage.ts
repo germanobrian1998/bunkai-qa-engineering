@@ -1,5 +1,5 @@
 import type { Locator, Request } from '@playwright/test';
-import type { RenameTestResponse } from '@schemas/tests.types';
+import type { RenameTestResponse, RestoreTestResponse } from '@schemas/tests.types';
 import type { TestContextOptions } from '@TestContext';
 
 import { ACTIVE_WORKSPACE_COOKIE } from '@data/constants';
@@ -115,8 +115,20 @@ export class TestDetailPage extends UiBase {
   async expectTitleInExplorer(args: { testId: string, title: string }): Promise<void> {
     await expect(
       this.page.getByTestId(`explorer-test-${args.testId}`),
-      'the explorer lists the Test under its new title',
+      'the explorer lists the Test under the expected title',
     ).toContainText(args.title, { timeout: CONTENT_TIMEOUT_MS });
+  }
+
+  @step
+  async expectExplorerRowAbsent(args: { testId: string, listedTestId: string }): Promise<void> {
+    await expect(
+      this.page.getByTestId(`explorer-test-${args.listedTestId}`),
+      'the explorer has loaded its Tests: a live Test of the same project is listed',
+    ).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
+    await expect(
+      this.page.getByTestId(`explorer-test-${args.testId}`),
+      'the explorer does not list the archived Test',
+    ).toHaveCount(0);
   }
 
   @atc('BK-2140')
@@ -159,5 +171,45 @@ export class TestDetailPage extends UiBase {
     await expect(this.page.getByTestId('test-archived-banner'), 'the archived banner is shown').toBeVisible();
     await expect(this.page.getByTestId('test-archived-badge'), 'the archived badge is shown').toBeVisible();
     await expect(this.page.getByTestId('test-detail-restore'), 'the banner offers Restore').toBeVisible();
+  }
+
+  @atc('BK-2152')
+  async restoreFromBanner(args: { chainLength: number }): Promise<void> {
+    const urlPattern = /\/api\/v1\/tests\/[0-9a-f-]+\/restore$/;
+    const restoreButton = this.page.getByTestId('test-detail-restore');
+    let requests = 0;
+    const onRequest = (request: Request): void => {
+      if (request.method() === 'POST' && urlPattern.test(request.url())) {
+        requests += 1;
+      }
+    };
+    this.page.on('request', onRequest);
+    try {
+      const { method, status, responseBody } = await this.interceptResponse<unknown, RestoreTestResponse>({
+        urlPattern,
+        timeout: CONTENT_TIMEOUT_MS * 2,
+        action: async () => {
+          await expect(async () => {
+            if (requests === 0 && await restoreButton.count() > 0 && await restoreButton.isEnabled()) {
+              await restoreButton.click({ timeout: 2_000 });
+            }
+            expect(requests, 'the Restore click reached the page handler').toBeGreaterThan(0);
+          }).toPass({ timeout: CONTENT_TIMEOUT_MS });
+        },
+      });
+      expect(method, 'the banner restore sends a POST').toBe('POST');
+      expect(status, 'the restore is accepted').toBe(200);
+      expect(responseBody?.test.changed, 'the restore reports a change').toBe(true);
+      expect(responseBody?.test.archived_at, 'the restored Test is no longer archived').toBeNull();
+    }
+    finally {
+      this.page.off('request', onRequest);
+    }
+    await expect(this.page.getByTestId('test-archived-banner'), 'the archived banner is gone').toBeHidden({ timeout: CONTENT_TIMEOUT_MS });
+    expect(requests, 'exactly one restore request was sent').toBe(1);
+    await expect(this.page.getByTestId('start-run-button'), 'Start Run is offered again').toBeVisible();
+    await expect(this.page.getByTestId('test-detail-rename'), 'rename is offered again').toBeVisible();
+    await expect(this.page.getByTestId('test-tag-editor-open'), 'the tag editor is offered again').toBeVisible();
+    await expect(this.page.getByTestId(REORDER_HANDLE), 'one reorder handle is offered per chain step').toHaveCount(args.chainLength);
   }
 }

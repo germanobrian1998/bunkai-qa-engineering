@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-28T15:17:30.182Z",
+  "generatedAt": "2026-11-28T19:24:30.084Z",
   "components": {
     "api": [
       {
@@ -149,52 +149,52 @@
           {
             "id": "BK-2146",
             "method": "listTagFilterWithoutArchived",
-            "line": 398
+            "line": 405
           },
           {
             "id": "BK-2153",
             "method": "keepRecordsAcrossArchiveAndRestore",
-            "line": 379
+            "line": 386
           },
           {
             "id": "BK-2156",
             "method": "refuseBlankTitle",
-            "line": 264
+            "line": 271
           },
           {
             "id": "BK-2161",
             "method": "refuseWriteOnArchivedTest",
-            "line": 307
+            "line": 314
           },
           {
             "id": "BK-2163",
             "method": "refuseWriteByViewer",
-            "line": 318
+            "line": 325
           },
           {
             "id": "BK-2164",
             "method": "hideTestFromNonMember",
-            "line": 326
+            "line": 333
           },
           {
             "id": "BK-2165",
             "method": "refuseStaleVersionRename",
-            "line": 344
+            "line": 351
           },
           {
             "id": "BK-2167",
             "method": "applyTitleLengthBoundaries",
-            "line": 280
+            "line": 287
           },
           {
             "id": "BK-2171",
             "method": "archiveAgainKeepsFirstArchive",
-            "line": 358
+            "line": 365
           },
           {
             "id": "BK-2172",
             "method": "restoreLiveTestChangesNothing",
-            "line": 368
+            "line": 375
           }
         ]
       },
@@ -315,12 +315,17 @@
           {
             "id": "BK-2140",
             "method": "renameFromHeader",
-            "line": 122
+            "line": 134
           },
           {
             "id": "BK-2144",
             "method": "archiveFromTestPage",
-            "line": 138
+            "line": 150
+          },
+          {
+            "id": "BK-2152",
+            "method": "restoreFromBanner",
+            "line": 176
           }
         ]
       },
@@ -368,6 +373,14 @@
       ]
     },
     {
+      "name": "OfferSurfaceSteps",
+      "file": "OfferSurfaceSteps.ts",
+      "relativePath": "tests/components/steps/OfferSurfaceSteps.ts",
+      "methods": [
+        "readOffers"
+      ]
+    },
+    {
       "name": "RunFixtureSteps",
       "file": "RunFixtureSteps.ts",
       "relativePath": "tests/components/steps/RunFixtureSteps.ts",
@@ -411,9 +424,9 @@
   ],
   "summary": {
     "totalComponents": 19,
-    "totalATCs": 40,
+    "totalATCs": 41,
     "apiComponents": 12,
     "uiComponents": 7,
-    "stepsModules": 5
+    "stepsModules": 6
   }
 }
