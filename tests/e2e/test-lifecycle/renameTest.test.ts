@@ -41,7 +41,7 @@ test.describe('BK-596: rename a Test from its page', () => {
   });
 
   test(
-    'BK-2140: should keep the chain, step ids and tags and show the new name on the Test page, the Tests list, the explorer and search when a member renames a Test from its page',
+    'BK-2140: should show the new name on the Test header, Tests list, explorer and search and raise the version by one keeping chain, step ids and tags after a rename by a member',
     { tag: ['@critical', '@smoke', '@regression'] },
     async ({ test: kata }) => {
       test.slow();

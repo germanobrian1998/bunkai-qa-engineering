@@ -1,4 +1,4 @@
-import type { Request } from '@playwright/test';
+import type { Locator, Request } from '@playwright/test';
 import type { RenameTestResponse } from '@schemas/tests.types';
 import type { TestContextOptions } from '@TestContext';
 
@@ -24,6 +24,15 @@ export class TestDetailPage extends UiBase {
   private async navigate(args: { projectSlug: string, testId: string, workspaceId: string }): Promise<void> {
     await this.page.context().addCookies([activeWorkspaceCookie({ name: ACTIVE_WORKSPACE_COOKIE, workspaceId: args.workspaceId, hostUrl: this.baseUrl })]);
     await this.page.goto(this.buildUrl(`/projects/${args.projectSlug}/tests/${args.testId}`), { waitUntil: 'commit' });
+  }
+
+  private async openByClick(args: { trigger: Locator, opened: Locator }): Promise<void> {
+    await expect(async () => {
+      if (!(await args.opened.isVisible())) {
+        await args.trigger.click();
+      }
+      await expect(args.opened).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: CONTENT_TIMEOUT_MS });
   }
 
   @step
@@ -78,7 +87,7 @@ export class TestDetailPage extends UiBase {
     };
     this.page.on('request', onRequest);
     try {
-      await this.page.getByTestId('test-detail-rename').click();
+      await this.openByClick({ trigger: this.page.getByTestId('test-detail-rename'), opened: this.page.getByTestId('test-rename-input') });
       await this.page.getByTestId('test-rename-input').fill('');
       await this.page.getByTestId('test-rename-save').click();
       await expect(this.page.getByTestId('test-rename-error')).toHaveText(args.message);
@@ -113,7 +122,7 @@ export class TestDetailPage extends UiBase {
   @atc('BK-2140')
   async renameFromHeader(args: { title: string }): Promise<void> {
     const { title } = args;
-    await this.page.getByTestId('test-detail-rename').click();
+    await this.openByClick({ trigger: this.page.getByTestId('test-detail-rename'), opened: this.page.getByTestId('test-rename-input') });
     await this.page.getByTestId('test-rename-input').fill(title);
     const { method, status, responseBody } = await this.interceptResponse<{ title: string }, RenameTestResponse>({
       urlPattern: /\/api\/v1\/tests\/[0-9a-f-]+$/,
@@ -129,8 +138,8 @@ export class TestDetailPage extends UiBase {
   @atc('BK-2144')
   async archiveFromTestPage(args: { title: string, runCount: number }): Promise<void> {
     const { title, runCount } = args;
-    await this.page.getByTestId('test-detail-archive').click();
     const dialog = this.page.getByTestId('archive-test-dialog');
+    await this.openByClick({ trigger: this.page.getByTestId('test-detail-archive'), opened: dialog });
     await expect(dialog, 'the confirmation names the Test').toContainText(title);
     await expect(dialog, 'the confirmation states that archiving is reversible').toContainText(/reversible/i);
     await expect(

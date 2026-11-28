@@ -40,7 +40,7 @@ test.describe('BK-596: archive a Test from its page', () => {
   });
 
   test(
-    'BK-2144: should archive the Test and keep its Runs readable once a member confirms the archive dialog given a live Test with 2 finished Runs',
+    'BK-2144: should archive after a confirmation naming the Test, its reversibility and its Run count, then show the restore hint',
     { tag: ['@critical', '@smoke', '@regression'] },
     async ({ test: kata }) => {
       const { api, arena } = member;
@@ -70,7 +70,7 @@ test.describe('BK-596: archive a Test from its page', () => {
   );
 
   test(
-    'BK-2158: should offer no Start Run and refuse POST /runs with 409 test_archived when a member reaches an archived Test that was never run',
+    'BK-2158: should offer no Start Run and refuse POST /runs with 409 test_archived given an archived Test',
     { tag: ['@critical', '@regression'] },
     async ({ test: kata }) => {
       test.slow();
