@@ -33,7 +33,7 @@ async holdRunReadsAfterArchive(args: { baseline: RunReadsBaseline, scope: RunRea
 
 ## 4. Assertions Split
 ### Fixed (inside ATC)
-The module-scoped report (totals and every row; not the project-wide scope flags), the workspace index rows of the Test and the comparison of the latest Run equal their baselines; the workspace run count has not dropped below its baseline; the Run still resolves with 200.
+The module-scoped report (totals and every row; not the project-wide scope flags), the workspace index rows of the Test and the comparison of the latest Run equal their baselines; the workspace run count has not dropped below its baseline (a floor on shared workspace state; the per-Test row equality of the report and of the workspace runs index carries the run-integrity claim); the Run still resolves with 200.
 ### Test-level (in test file)
 Preconditions that keep the equality from being empty: the report lists exactly the 2 Run ids of the Test history (so the module scope isolates the data), `totals.passed` is 2, the workspace index rows of the Test are exactly those 2 Run ids, `report.scope.has_runs` is true (the scope is project-wide, so it is asserted only here), and the comparison state is `compared` (the latest Run has a previous Run). The archive (204) is the stimulus.
 
@@ -42,7 +42,7 @@ Preconditions that keep the equality from being empty: the report lists exactly 
 |----|-----------------|---------------|
 | AC-04 4.3 | EP (single partition: Test with finished Runs) | 1 |
 
-Reduction: none. Isolation: the report is scoped by `module_id` to a module generated for this test, so its totals and rows can only move because of this test (the project and the workspace are shared with other files and sessions). The workspace runs index has no module or Test filter, so it is read with `project_id` and every page, and only the rows of the Test are compared; paging stops at the Test creation time (the index is keyset-ordered `started_at desc`); `workspace_run_count` is workspace-wide shared state, so it is asserted as a floor (runs never decrease), not compared for equality.
+Reduction: none. Isolation: the report is scoped by `module_id` to a module generated for this test, so its totals and rows can only move because of this test (the project and the workspace are shared with other files and sessions). The workspace runs index has no module or Test filter, so it is read with `project_id` and every page, and only the rows of the Test are compared; paging stops at the Test creation time (the index is keyset-ordered `started_at desc`); `workspace_run_count` is workspace-wide shared state, so it is asserted as a floor (runs never decrease), not compared for equality; the per-Test row equality carries the run-integrity claim.
 
 ## 7. Dependencies
 - `TestSeedSteps.seedIsolatedModule` (module, story, criterion and ATC generated for the test, named `Kata isolated <id>`), `TestSeedSteps.seedWithHistory({ chainLength: 1, tags, finishedRuns: 2, plans: 0 })`, `TestsApi.listRunHistory`, `TestsApi.archiveTest`
