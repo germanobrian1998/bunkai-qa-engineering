@@ -14,7 +14,7 @@
 ```typescript
 @atc('BK-2140')
 async renameFromHeader(args: { title: string }): Promise<void> {
-  await this.page.getByTestId('test-detail-rename').click();
+  await this.openByClick({ trigger: this.page.getByTestId('test-detail-rename'), opened: this.page.getByTestId('test-rename-input') });
   await this.page.getByTestId('test-rename-input').fill(args.title);
   const { method, status, responseBody } = await this.interceptResponse<{ title: string }, RenameTestResponse>({
     urlPattern: /\/api\/v1\/tests\/[0-9a-f-]+$/,
@@ -29,7 +29,7 @@ async renameFromHeader(args: { title: string }): Promise<void> {
 ```
 
 ## 3B. UI Details
-Page: Test detail (`/projects/{slug}/tests/{testId}`), workspace set through the active-workspace cookie as `RunsReportPage` does. Entry `test-detail-rename`, form `test-rename-form`, input `test-rename-input`, save `test-rename-save`. Locators inline (one use). Response intercepted with `UiBase.interceptResponse` (it matches the URL only, so the ATC asserts the method). The header is read through `test-detail-title`, the testid of the header `<h1>`. `navigate` now goes to `waitUntil: 'commit'`; `goto` waits on `test-detail-rename` (30 s).
+Page: Test detail (`/projects/{slug}/tests/{testId}`), workspace set through the active-workspace cookie as `RunsReportPage` does. Entry `test-detail-rename`, form `test-rename-form`, input `test-rename-input`, save `test-rename-save`. Testids are used inline; some repeat within the component and are not yet extracted (follow-up). The form is opened through `openByClick`, which retries the click until the input is visible because the server-rendered page can lose a click made before hydration. Response intercepted with `UiBase.interceptResponse` (it matches the URL only, so the ATC asserts the method). The header is read through `test-detail-title`, the testid of the header `<h1>`. `navigate` now goes to `waitUntil: 'commit'`; `goto` waits on `test-detail-rename` (30 s).
 
 ## 4. Assertions Split
 ### Fixed (inside ATC)
