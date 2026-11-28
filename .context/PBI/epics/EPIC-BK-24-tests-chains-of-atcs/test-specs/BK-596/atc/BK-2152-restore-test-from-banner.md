@@ -82,7 +82,7 @@ Reduction: none. Restoring a live Test is BK-2172.
 
 ## 9. Checklist
 - [ ] restoreFromBanner naming
-- [ ] No params
+- [ ] One object param (`chainLength`)
 - [ ] void return
 - [ ] Fixed vs test-level split
 - [ ] Not duplicating an existing ATC

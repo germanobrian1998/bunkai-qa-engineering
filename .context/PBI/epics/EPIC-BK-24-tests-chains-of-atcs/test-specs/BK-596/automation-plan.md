@@ -109,7 +109,7 @@ Reused non-ATC members by composition: `RunFixtureSteps.openMemberSession`, `Run
 | ActivityApi | `snapshotTestEvents`, `listNewTestEvents` | `string[]` | Event ids of the feed filtered by action list and optional Test id; the delta read returns the ids not in a known snapshot. The only implementation, used by every spec |
 | AtcsApi | `createAtc`, `archiveAtc`, `readAtcUsage` | tuples | Seeding; usage read for BK-2152 |
 | StructureApi | `createModule`, `createUserStory`, `createAcceptanceCriterion`, `archiveModule` | tuples | Seeding scaffold |
-| SearchApi | `searchWorkspace`, `searchChatEntities` | tuples | Offer-surface reads for BK-2152 |
+| SearchApi | `searchPalette`, `searchChatEntities` | tuples | Offer-surface reads for BK-2152 |
 | PlansApi | `createPlan`, `addTests`, `closePlan`, `listPlanTests`, `createMilestone`, `attachPlans`, `archiveMilestone` | tuples | TC40 seeding, teardown and the "no membership row added or removed" read |
 | TestDetailPage | `goto`, `expectNoWriteControls`, `expectOffersWriteControls`, `expectFrozen`, `expectNoStartRun`, `expectRenameError`, `readRunHistoryRows` | `void` / data | Test-level UI assertions for ATC-owning TCs and the UI halves of integration TCs |
 
@@ -136,7 +136,7 @@ Generate per test through the product API (Test, ATCs, Runs, plans, milestone), 
 | BK-2144 | live Test with 2 finished Runs | Generate | Feasible | Real path: start, mark every step, finish |
 | BK-2147 | archived Test, 2 finished Runs, second has a failed step | Generate | Feasible | Mark one step `failed`, finish with verdict `failed` |
 | BK-2150 | Test with Runs under a story whose ATCs it chains | Generate | Feasible | Traceability needs the ATCs bound to acceptance criteria of the generated story (the ATC create body requires them) |
-| BK-2152 | archived Test | Generate | Feasible | Offer-surface UI locators unknown (see §8) |
+| BK-2152 | archived Test | Generate | Feasible | Offer surfaces resolved: explorer and Tests list in the UI, the rest through their APIs (see "PR5b deviations") |
 | BK-2158 | archived never-run Test, environment | Generate | Feasible | Environment from discovery |
 | BK-2185 | ATC chained by S1, S2 live and S3 archived; ATC live or archived | Generate | Feasible | Archive of an ATC is `DELETE /atcs/{id}` |
 | BK-2187 | Test with one running Run; Test with finished Runs only | Generate | Feasible | Start a Run and leave it running |
@@ -492,7 +492,7 @@ Dependency graph: WP1 -> WP2 -> WP3 -> WP4 -> {WP5 -> WP6} -> {WP7, WP8} -> {WP9
 - One `GET /v1/search` assertion covers workspace search and the command palette. Owner decision; lost: the rendered palette dropdown.
 - The chat mention picker is kept as an API check. `GET /v1/workspaces/{id}/chat/entities/search` is in the OpenAPI contract: `SearchApi.searchChatEntities` returns the generated `ChatEntitySearchResponse` (facade `@schemas/workspace.types`), with no hand-typed shape or runtime guard. The search returns at most 5 per entity type; the generated unique title keeps the Test inside that cap. Owner decision; lost: the rendered picker dropdown.
 - `OfferSurfaceSteps.readOffers` returns a named record (`surfaces: { palette, planPicker, tagFilter, chatPicker }` and `atcUsage: { count, archivedCount, listed }`); the spec compares it with literal expected objects before and after the restore, so a failure names the surface. Palette and tag reads use the workspace-scoped member session; the plan picker, the chat picker and the usage read use the plain member session.
-- The ATC usage is read on an isolated ATC from `seedIsolatedModule` (the shared scaffold ATC is chained by every Test of the arena), so the count is exactly 0 then 1 and `archivedCount` 1 then 0. The BK-2240 fix is live on staging (the pre-restore read passed on the first complete run), so no `knownDefect` wraps it. The pre-restore usage assertion sits last in the test so a regression there does not hide the other surfaces.
+- The ATC usage is read on an isolated ATC from `seedIsolatedModule` (the shared scaffold ATC is chained by every Test of the arena), so the count is exactly 0 then 1 and `archivedCount` 1 then 0. The BK-2240 fix is live on staging (the pre-restore read passed on the first complete run), so no `knownDefect` wraps it. The pre-restore usage check is an `expect.soft` next to the pre-restore surfaces assertion, so a regression there is reported without stopping the test.
 - The explorer absence check is not empty by construction: `TestDetailPage.expectExplorerRowAbsent` first waits for a second, live Test of the project (seeded on the shared ATC so it does not change the isolated usage count) to be listed, then asserts the archived row is absent. After the restore, `expectTitleInExplorer` asserts the row is back. Its message was reworded from "new title" to "expected title" because BK-2152 reuses it without a rename (small change to merged PR5a code).
 - The Tests list row is checked through the unique tag (`filterByTag` plus `expectFilteredRows`: exactly this Test), the same bounded read BK-2140 uses.
 - `TestsApi.renameTest` was added (title only; `X-If-Match` is not needed here), asserting 200. The rename back is kept for this TC and the final title is read.
