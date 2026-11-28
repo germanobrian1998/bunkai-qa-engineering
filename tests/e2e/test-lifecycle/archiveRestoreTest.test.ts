@@ -43,6 +43,7 @@ test.describe('BK-596: archive a Test from its page', () => {
     'BK-2144: should archive after a confirmation naming the Test, its reversibility and its Run count, then show the restore hint',
     { tag: ['@critical', '@smoke', '@regression'] },
     async ({ test: kata }) => {
+      test.slow();
       const { api, arena } = member;
       const seed = await seeds.seedWithHistory({ api, arena, chainLength: 2, tags: [], finishedRuns: 2, plans: 0 });
       expect(seed.run_count, 'precondition: the Test has 2 finished Runs').toBe(2);

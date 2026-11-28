@@ -29,7 +29,7 @@ export class TestDetailPage extends UiBase {
   private async openByClick(args: { trigger: Locator, opened: Locator }): Promise<void> {
     await expect(async () => {
       if (!(await args.opened.isVisible())) {
-        await args.trigger.click();
+        await args.trigger.click({ timeout: 2_000 });
       }
       await expect(args.opened).toBeVisible({ timeout: 2_000 });
     }).toPass({ timeout: CONTENT_TIMEOUT_MS });
