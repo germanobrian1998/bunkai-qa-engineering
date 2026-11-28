@@ -36,6 +36,8 @@ Status 409, error code `conflict`, reason `test_archived`.
 ### Test-level (in test file)
 Positive control on the live Test (`TestDetailPage.expectStartRunOffered`: `start-run-button` visible, which also proves the project has an environment); after the archive, `TestDetailPage.expectNoStartRun` (archived banner visible first, then no `start-run-button` or `start-run-env`); the workspace runs index has no row for the Test (`RunsApi.readWorkspaceRuns` with `since` the Test creation time, expected `[]`), the API proxy of "no runs row exists". The ATC is called through the `member.api` session, not `kata.api`.
 
+The TC's final "restore so the fixture is live again" step is dropped because each test seeds its own Test; the Test ends archived and is left as residue.
+
 ## 6. Technique-derivation check
 | AC | Technique fired | ATCs produced |
 |----|-----------------|---------------|

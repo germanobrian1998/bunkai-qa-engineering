@@ -33,7 +33,7 @@ async archiveFromTestPage(args: { title: string, runCount: number }): Promise<vo
 ```
 
 ## 3B. UI Details
-Dialog ids `archive-test-dialog`, `archive-test-runs`, `archive-test-confirm`; banner `test-archived-banner`, restore `test-detail-restore`. The copy is asserted by meaning (title, reversibility, count, kept and readable), not by the literal sentence (TC refinement note). The toast (sonner) has no role or testid, so it is read through `[data-sonner-toast]` filtered by the Test title; it proved stable on staging. The reversibility check is `/reversible/i` (`/reversible|restore/i` would also match unrelated copy) and the Run count is matched as a whole number with the kept-and-readable meaning (a bare digit would match `12`).
+Dialog ids `archive-test-dialog`, `archive-test-runs`, `archive-test-confirm`; banner `test-archived-banner`, restore `test-detail-restore`. The copy is asserted by meaning (title, reversibility, count, kept and readable), not by the literal sentence (TC refinement note). The toast (sonner) has no role or testid, so it is read through `[data-sonner-toast]` filtered by the Test title; it passed on one staging run (2026-11-28); if it flakes, drop only that assertion. The reversibility check is `/reversible/i` (`/reversible|restore/i` would also match unrelated copy) and the Run count is matched as a whole number with the kept-and-readable meaning (a bare digit would match `12`).
 
 ## 4. Assertions Split
 ### Fixed (inside ATC)
