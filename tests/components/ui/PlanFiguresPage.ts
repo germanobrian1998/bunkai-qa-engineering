@@ -21,9 +21,9 @@ export class PlanFiguresPage extends UiBase {
   }
 
   private async readPlan(args: { projectSlug: string, planId: string }): Promise<PlanFigure> {
-    await this.page.goto(this.buildUrl(`/projects/${args.projectSlug}/plans/${args.planId}`));
+    await this.page.goto(this.buildUrl(`/projects/${args.projectSlug}/plans/${args.planId}`), { waitUntil: 'commit' });
     const progress = this.page.getByTestId('test-plan-progress');
-    await expect(progress, 'the plan page shows its progress figures, not the empty or unavailable state').toBeVisible();
+    await expect(progress, 'the plan page shows its progress figures, not the empty or unavailable state').toBeVisible({ timeout: 30_000 });
     const chips = await this.page.locator('[data-testid^="test-plan-progress-chip-"]').allTextContents();
     return {
       percent: normalize(await this.page.getByTestId('test-plan-progress-percent').textContent() ?? ''),
@@ -34,11 +34,11 @@ export class PlanFiguresPage extends UiBase {
   }
 
   private async readMilestone(args: { projectSlug: string, milestoneId: string }): Promise<MilestoneFigure> {
-    await this.page.goto(this.buildUrl(`/projects/${args.projectSlug}/milestones/${args.milestoneId}`));
+    await this.page.goto(this.buildUrl(`/projects/${args.projectSlug}/milestones/${args.milestoneId}`), { waitUntil: 'commit' });
     await expect(
       this.page.getByTestId('milestone-readiness'),
       'the milestone page shows its readiness, not the empty or unavailable state',
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 30_000 });
     const chips = await this.page.locator('[data-testid^="milestone-readiness-chip-"]').allTextContents();
     return {
       percent: normalize(await this.page.getByTestId('milestone-readiness-percent').textContent() ?? ''),

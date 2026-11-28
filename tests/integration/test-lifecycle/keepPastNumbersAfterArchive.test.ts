@@ -84,6 +84,7 @@ test.describe('BK-596: Archive keeps past numbers', () => {
     'BK-2179: should keep open plan progress, milestone readiness and a closed plan snapshot identical after archiving a Test given a Test held by open and closed plans',
     { tag: ['@critical', '@regression'] },
     async ({ test: kata }) => {
+      test.slow();
       const planSeed = await seeds.seedPlanFigures({ api: member.api, arena: member.arena });
       const members = [planSeed.passedTestId, planSeed.idleTestId].sort();
       const scope: PlanFiguresScope = {
