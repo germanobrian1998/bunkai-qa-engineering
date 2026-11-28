@@ -70,7 +70,7 @@ export class TestSeedSteps extends TestContext {
     return read.test;
   }
 
-  private async ensureEnvironment(args: { api: ApiFixture, projectId: string }): Promise<string> {
+  async ensureEnvironment(args: { api: ApiFixture, projectId: string }): Promise<string> {
     const cached = this.environments.get(args.projectId);
     if (cached) {
       return cached;

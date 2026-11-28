@@ -178,6 +178,10 @@ export class TestLifecycleSteps extends TestContext {
     return { api: member, arena: { workspaceId, project, atcId } };
   }
 
+  async openScopedSession(args: { role: WorkspaceRole, workspaceId: string }): Promise<ApiFixture> {
+    return this.openRole(args.role, args.workspaceId);
+  }
+
   async openRoleSession(args: { role: WorkspaceRole }): Promise<ApiFixture> {
     return this.openRole(args.role);
   }

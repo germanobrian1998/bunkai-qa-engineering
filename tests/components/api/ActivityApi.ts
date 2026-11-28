@@ -83,8 +83,15 @@ export class ActivityApi extends ApiBase {
   async snapshotTestEvents(
     args: { workspaceId: string, actions: ActivityItem['action'][], testId?: string },
   ): Promise<string[]> {
+    const items = await this.collectTestActivity(args);
+    return items.map(item => item.id);
+  }
+
+  private async collectTestActivity(
+    args: { workspaceId: string, actions: ActivityItem['action'][], testId?: string },
+  ): Promise<ActivityItem[]> {
     const { workspaceId, actions, testId } = args;
-    const ids: string[] = [];
+    const items: ActivityItem[] = [];
     const floor = testId === undefined ? null : await this.readTestCreatedAt(testId);
     let cursor: string | null = null;
     for (let pageNumber = 0; pageNumber < ACTIVITY_PAGE_CAP; pageNumber++) {
@@ -93,14 +100,13 @@ export class ActivityApi extends ApiBase {
         : { workspace_id: workspaceId, limit: '50', cursor };
       const [response, page] = await this.apiGET<ActivityPage>('/v1/activity', { params });
       expect(response.status(), `GET /v1/activity for ${actions.join(', ')} events`).toBe(200);
-      ids.push(...page.items
-        .filter(item => actions.includes(item.action) && (testId === undefined || item.item.entity_id === testId))
-        .map(item => item.id));
+      items.push(...page.items
+        .filter(item => actions.includes(item.action) && (testId === undefined || item.item.entity_id === testId)));
       cursor = page.next_cursor;
       const oldest = page.items.at(-1);
       const coveredFloor = floor !== null && oldest !== undefined && Date.parse(oldest.created_at) < Date.parse(floor);
       if (cursor === null || floor === null || coveredFloor) {
-        return ids;
+        return items;
       }
     }
     throw new Error(`GET /v1/activity: the events of Test ${testId} were not covered within ${ACTIVITY_PAGE_CAP} pages`);
@@ -116,7 +122,15 @@ export class ActivityApi extends ApiBase {
   async listNewTestEvents(
     args: { workspaceId: string, actions: ActivityItem['action'][], testId?: string, knownIds: string[] },
   ): Promise<string[]> {
-    const ids = await this.snapshotTestEvents(args);
-    return ids.filter(id => !args.knownIds.includes(id));
+    const items = await this.listNewTestActivity(args);
+    return items.map(item => item.id);
+  }
+
+  @step
+  async listNewTestActivity(
+    args: { workspaceId: string, actions: ActivityItem['action'][], testId?: string, knownIds: string[] },
+  ): Promise<ActivityItem[]> {
+    const items = await this.collectTestActivity(args);
+    return items.filter(item => !args.knownIds.includes(item.id));
   }
 }

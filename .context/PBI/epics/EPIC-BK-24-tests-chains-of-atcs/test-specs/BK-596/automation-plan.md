@@ -229,10 +229,10 @@ Fixture: `{ test: kata }` with `test.use({ storageState: config.auth.roleStatePa
 
 #### Scenario 1: BK-2140 rename keeps chain, step ids and tags
 Test: "BK-2140: should show the new name on the Test header, Tests list, explorer and search and raise the version by one keeping chain, step ids and tags after a rename by a member"
-Preconditions: Member session; arena; `seedTest({ atcs: 2, tags: [tag, tagB] })`; baseline `getTest` (version, chain with step ids, tags).
+Preconditions: Member session; arena; `seedInState({ state: 'live', chainLength: 2, tags: [tag, tagB] })` (the returned read is the baseline: version, chain with step ids, tags).
 ATCs called: `kata.ui.testDetail.renameFromHeader({ title })`.
-Test-level assertions: `getTest` shows title, version = baseline + 1, same chain order, same step ids, same tags; `OfferSurfaceSteps.expectTitleOnSurfaces` (Tests list, explorer, workspace search by the unique title); `ActivityApi.snapshotTestEvents`, `ActivityApi.listNewTestEvents` gained one `test.renamed` carrying old and new name.
-Teardown: rename back via `renameTest`; Test archived in `afterAll`.
+Test-level assertions: `getTest` shows title, version = baseline + 1, same chain order, same step ids, same tags; `TestDetailPage.expectTitleInExplorer`, `TestsListPage.expectRowTitle` (after the unique-tag filter), workspace search through `SearchApi.searchPalette` on a scoped member session (new title found, old title gone) and `TestsApi.searchTests`; `ActivityApi.listNewTestActivity` returns one `test.renamed` carrying old and new title.
+Teardown: Test archived in `afterAll` (no rename back).
 
 ### File: tests/e2e/test-lifecycle/archiveRestoreTest.test.ts
 
@@ -240,9 +240,9 @@ Fixture: `{ test: kata }`, Member storage state.
 
 #### Scenario 1: BK-2144 archive after confirmation
 Test: "BK-2144: should archive after a confirmation naming the Test, its reversibility and its Run count, then show the restore hint"
-Preconditions: `seedTest({ atcs: 2, finishedRuns: 2 })`; baseline `test.archived` events.
+Preconditions: `seedWithHistory({ chainLength: 2, tags: [], finishedRuns: 2, plans: 0 })`; baseline `test.archived` events.
 ATCs called: `kata.ui.testDetail.archiveFromTestPage({ title, runCount: 2 })`.
-Test-level assertions: `getTest` has `archived_at` and `archived_by` equal to the Member id (`GET /me`); exactly one new `test.archived` event; banner offers Restore.
+Test-level assertions: `getTest` has `archived_at` and `archived_by` equal to the Member id (`GET /me`); exactly one new `test.archived` event with the Test title; run history still lists the 2 Runs.
 Teardown: `restoreTest` is unnecessary (archived Test is the end state); nothing else.
 
 #### Scenario 2: BK-2152 restore returns the Test to every offer surface
@@ -253,9 +253,9 @@ Test-level assertions: `OfferSurfaceSteps.readOffers` shows the Test on workspac
 
 #### Scenario 3: BK-2158 archived Test offers no Start Run and refuses POST /runs
 Test: "BK-2158: should offer no Start Run and refuse POST /runs with 409 test_archived given an archived Test"
-Preconditions: `seedTest({ atcs: 1 })` archived; environment from the arena; workspace runs baseline.
-ATCs called: `member.api.runs.refuseRunFromArchivedTest({ testId, environmentId })`.
-Test-level assertions: `kata.ui.testDetail.expectNoStartRun`; workspace runs index has no row for the Test.
+Preconditions: live never-run Test (`seedInState`), environment from `TestSeedSteps.ensureEnvironment`; the Test is archived mid-test after the live Start Run control.
+ATCs called: `api.runs.refuseRunFromArchivedTest({ testId, environmentId })`.
+Test-level assertions: `expectStartRunOffered` on the live Test, `expectNoStartRun` after the archive; workspace runs index has no row for the Test since its creation.
 
 ### File: tests/e2e/test-lifecycle/viewArchivedEvidence.test.ts
 
@@ -468,3 +468,17 @@ Dependency graph: WP1 -> WP2 -> WP3 -> WP4 -> {WP5 -> WP6} -> {WP7, WP8} -> {WP9
 - Gap kept visible: the closed plan `progress_snapshot` "byte-identical" check has no DB or API path; the frozen figures rendered by the closed plan page stand in for it (spec.md OQ1).
 - Residue per run in staging: BK-2178 leaves 1 archived module with its story, criterion and ATC and 2 finished Runs of an archived Test; BK-2179 leaves 2 closed plans, 1 archived milestone and 2 archived Tests (one with a finished Run).
 - Both tests carry `@critical` and `@regression` to match the TC priority.
+
+### PR5a deviations (BK-2140, BK-2144, BK-2158)
+
+- Owner decisions applied: one `GET /v1/search` assertion covers workspace search and the command palette (the product has one endpoint behind both); the PR is split, so BK-2152 (`restoreFromBanner`, `OfferSurfaceSteps`, `SearchApi.searchChatEntities`, `AtcsApi.readAtcUsage`) lands in PR5b and is not in this slice.
+- `TestDetailPage` already existed (PR2), so it is extended, not created. `navigate` now goes to `waitUntil: 'commit'` and the merged BK-2156 `expectBlankRenameBlocked` now opens the rename form through `openByClick` (two small merged-code changes); `goto` and `open` keep their content waits (`test-detail-rename`, `test-tabs`) with a 30 s timeout because commit returns before the page renders.
+- Explorer and Tests list are UI checks (`explorer-test-<id>`, `tests-list-open-<id>`), not `OfferSurfaceSteps.expectTitleOnSurfaces`: `TestDetailPage.expectTitleInExplorer` and `TestsListPage.expectRowTitle`. Workspace search is an API check (`SearchApi.searchPalette`); lost: the rendered palette dropdown.
+- Palette reads use a workspace-scoped session: `GET /v1/search` resolves the workspace from the `bk_active_ws` cookie, so `TestLifecycleSteps.openScopedSession({ role, workspaceId })` wraps the existing private `openRole`.
+- Chain order in BK-2140 is proved by `step_id` and `position` (the seed repeats one scaffold ATC, so `atc_id` order cannot tell steps apart); `atc_id`s are compared as well.
+- `ActivityApi.listNewTestActivity` returns the new items (not only ids) so the spec can check the `test.renamed` and `test.archived` payloads; `snapshotTestEvents` and `listNewTestEvents` are thin wrappers over a private collector (same 20-page cap, no behaviour change).
+- The Test page is server-rendered, so a first click made before hydration is lost. `TestDetailPage.openByClick` retries the click (2 s click timeout, 2 s visibility probe on the opened element, 30 s `toPass` cap) and clicks only while the opened element is not visible. It opens the rename form and the archive dialog in `renameFromHeader`, `archiveFromTestPage` and the merged BK-2156 `expectBlankRenameBlocked`.
+- The TC's final "restore so the fixture is live again" step (BK-2158) is dropped because each test seeds its own Test; the Test ends archived and is left as residue.
+- `renameFromHeader` asserts the PATCH method (the intercept helper matches the URL only) and reads the header through `test-detail-title`. `archiveFromTestPage` asserts `/reversible/i` and the Run count as a whole number with the kept-and-readable meaning, the DELETE method, the sonner toast through `[data-sonner-toast]` (passed on one staging run (2026-11-28); if it flakes, drop only that assertion), and the archived badge. `TestsApi.renameTest` was not added: nothing in PR5a needs it (BK-2152 does).
+- BK-2158 stays in the E2E file and adds a live-Test positive control (`expectStartRunOffered`) before the archive, so the absence check cannot pass on a page that never offers the button. `TestSeedSteps.ensureEnvironment` is public. `since` for the runs read is the Test creation time. `test.slow()` on BK-2140 and BK-2158 (several navigations) and on BK-2144 (2 seeded Runs plus page waits).
+- Residue per run in staging: 3 archived Tests (BK-2144 with 2 finished Runs); environment `kata-bk596-env` reused.

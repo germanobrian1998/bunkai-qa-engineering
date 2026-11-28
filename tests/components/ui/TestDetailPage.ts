@@ -1,13 +1,15 @@
-import type { Request } from '@playwright/test';
+import type { Locator, Request } from '@playwright/test';
+import type { RenameTestResponse } from '@schemas/tests.types';
 import type { TestContextOptions } from '@TestContext';
 
 import { ACTIVE_WORKSPACE_COOKIE } from '@data/constants';
 import { expect } from '@playwright/test';
 import { UiBase } from '@ui/UiBase';
 import { activeWorkspaceCookie } from '@utils/cookies';
-import { step } from '@utils/decorators';
+import { atc, step } from '@utils/decorators';
 
 const REORDER_HANDLE = /^test-reorder-handle-/;
+const CONTENT_TIMEOUT_MS = 30_000;
 
 const LIFECYCLE_CONTROLS = {
   live: ['test-detail-rename', 'test-detail-archive'],
@@ -21,19 +23,28 @@ export class TestDetailPage extends UiBase {
 
   private async navigate(args: { projectSlug: string, testId: string, workspaceId: string }): Promise<void> {
     await this.page.context().addCookies([activeWorkspaceCookie({ name: ACTIVE_WORKSPACE_COOKIE, workspaceId: args.workspaceId, hostUrl: this.baseUrl })]);
-    await this.page.goto(this.buildUrl(`/projects/${args.projectSlug}/tests/${args.testId}`));
+    await this.page.goto(this.buildUrl(`/projects/${args.projectSlug}/tests/${args.testId}`), { waitUntil: 'commit' });
+  }
+
+  private async openByClick(args: { trigger: Locator, opened: Locator }): Promise<void> {
+    await expect(async () => {
+      if (!(await args.opened.isVisible())) {
+        await args.trigger.click({ timeout: 2_000 });
+      }
+      await expect(args.opened).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: CONTENT_TIMEOUT_MS });
   }
 
   @step
   async goto(args: { projectSlug: string, testId: string, workspaceId: string }): Promise<void> {
     await this.navigate(args);
-    await expect(this.page.getByTestId('test-detail-rename')).toBeVisible();
+    await expect(this.page.getByTestId('test-detail-rename')).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
   }
 
   @step
   async open(args: { projectSlug: string, testId: string, workspaceId: string }): Promise<void> {
     await this.navigate(args);
-    await expect(this.page.getByTestId('test-tabs')).toBeVisible();
+    await expect(this.page.getByTestId('test-tabs')).toBeVisible({ timeout: CONTENT_TIMEOUT_MS });
   }
 
   @step
@@ -76,7 +87,7 @@ export class TestDetailPage extends UiBase {
     };
     this.page.on('request', onRequest);
     try {
-      await this.page.getByTestId('test-detail-rename').click();
+      await this.openByClick({ trigger: this.page.getByTestId('test-detail-rename'), opened: this.page.getByTestId('test-rename-input') });
       await this.page.getByTestId('test-rename-input').fill('');
       await this.page.getByTestId('test-rename-save').click();
       await expect(this.page.getByTestId('test-rename-error')).toHaveText(args.message);
@@ -85,5 +96,68 @@ export class TestDetailPage extends UiBase {
     finally {
       this.page.off('request', onRequest);
     }
+  }
+
+  @step
+  async expectStartRunOffered(): Promise<void> {
+    await expect(this.page.getByTestId('test-detail-rename'), 'the live Test page rendered its controls').toBeVisible();
+    await expect(this.page.getByTestId('start-run-button'), 'a live Test offers Start Run').toBeVisible();
+  }
+
+  @step
+  async expectNoStartRun(): Promise<void> {
+    await expect(this.page.getByTestId('test-archived-banner'), 'the archived Test page rendered its content').toBeVisible();
+    await expect(this.page.getByTestId('start-run-button'), 'an archived Test offers no Start Run').toHaveCount(0);
+    await expect(this.page.getByTestId('start-run-env')).toHaveCount(0);
+  }
+
+  @step
+  async expectTitleInExplorer(args: { testId: string, title: string }): Promise<void> {
+    await expect(
+      this.page.getByTestId(`explorer-test-${args.testId}`),
+      'the explorer lists the Test under its new title',
+    ).toContainText(args.title, { timeout: CONTENT_TIMEOUT_MS });
+  }
+
+  @atc('BK-2140')
+  async renameFromHeader(args: { title: string }): Promise<void> {
+    const { title } = args;
+    await this.openByClick({ trigger: this.page.getByTestId('test-detail-rename'), opened: this.page.getByTestId('test-rename-input') });
+    await this.page.getByTestId('test-rename-input').fill(title);
+    const { method, status, responseBody } = await this.interceptResponse<{ title: string }, RenameTestResponse>({
+      urlPattern: /\/api\/v1\/tests\/[0-9a-f-]+$/,
+      action: async () => this.page.getByTestId('test-rename-save').click(),
+    });
+    expect(method, 'the header rename sends a PATCH').toBe('PATCH');
+    expect(status, 'the rename is accepted').toBe(200);
+    expect(responseBody?.changed, 'the rename reports a change').toBe(true);
+    expect(responseBody?.test.title, 'the response carries the new title').toBe(title);
+    await expect(this.page.getByTestId('test-detail-title'), 'the header shows the new title').toHaveText(title);
+  }
+
+  @atc('BK-2144')
+  async archiveFromTestPage(args: { title: string, runCount: number }): Promise<void> {
+    const { title, runCount } = args;
+    const dialog = this.page.getByTestId('archive-test-dialog');
+    await this.openByClick({ trigger: this.page.getByTestId('test-detail-archive'), opened: dialog });
+    await expect(dialog, 'the confirmation names the Test').toContainText(title);
+    await expect(dialog, 'the confirmation states that archiving is reversible').toContainText(/reversible/i);
+    await expect(
+      this.page.getByTestId('archive-test-runs'),
+      'the confirmation states the Run count and that the Runs are kept and readable',
+    ).toHaveText(new RegExp(`^${runCount} Runs? ha(s|ve) been recorded\\..*\\bkept\\b.*\\breadable\\b`));
+    const { method, status } = await this.interceptResponse({
+      urlPattern: /\/api\/v1\/tests\/[0-9a-f-]+$/,
+      action: async () => this.page.getByTestId('archive-test-confirm').click(),
+    });
+    expect(method, 'the confirmation sends a DELETE').toBe('DELETE');
+    expect(status, 'the archive is accepted').toBe(204);
+    await expect(
+      this.page.locator('[data-sonner-toast]').filter({ hasText: title }),
+      'the toast explains how to restore',
+    ).toContainText(/restore/i);
+    await expect(this.page.getByTestId('test-archived-banner'), 'the archived banner is shown').toBeVisible();
+    await expect(this.page.getByTestId('test-archived-badge'), 'the archived badge is shown').toBeVisible();
+    await expect(this.page.getByTestId('test-detail-restore'), 'the banner offers Restore').toBeVisible();
   }
 }

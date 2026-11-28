@@ -54,4 +54,12 @@ export class TestsListPage extends UiBase {
       { message: 'the list shows exactly the Tests the tag filter returned, in the same order' },
     ).toEqual(expected);
   }
+
+  @step
+  async expectRowTitle(args: { testId: string, title: string }): Promise<void> {
+    await expect(
+      this.page.getByTestId(`tests-list-open-${args.testId}`),
+      'the Tests list row shows the Test under its new title',
+    ).toContainText(args.title);
+  }
 }
