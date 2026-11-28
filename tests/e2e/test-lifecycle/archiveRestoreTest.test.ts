@@ -129,12 +129,13 @@ test.describe('BK-596: archive and restore a Test from its page', () => {
 
       const before = await offers.readOffers({ session: api, scopedSession: scoped, offered });
       expect(before.surfaces, 'before the restore, no offer surface lists the archived Test').toEqual(noSurface);
+      expect.soft(before.atcUsage, 'before the restore, the ATC usage lists no Test and counts the archived one apart').toEqual({ count: 0, archivedCount: 1, listed: false });
 
       await kata.ui.testDetail.open(place);
       await kata.ui.testDetail.expectFrozen();
       await kata.ui.testDetail.expectExplorerRowAbsent({ testId: archived.id, listedTestId: listed.id });
 
-      await kata.ui.testDetail.restoreFromBanner();
+      await kata.ui.testDetail.restoreFromBanner({ chainLength: 2 });
 
       const [, restored] = await api.tests.getTest(archived.id);
       expect(restored.test.archived_at, 'the stored Test is live again').toBeNull();
@@ -154,8 +155,6 @@ test.describe('BK-596: archive and restore a Test from its page', () => {
       expect(renamedBack.changed, 'the restored Test accepts the rename back').toBe(true);
       const [, final] = await api.tests.getTest(archived.id);
       expect(final.test.title, 'the Test ends with its original title').toBe(archived.title);
-
-      expect(before.atcUsage, 'before the restore, the ATC usage lists no Test and counts the archived one apart').toEqual({ count: 0, archivedCount: 1, listed: false });
     },
   );
 });

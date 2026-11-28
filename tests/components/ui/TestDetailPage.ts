@@ -174,12 +174,13 @@ export class TestDetailPage extends UiBase {
   }
 
   @atc('BK-2152')
-  async restoreFromBanner(): Promise<void> {
+  async restoreFromBanner(args: { chainLength: number }): Promise<void> {
     const urlPattern = /\/api\/v1\/tests\/[0-9a-f-]+\/restore$/;
-    let requested = false;
+    const restoreButton = this.page.getByTestId('test-detail-restore');
+    let requests = 0;
     const onRequest = (request: Request): void => {
       if (request.method() === 'POST' && urlPattern.test(request.url())) {
-        requested = true;
+        requests += 1;
       }
     };
     this.page.on('request', onRequest);
@@ -189,10 +190,10 @@ export class TestDetailPage extends UiBase {
         timeout: CONTENT_TIMEOUT_MS * 2,
         action: async () => {
           await expect(async () => {
-            if (!requested) {
-              await this.page.getByTestId('test-detail-restore').click({ timeout: 2_000 });
+            if (requests === 0 && await restoreButton.count() > 0 && await restoreButton.isEnabled()) {
+              await restoreButton.click({ timeout: 2_000 });
             }
-            expect(requested, 'the Restore click reached the page handler').toBe(true);
+            expect(requests, 'the Restore click reached the page handler').toBeGreaterThan(0);
           }).toPass({ timeout: CONTENT_TIMEOUT_MS });
         },
       });
@@ -205,9 +206,10 @@ export class TestDetailPage extends UiBase {
       this.page.off('request', onRequest);
     }
     await expect(this.page.getByTestId('test-archived-banner'), 'the archived banner is gone').toBeHidden({ timeout: CONTENT_TIMEOUT_MS });
+    expect(requests, 'exactly one restore request was sent').toBe(1);
     await expect(this.page.getByTestId('start-run-button'), 'Start Run is offered again').toBeVisible();
     await expect(this.page.getByTestId('test-detail-rename'), 'rename is offered again').toBeVisible();
     await expect(this.page.getByTestId('test-tag-editor-open'), 'the tag editor is offered again').toBeVisible();
-    await expect(this.page.getByTestId(REORDER_HANDLE), 'the reorder handles are offered again').not.toHaveCount(0);
+    await expect(this.page.getByTestId(REORDER_HANDLE), 'one reorder handle is offered per chain step').toHaveCount(args.chainLength);
   }
 }

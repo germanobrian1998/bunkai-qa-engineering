@@ -162,6 +162,9 @@ export type ChatMember = components['schemas']['ChatMember'];
 /** Successful response (200) of GET /api/v1/workspaces/{id}/chat/roster */
 export type ListMembersResponse = paths['/api/v1/workspaces/{id}/chat/roster']['get']['responses']['200']['content']['application/json'];
 
+/** Successful response (200) of GET /api/v1/workspaces/{id}/chat/entities/search (at most 5 per entity type) */
+export type ChatEntitySearchResponse = paths['/api/v1/workspaces/{id}/chat/entities/search']['get']['responses']['200']['content']['application/json'];
+
 /** Body of the 200 answered by DELETE /api/v1/workspaces/{id}/members/{userId} */
 export type WorkspaceMemberRemoveResponse = components['schemas']['WorkspaceMemberRemoveResponse'];
 
