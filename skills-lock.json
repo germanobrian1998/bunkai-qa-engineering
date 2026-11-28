@@ -5,8 +5,8 @@
       "source": "cathrynlavery/diagram-design",
       "sourceType": "github",
       "skillPath": "skills/diagram-design/SKILL.md",
-      "computedHash": "f5f88973e37f06c0f73afed09341205aa7175c45e41dac1259868428e77bf6bb",
-      "commit": "0eeda75a708f419560d5e032693618bb9954f17b"
+      "computedHash": "d48c9ab592486435222c760c347b99e6e27d89b103aaf6b2808b2dec2b57d466",
+      "commit": "795eec47fd376e5dda0b9e056a49520060cd2f13"
     },
     "playwright-best-practices": {
       "source": "currents-dev/playwright-best-practices-skill",
