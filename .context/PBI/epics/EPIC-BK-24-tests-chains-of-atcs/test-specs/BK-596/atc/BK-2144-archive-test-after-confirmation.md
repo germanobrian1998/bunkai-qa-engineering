@@ -55,7 +55,7 @@ BVA: N/A (the zero-Run state is TC31, Deferred). Reduction: none.
 ## 8. Data Context
 | Precondition | Pattern | Source | Placement | Cleanup |
 |--------------|---------|--------|-----------|---------|
-| Test with 2 finished Runs | Generate (real path: start, mark, finish) | `POST /runs`, `/steps/{id}/mark`, `/finish` | test | none needed, the Test ends archived |
+| Test with 2 finished Runs | Generate (real path: start, mark, finish) | `POST /runs`, `/steps/{id}/mark`, `/finish` | test | none needed, the Test ends archived; the TC's final restore step is dropped because each test seeds its own Test |
 
 ## 9. Checklist
 - [ ] archiveFromTestPage naming
