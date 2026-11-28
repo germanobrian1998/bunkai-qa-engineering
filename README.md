@@ -590,7 +590,7 @@ The `.template/boilerplate.lock.json` file is committable: commit it so your tea
 
 ### GitHub Actions Workflows
 
-The workflows are the files in `.github/workflows/`; each one's `on:` block is its trigger (a PR to `main`, a cron, a manual dispatch). The suite workflows (smoke, sanity, regression) run the Playwright tags and patterns their names say, `build.yml` validates that the framework compiles, and the `pages*` workflows publish and maintain the decks site.
+The workflows are the files in `.github/workflows/`; each one's `on:` block is its trigger (a PR to `main`, a cron, a manual dispatch). The suite workflows (smoke, sanity, regression) run the Playwright tags and patterns their names say, `build.yml` validates that the framework compiles, `static.yml` publishes one check run per static check of the evidence contract that runs in CI (the list is `evidence.static` in `.agents/project.yaml`, each check run is named after its id, and the merge guard of `git:policy verify --merge` reads those names), and the `pages*` workflows publish and maintain the decks site.
 
 ### Environment Secrets
 
