@@ -8,6 +8,7 @@ import type { TestContextOptions } from '@TestContext';
 import { randomUUID } from 'node:crypto';
 
 import { ApiBase } from '@api/ApiBase';
+import { TEST_LIFECYCLE } from '@data/constants';
 import { expect } from '@playwright/test';
 import { atc, step } from '@utils/decorators';
 
@@ -266,6 +267,19 @@ export class RunsApi extends ApiBase {
       expect(error.error.code).toBe(expected.status === 422 ? 'validation_failed' : 'bad_request');
       expect(JSON.stringify(error.error)).not.toMatch(DATABASE_ERROR_TEXT);
     }
+    return [response, body];
+  }
+
+  @atc('BK-2158')
+  async refuseRunFromArchivedTest(args: { testId: string, environmentId: string }): Promise<[APIResponse, ErrorEnvelope]> {
+    const [response, body] = await this.apiPOST<ErrorEnvelope, StartRunBody>(
+      '/v1/runs',
+      { test_id: args.testId, environment_id: args.environmentId },
+      { headers: { 'Idempotency-Key': randomUUID() } },
+    );
+    expect(response.status(), 'starting a Run from an archived Test is a conflict').toBe(409);
+    expect(body.error.code).toBe('conflict');
+    expect(this.readReason(body), 'the refusal names the archived Test').toBe(TEST_LIFECYCLE.archivedReason);
     return [response, body];
   }
 

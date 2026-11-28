@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "generatedAt": "2026-11-28T14:24:03.631Z",
+  "generatedAt": "2026-11-28T14:54:00.609Z",
   "components": {
     "api": [
       {
@@ -100,27 +100,32 @@
           {
             "id": "BK-1974",
             "method": "readReportIsolatedToProject",
-            "line": 162
+            "line": 163
           },
           {
             "id": "BK-1975",
             "method": "readReportWithConsistentTotals",
-            "line": 189
+            "line": 190
           },
           {
             "id": "BK-1982",
             "method": "readReportWithScopedToken",
-            "line": 211
+            "line": 212
           },
           {
             "id": "BK-1983",
             "method": "probeReportParameters",
-            "line": 237
+            "line": 238
+          },
+          {
+            "id": "BK-2158",
+            "method": "refuseRunFromArchivedTest",
+            "line": 273
           },
           {
             "id": "BK-2178",
             "method": "holdRunReadsAfterArchive",
-            "line": 272
+            "line": 286
           }
         ]
       },
@@ -306,7 +311,18 @@
         "name": "TestDetailPage",
         "file": "TestDetailPage.ts",
         "relativePath": "tests/components/ui/TestDetailPage.ts",
-        "atcs": []
+        "atcs": [
+          {
+            "id": "BK-2140",
+            "method": "renameFromHeader",
+            "line": 113
+          },
+          {
+            "id": "BK-2144",
+            "method": "archiveFromTestPage",
+            "line": 129
+          }
+        ]
       },
       {
         "name": "TestsListPage",
@@ -374,6 +390,7 @@
         "openMemberArena",
         "openRoleSession",
         "openRoleTestDetail",
+        "openScopedSession",
         "release"
       ]
     },
@@ -382,6 +399,7 @@
       "file": "TestSeedSteps.ts",
       "relativePath": "tests/components/steps/TestSeedSteps.ts",
       "methods": [
+        "ensureEnvironment",
         "seedInState",
         "seedIsolatedModule",
         "seedPlanFigures",
@@ -393,7 +411,7 @@
   ],
   "summary": {
     "totalComponents": 19,
-    "totalATCs": 37,
+    "totalATCs": 40,
     "apiComponents": 12,
     "uiComponents": 7,
     "stepsModules": 5
