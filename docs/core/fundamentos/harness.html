@@ -655,6 +655,14 @@
         vigilan. <code>repo:check</code> es la pasada completa, la que conviene correr antes de
         abrir un PR.
       </p>
+      <p>
+        En CI, <code>.github/workflows/static.yml</code> corre en cada PR y en cada push a la rama
+        de producción. Lee de <code>evidence.static</code> en <code>.agents/project.yaml</code> los
+        checks cuyo <code>where</code> incluye <code>ci</code> y ejecuta cada uno en su propio job
+        con <code>bun scripts/edd.ts check &lt;id&gt;</code>. Cada check run lleva el nombre de su
+        id, que es el que busca la guarda de merge de
+        <code>bun run git:policy verify --merge</code>.
+      </p>
 
       <div class="callout warn" id="errores">
         <span class="callout-title">Errores comunes</span>
